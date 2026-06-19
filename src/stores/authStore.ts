@@ -2,6 +2,8 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import axios from 'axios'
 
+const BASE = import.meta.env.VITE_API_URL || ''
+
 interface User {
   id: string
   email: string
@@ -27,8 +29,8 @@ export const useAuthStore = create<AuthState>()(
       user:         null,
 
       login: async (email, password) => {
-        const { data } = await axios.post('/auth/login', { email, password })
-        const meRes = await axios.get('/auth/me', {
+        const { data } = await axios.post(`${BASE}/auth/login`, { email, password })
+        const meRes = await axios.get(`${BASE}/auth/me`, {
           headers: { Authorization: `Bearer ${data.access_token}` },
         })
         set({
@@ -42,7 +44,7 @@ export const useAuthStore = create<AuthState>()(
         const rt = get().refreshToken
         if (!rt) return false
         try {
-          const { data } = await axios.post('/auth/refresh', { refresh_token: rt })
+          const { data } = await axios.post(`${BASE}/auth/refresh`, { refresh_token: rt })
           set({ accessToken: data.access_token, refreshToken: data.refresh_token })
           return true
         } catch {

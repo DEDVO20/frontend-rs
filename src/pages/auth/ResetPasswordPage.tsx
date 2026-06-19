@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+const BASE = import.meta.env.VITE_API_URL || ''
 import { Button } from '@/components/ui/Button'
 import { CheckCircle2, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react'
 
@@ -44,7 +45,7 @@ export function ResetPasswordPage() {
     setSubmitting(true)
     setErrorMsg('')
     try {
-      await axios.post('/auth/reset-password', {
+      await axios.post(`${BASE}/auth/reset-password`, {
         access_token: accessToken,
         password,
       })

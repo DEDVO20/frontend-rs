@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
+const BASE = import.meta.env.VITE_API_URL || ''
 import { Button } from '@/components/ui/Button'
 import { CheckCircle2, AlertCircle, Eye, EyeOff, Lock, User } from 'lucide-react'
 
@@ -19,7 +20,7 @@ export function AcceptInvitationPage() {
 
   useEffect(() => {
     if (!token) { setStatus('invalid'); return }
-    axios.get(`/auth/invitations/verify?token=${token}`)
+    axios.get(`${BASE}/auth/invitations/verify?token=${token}`)
       .then(({ data }) => {
         if (data.valid) {
           setInvite({ email: data.email, companyName: data.companyName, fullName: data.fullName ?? '' })
@@ -40,7 +41,7 @@ export function AcceptInvitationPage() {
     setSubmitting(true)
     setErrorMsg('')
     try {
-      await axios.post('/auth/invitations/accept', {
+      await axios.post(`${BASE}/auth/invitations/accept`, {
         token,
         email: invite.email,
         password,
