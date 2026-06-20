@@ -5,10 +5,9 @@ import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { PageLoader } from '@/components/ui/Spinner'
-import { formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
-  Plus, Search, Eye, Trash2, X, MessageSquareMore,
+  Plus, Search, Eye, Trash2, X,
 } from 'lucide-react'
 
 function fmtDate(d: string) {
@@ -181,7 +180,6 @@ export function RequestsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filtered.map((r: any) => {
-                    const st = STATUS_MAP[r.status] ?? { label: r.status, color: 'gray' }
                     const pr = PRIORITY_MAP[r.priority] ?? { label: r.priority, color: 'gray' }
                     return (
                       <tr key={r.id} className="hover:bg-slate-50 transition-colors group">
@@ -268,7 +266,7 @@ export function RequestsPage() {
 
 // ── New Request Modal ─────────────────────────────────────────────────────────
 
-function NewRequestModal({ companies, onClose }: { companies: any[]; onClose: () => void }) {
+function NewRequestModal({ onClose }: { companies: any[]; onClose: () => void }) {
   const qc = useQueryClient()
   const [form, setForm] = useState({ request_type_id: '', title: '', description: '', priority: 'medium' })
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))

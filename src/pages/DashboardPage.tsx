@@ -2,11 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
 import { PageLoader } from '@/components/ui/Spinner'
-import { useAuthStore } from '@/stores/authStore'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2, CheckCircle2, FileText, BarChart3,
-  AlertTriangle, ChevronRight, Eye, RefreshCw, X,
+  AlertTriangle, ChevronRight, Eye, RefreshCw,
 } from 'lucide-react'
 
 function greeting() {
@@ -32,7 +31,6 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export function DashboardPage() {
-  const { user } = useAuthStore()
   const nav = useNavigate()
 
   const { data, isLoading, refetch } = useQuery({

@@ -8,7 +8,7 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { formatDate } from '@/lib/utils'
 import {
   Search, Upload, Download, Eye, Trash2, X, Grid3x3, List,
-  FileText, Clock, AlertCircle, Edit3, Send, Folder,
+  FileText, Edit3, Send, Folder,
 } from 'lucide-react'
 
 // ── helpers ────────────────────────────────────────────────────────────────────

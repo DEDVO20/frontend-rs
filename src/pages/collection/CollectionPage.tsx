@@ -761,7 +761,7 @@ function FileDropZone({
   )
 }
 
-function ResultPanel({ result, onClose }: { result: { imported: number; skipped: number; errors: string[] }; onClose: () => void }) {
+function ResultPanel({ result }: { result: { imported: number; skipped: number; errors: string[] }; onClose: () => void }) {
   return (
     <div className="space-y-4 text-center py-4">
       <div className="text-5xl mb-2">🎉</div>

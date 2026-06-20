@@ -7,6 +7,7 @@ const BASE = import.meta.env.VITE_API_URL || ''
 interface User {
   id: string
   email: string
+  full_name?: string
   role: string
   companyId: string | null
   modules: string[]

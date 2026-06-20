@@ -3,13 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
-import { Badge } from '@/components/ui/Badge'
 import { PageLoader } from '@/components/ui/Spinner'
 import { formatDate } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
   UserPlus, Search, Users, Shield, ShieldCheck, Mail,
-  MoreVertical, X, CheckCircle2, XCircle,
+  X, CheckCircle2, XCircle,
 } from 'lucide-react'
 
 const ROLE_LABELS: Record<string, { label: string; color: string; icon: any }> = {

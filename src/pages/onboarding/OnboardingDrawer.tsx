@@ -3,8 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import {
-  X, CheckCircle2, Clock, FileText, Shield, IdCard, Mail, Phone, MessageCircle,
-  Building2, Globe, MapPin, Briefcase, ExternalLink, AlertCircle, ChevronDown,
+  X, CheckCircle2, FileText, Shield, IdCard, Mail, Phone, MessageCircle,
+  Building2, Globe, MapPin, ExternalLink, AlertCircle, ChevronDown,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 

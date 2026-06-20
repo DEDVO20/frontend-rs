@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import {
-  Building2, ArrowLeft, CheckCircle2, Loader2, ChevronRight, ChevronLeft,
+  Building2, ArrowLeft, CheckCircle2, Loader2, ChevronLeft,
   FileText, Shield, ClipboardList, Users, Calculator, CreditCard, ShoppingBag,
   FileCheck2, IdCard, AlertCircle, ChevronDown, ChevronUp, Paperclip,
 } from 'lucide-react'
@@ -293,7 +293,7 @@ export function RegisterCompanyPage() {
 
           {/* Progress */}
           <div className="flex items-center justify-center gap-1 mb-6">
-            {STEPS.map((label, i) => (
+            {STEPS.map((_, i) => (
               <div key={i} className="flex items-center gap-1">
                 <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all ${
                   i < step ? 'bg-primary-500 text-white' :

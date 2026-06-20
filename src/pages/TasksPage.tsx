@@ -4,9 +4,8 @@ import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
-import { formatDate } from '@/lib/utils'
 import {
-  CheckCircle2, Circle, Clock, Plus, Search, Pencil, Trash2,
+  CheckCircle2, Circle, Clock, Plus, Search, Trash2,
   ChevronDown, X, AlertTriangle, Eye, Upload, FileText, Paperclip,
 } from 'lucide-react'
 import { toast } from 'sonner'

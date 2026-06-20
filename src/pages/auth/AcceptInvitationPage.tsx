@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 const BASE = import.meta.env.VITE_API_URL || ''
 import { Button } from '@/components/ui/Button'
-import { CheckCircle2, AlertCircle, Eye, EyeOff, Lock, User } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Eye, EyeOff, Lock } from 'lucide-react'
 
 export function AcceptInvitationPage() {
   const [params] = useSearchParams()

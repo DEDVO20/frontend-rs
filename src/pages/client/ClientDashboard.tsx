@@ -5,7 +5,7 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { useNavigate } from 'react-router-dom'
 import {
-  ClipboardList, FileText, CheckCircle2, AlertTriangle, Building2,
+  ClipboardList, FileText, AlertTriangle, Building2,
 } from 'lucide-react'
 
 function fmtDate(d: string) {

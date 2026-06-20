@@ -3,11 +3,7 @@ import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
-import { Building2, CheckCircle2 } from 'lucide-react'
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+import { CheckCircle2 } from 'lucide-react'
 
 export function MyCompanyPage() {
   const { user } = useAuthStore()

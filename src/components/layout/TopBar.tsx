@@ -1,5 +1,4 @@
 import { Bell, Search } from 'lucide-react'
-import { useAuthStore } from '@/stores/authStore'
 
 interface Props {
   title: string
@@ -7,8 +6,6 @@ interface Props {
 }
 
 export function TopBar({ title, subtitle }: Props) {
-  const { user } = useAuthStore()
-
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0">
       <div>

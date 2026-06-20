@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronRight, Menu, X, Phone, TrendingUp, Lock, Download } from 'lucide-react'
+import { ArrowRight, ChevronRight, Menu, X, Phone } from 'lucide-react'
 import { useState } from 'react'
 
 const NAV_LINKS = [

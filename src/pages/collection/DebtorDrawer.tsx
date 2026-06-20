@@ -6,8 +6,8 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { toast } from 'sonner'
 import {
-  X, Phone, Mail, MapPin, User, FileText, Handshake,
-  ClipboardList, History, Plus, CheckCircle2, Edit3, Calendar,
+  X, Phone, Mail, User, FileText, Handshake,
+  ClipboardList, History, Plus, Calendar,
 } from 'lucide-react'
 
 const CHANNEL_LABELS: Record<string, string> = {
