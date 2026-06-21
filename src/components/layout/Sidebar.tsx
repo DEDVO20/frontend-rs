@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 import {
   LayoutDashboard, Building2, UserCheck, ClipboardList,
-  FileText, MessageSquareMore, Landmark,
+  FileText, MessageSquareMore, Landmark, BarChart3,
   Users, Settings, Globe, LogOut, X,
 } from 'lucide-react'
 
@@ -38,7 +38,8 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Módulos',
     items: [
-      { to: '/app/collection',  label: 'Cartera',      icon: Landmark,        adminOnly: true, module: 'collection' },
+      { to: '/app/collection',    label: 'Cartera',        icon: Landmark,   adminOnly: true, module: 'collection' },
+      { to: '/app/dashboards-bi', label: 'Dashboards BI', icon: BarChart3 },
     ],
   },
   {

@@ -19,6 +19,7 @@ import { CompaniesPage } from '@/pages/CompaniesPage'
 import { ProfilesPage } from '@/pages/ProfilesPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { RequestsPage } from '@/pages/RequestsPage'
+import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff']
 
@@ -53,6 +54,7 @@ export const router = createBrowserRouter([
       { path: 'documents',    element: <DocumentsPage /> },
       { path: 'companies',    element: <CompaniesPage /> },
       { path: 'requests',     element: <RequestsPage /> },
+      { path: 'dashboards-bi', element: <DashboardsBIPage /> },
       { path: 'profiles',     element: <ProfilesPage /> },
       { path: 'audit',        element: <AuditPage /> },
       { path: 'settings',     element: <SettingsPage /> },
