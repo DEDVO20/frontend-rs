@@ -7,7 +7,7 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
 import {
-  Plus, BarChart3, ExternalLink, Trash2, Pencil, X, Eye, Maximize2,
+  Plus, BarChart3, ExternalLink, Trash2, Pencil, X, Maximize2,
 } from 'lucide-react'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff']
