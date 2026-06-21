@@ -145,7 +145,12 @@ function MasivoPanel({ companyId }: { companyId: string }) {
   const noContact = targets.length - contactable.length
 
   const applyTemplate = (tpl: any) => {
-    if (tpl) { setMessage(tpl.body ?? tpl.content ?? ''); setChannel(tpl.channel ?? 'whatsapp') }
+    if (tpl) {
+      setMessage(tpl.body ?? tpl.content ?? '')
+      setChannel(tpl.channel ?? 'whatsapp')
+    } else {
+      setMessage('')
+    }
   }
 
   const firstTarget = targets[0]
@@ -205,7 +210,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
             onChange={e => {
               setPlantilla(e.target.value)
               const tpl = (templates ?? []).find((t: any) => t.id === e.target.value)
-              if (tpl) applyTemplate(tpl)
+              applyTemplate(tpl ?? null)
             }}
             className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
             <option value="">Sin plantilla</option>
@@ -1229,7 +1234,7 @@ export function CollectionPage() {
           </div>
 
           {/* Panels */}
-          {tab === 'masivo'     && <MasivoPanel companyId={companyId} />}
+          {tab === 'masivo'     && <MasivoPanel key={companyId} companyId={companyId} />}
           {tab === 'plantillas' && <PlantillasPanel />}
 
           {/* Debtors table */}
@@ -1416,6 +1421,7 @@ export function CollectionPage() {
 
       {viewDebtorId && (
         <DebtorDrawer
+          key={viewDebtorId}
           id={viewDebtorId}
           onClose={() => setViewDebtorId(null)}
         />
