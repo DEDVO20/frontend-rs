@@ -20,6 +20,7 @@ import { ProfilesPage } from '@/pages/ProfilesPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { RequestsPage } from '@/pages/RequestsPage'
 import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
+import { NotFoundPage } from '@/pages/NotFoundPage'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff']
 
@@ -58,6 +59,8 @@ export const router = createBrowserRouter([
       { path: 'profiles',     element: <ProfilesPage /> },
       { path: 'audit',        element: <AuditPage /> },
       { path: 'settings',     element: <SettingsPage /> },
+      { path: '*',            element: <NotFoundPage /> },
     ],
   },
+  { path: '*', element: <NotFoundPage /> },
 ])
