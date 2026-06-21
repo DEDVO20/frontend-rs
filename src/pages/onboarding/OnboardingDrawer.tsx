@@ -7,6 +7,7 @@ import {
   Building2, Globe, MapPin, ExternalLink, AlertCircle, ChevronDown,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
+import { toast } from 'sonner'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -455,6 +456,28 @@ export function OnboardingDrawer({ id, onClose }: Props) {
                     <p className="text-xs text-green-600 flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Cambios guardados
                     </p>
+                  )}
+
+                  {/* Reenviar invitación */}
+                  {item?.status === 'approved' && (
+                    <div className="pt-3 border-t border-slate-100">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.post(`/api/onboarding/${id}/resend-invitation`)
+                            toast.success(`Invitación reenviada a ${item.rep_email}`)
+                          } catch (e: any) {
+                            toast.error(e.response?.data?.error ?? 'Error al reenviar')
+                          }
+                        }}
+                        className="w-full py-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Mail className="w-4 h-4" /> Reenviar invitación a {item.rep_email}
+                      </button>
+                      <p className="text-[10px] text-slate-400 mt-1 text-center">
+                        Invalida la invitación anterior y envía una nueva con token fresco (7 días).
+                      </p>
+                    </div>
                   )}
                 </div>
               </Section>

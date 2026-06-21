@@ -70,14 +70,13 @@ export function DashboardPage() {
       const openRequests = allRequests.filter((r: any) => r.status === 'open' || r.status === 'pending')
       const inProgress = allRequests.filter((r: any) => r.status === 'in_progress')
 
-      // Cobertura de servicios
+      // Cobertura de servicios (usando columnas boolean de la tabla companies)
       const modules = { facturacion: 0, contabilidad: 0, tesoreria: 0, personal: 0 }
       allCompanies.forEach((c: any) => {
-        const mods: string[] = c.modules ?? c.active_modules ?? []
-        if (mods.includes('billing') || mods.includes('facturacion')) modules.facturacion++
-        if (mods.includes('accounting') || mods.includes('contabilidad')) modules.contabilidad++
-        if (mods.includes('treasury') || mods.includes('tesoreria')) modules.tesoreria++
-        if (mods.includes('hr') || mods.includes('personal') || mods.includes('payroll')) modules.personal++
+        if (c.billing_module)    modules.facturacion++
+        if (c.accounting_module) modules.contabilidad++
+        if (c.treasury_module)   modules.tesoreria++
+        if (c.hr_module)         modules.personal++
       })
 
       return {
@@ -128,7 +127,7 @@ export function DashboardPage() {
                 {d.overdueTasks.length} tareas vencidas requieren atención inmediata.
               </p>
             </div>
-            <button onClick={() => nav('/tasks')} className="text-sm font-medium text-amber-700 hover:text-amber-900 whitespace-nowrap">
+            <button onClick={() => nav('/app/tasks')} className="text-sm font-medium text-amber-700 hover:text-amber-900 whitespace-nowrap">
               Revisar →
             </button>
           </div>
@@ -189,27 +188,28 @@ export function DashboardPage() {
                 <p className="text-sm font-bold text-slate-900 mt-0.5">Empresas clientes</p>
                 <p className="text-xs text-slate-400">{d.companyCount} empresas · {d.activeCompanies} activas</p>
               </div>
-              <button onClick={() => nav('/companies')} className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-800">
-                <RefreshCw className="w-3 h-3" /> Ver todas →
+              <button onClick={() => nav('/app/companies')} className="flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-800">
+                Ver todas →
               </button>
             </div>
             <div className="divide-y divide-slate-50">
-              <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-2 text-xs font-medium text-slate-400">
+              <div className="grid grid-cols-[1fr_70px_80px_120px] gap-2 px-4 py-2 text-xs font-medium text-slate-400">
                 <span>Empresa</span>
-                <span>Módulos</span>
-                <span>Estado</span>
-                <span>Creada</span>
+                <span className="text-center">Módulos</span>
+                <span className="text-center">Estado</span>
+                <span className="text-right">Creada</span>
               </div>
               {d.companies.slice(0, 6).map((c: any) => (
-                <div key={c.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3 items-center hover:bg-slate-50 transition-colors">
+                <div key={c.id} className="grid grid-cols-[1fr_70px_80px_120px] gap-2 px-4 py-3 items-center hover:bg-slate-50 transition-colors cursor-pointer"
+                  onClick={() => nav('/app/companies')}>
                   <p className="text-sm font-medium text-slate-900 truncate">{c.name ?? c.legal_name ?? '—'}</p>
-                  <span className="text-xs text-slate-400">{(c.modules ?? c.active_modules ?? []).length || '—'}</span>
-                  <StatusBadge status={c.status ?? c.onboarding_status ?? 'nueva'} />
-                  <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 text-center">
+                    {[c.billing_module, c.accounting_module, c.treasury_module, c.hr_module].filter(Boolean).length || '—'}
+                  </span>
+                  <span className="text-center"><StatusBadge status={c.status ?? c.onboarding_status ?? 'nueva'} /></span>
+                  <div className="flex items-center justify-end gap-2">
                     <span className="text-xs text-slate-400">{c.created_at ? fmtDate(c.created_at) : '—'}</span>
-                    <button onClick={() => nav(`/companies/${c.id}`)} className="text-slate-400 hover:text-primary-600">
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
+                    <Eye className="w-3.5 h-3.5 text-slate-300" />
                   </div>
                 </div>
               ))}
@@ -227,7 +227,7 @@ export function DashboardPage() {
                 <p className="text-sm font-bold text-slate-900 mt-0.5">Tareas urgentes</p>
                 <p className="text-xs text-slate-400">{d.pendingTasks.length} pendientes · {d.overdueTasks.length} vencidas</p>
               </div>
-              <button onClick={() => nav('/tasks')} className="text-xs font-medium text-primary-600 hover:text-primary-800">
+              <button onClick={() => nav('/app/tasks')} className="text-xs font-medium text-primary-600 hover:text-primary-800">
                 Ver todas →
               </button>
             </div>
@@ -259,7 +259,7 @@ export function DashboardPage() {
                 <p className="text-sm font-bold text-slate-900 mt-0.5">Documentos recientes</p>
                 <p className="text-xs text-slate-400">{d.totalDocs} documento{d.totalDocs !== 1 ? 's' : ''} cargados</p>
               </div>
-              <button onClick={() => nav('/documents')} className="text-xs font-medium text-primary-600 hover:text-primary-800">
+              <button onClick={() => nav('/app/documents')} className="text-xs font-medium text-primary-600 hover:text-primary-800">
                 Ver todos →
               </button>
             </div>
@@ -330,7 +330,7 @@ export function DashboardPage() {
                   <p className="text-sm font-bold text-slate-900 mt-0.5">Solicitudes pendientes</p>
                   <p className="text-xs text-slate-400">{d.openRequests.length} abierta{d.openRequests.length !== 1 ? 's' : ''} · {d.inProgress.length} en proceso</p>
                 </div>
-                <button onClick={() => nav('/requests')} className="text-xs font-medium text-primary-600 hover:text-primary-800">
+                <button onClick={() => nav('/app/requests')} className="text-xs font-medium text-primary-600 hover:text-primary-800">
                   Ver todas →
                 </button>
               </div>
