@@ -766,28 +766,87 @@ function FileDropZone({
   )
 }
 
-function ResultPanel({ result }: { result: { imported: number; skipped: number; errors: string[] }; onClose: () => void }) {
+function ResultPanel({ result }: { result: any }) {
+  const hasDebtInfo = result.newDebts !== undefined
   return (
     <div className="space-y-4 text-center py-4">
       <div className="text-5xl mb-2">🎉</div>
       <h4 className="text-lg font-bold text-slate-900">¡Importación completada!</h4>
-      <div className="grid grid-cols-3 gap-3 mt-4">
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-          <p className="text-2xl font-bold text-emerald-700">{result.imported}</p>
-          <p className="text-xs text-emerald-600 mt-0.5">Actualizados</p>
+
+      {hasDebtInfo ? (
+        <>
+          {/* Resumen deudores */}
+          <div className="grid grid-cols-3 gap-3 mt-4">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+              <p className="text-2xl font-bold text-emerald-700">{result.imported}</p>
+              <p className="text-[10px] text-emerald-600 font-medium uppercase">Deudores procesados</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <p className="text-2xl font-bold text-amber-700">{result.skipped}</p>
+              <p className="text-[10px] text-amber-600 font-medium uppercase">Saltados</p>
+            </div>
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+              <p className="text-2xl font-bold text-red-700">{result.errors?.length ?? 0}</p>
+              <p className="text-[10px] text-red-600 font-medium uppercase">Errores</p>
+            </div>
+          </div>
+
+          {/* Resumen facturas */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+              <p className="text-2xl font-bold text-blue-700">{result.newDebts ?? 0}</p>
+              <p className="text-[10px] text-blue-600 font-medium uppercase">Facturas nuevas</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+              <p className="text-2xl font-bold text-slate-700">{result.updatedDebts ?? 0}</p>
+              <p className="text-[10px] text-slate-500 font-medium uppercase">Facturas actualizadas</p>
+            </div>
+          </div>
+
+          {/* Resumen pagos detectados */}
+          {((result.paidDebts ?? 0) > 0 || (result.paidDebtors ?? 0) > 0) && (
+            <div className="bg-primary-50 border border-primary-200 rounded-xl p-4 text-left">
+              <p className="text-xs font-bold text-primary-700 uppercase tracking-wider mb-2">Pagos detectados</p>
+              <div className="flex gap-6">
+                {(result.paidDebts ?? 0) > 0 && (
+                  <div>
+                    <p className="text-lg font-bold text-primary-700">{result.paidDebts}</p>
+                    <p className="text-xs text-primary-600">facturas marcadas como pagadas</p>
+                  </div>
+                )}
+                {(result.paidDebtors ?? 0) > 0 && (
+                  <div>
+                    <p className="text-lg font-bold text-primary-700">{result.paidDebtors}</p>
+                    <p className="text-xs text-primary-600">deudores saldados completamente</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        /* Resumen simple (contactos import) */
+        <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+            <p className="text-2xl font-bold text-emerald-700">{result.updated ?? result.imported ?? 0}</p>
+            <p className="text-[10px] text-emerald-600 font-medium uppercase">Actualizados</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <p className="text-2xl font-bold text-amber-700">{result.notFound ?? result.skipped ?? 0}</p>
+            <p className="text-[10px] text-amber-600 font-medium uppercase">No encontrados</p>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+            <p className="text-2xl font-bold text-red-700">{result.errors?.length ?? 0}</p>
+            <p className="text-[10px] text-red-600 font-medium uppercase">Errores</p>
+          </div>
         </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-2xl font-bold text-amber-700">{result.skipped}</p>
-          <p className="text-xs text-amber-600 mt-0.5">Sin cambios</p>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <p className="text-2xl font-bold text-red-700">{result.errors?.length ?? 0}</p>
-          <p className="text-xs text-red-600 mt-0.5">Errores</p>
-        </div>
-      </div>
+      )}
+
       {result.errors?.length > 0 && (
         <div className="text-left mt-3 border border-red-200 rounded-xl p-3 bg-red-50 max-h-32 overflow-y-auto">
-          {result.errors.map((err, i) => <p key={i} className="text-xs text-red-600">• {err}</p>)}
+          {(Array.isArray(result.errors) ? result.errors : []).map((err: any, i: number) => (
+            <p key={i} className="text-xs text-red-600">• {typeof err === 'string' ? err : `Fila ${err.row}: ${err.reason}`}</p>
+          ))}
         </div>
       )}
     </div>
@@ -801,6 +860,8 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [file,      setFile]      = useState<File | null>(null)
   const [preview,   setPreview]   = useState<{ headers: string[]; rows: string[][] } | null>(null)
   const [importing, setImporting] = useState(false)
+  const [progress,  setProgress]  = useState(0)
+  const [progressMsg, setProgressMsg] = useState('')
   const [result,    setResult]    = useState<{ imported: number; skipped: number; errors: string[] } | null>(null)
 
   const steps = mode === 'siigo' ? SIIGO_STEPS : CONTACTOS_STEPS
@@ -831,24 +892,85 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const handleImportSiigo = async () => {
     if (!file) return
     setImporting(true)
+    setProgress(0)
+    setProgressMsg('Iniciando importación...')
+
     try {
       const fd = new FormData()
       fd.append('file', file)
       if (companyId) fd.append('company_id', companyId)
-      const { data: res } = await api.post('/api/collection/debtors/import', fd)
-      setResult(res); setStep(3); onDone()
+
+      const token = (await import('@/stores/authStore')).useAuthStore.getState().accessToken
+      const baseUrl = import.meta.env.VITE_API_URL || ''
+
+      const response = await fetch(`${baseUrl}/api/collection/debtors/import`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'text/event-stream',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: fd,
+      })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Error al importar' }))
+        throw new Error(err.error ?? 'Error al importar')
+      }
+
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let finalResult: any = null
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const events = buffer.split('\n\n')
+        buffer = events.pop() ?? ''
+
+        for (const event of events) {
+          const dataLine = event.split('\n').find(l => l.startsWith('data: '))
+          if (!dataLine) continue
+          const data = JSON.parse(dataLine.slice(6))
+
+          if (data.type === 'progress') {
+            setProgress(data.progress)
+            setProgressMsg(data.message)
+          } else if (data.type === 'done') {
+            finalResult = data
+            setProgress(100)
+            setProgressMsg('¡Importación completada!')
+          }
+        }
+      }
+
+      if (finalResult) {
+        await new Promise(r => setTimeout(r, 400))
+        setResult(finalResult)
+        setStep(3)
+        onDone()
+      }
     } catch (e: any) {
-      toast.error(e.response?.data?.error ?? 'Error al importar')
+      toast.error(e.message ?? 'Error al importar')
     } finally { setImporting(false) }
   }
 
   const handleImportContactos = async () => {
     if (!file) return
     setImporting(true)
+    setProgress(0)
+    setProgressMsg('Procesando archivo Excel...')
     try {
       const fd = new FormData()
       fd.append('file', file)
+      setProgress(30)
+      setProgressMsg('Buscando deudores por NIT...')
       const { data: res } = await api.post('/api/collection/contacts/import', fd)
+      setProgress(100)
+      setProgressMsg('¡Listo!')
+      await new Promise(r => setTimeout(r, 400))
       setResult(res); setStep(2); onDone()
     } catch (e: any) {
       toast.error(e.response?.data?.error ?? 'Error al importar contactos')
@@ -983,7 +1105,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               )}
 
               {/* Paso 3: resultado */}
-              {step === 3 && result && <ResultPanel result={result} onClose={onClose} />}
+              {step === 3 && result && <ResultPanel result={result} />}
             </>
           )}
 
@@ -1048,7 +1170,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               )}
 
               {/* Paso 2: resultado */}
-              {step === 2 && result && <ResultPanel result={result} onClose={onClose} />}
+              {step === 2 && result && <ResultPanel result={result} />}
             </>
           )}
         </div>
@@ -1066,7 +1188,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
             {done ? (
               <Button onClick={onClose}>Cerrar</Button>
             ) : (
-              <Button onClick={handleContinue} loading={importing} disabled={!canContinue()}>
+              <Button onClick={handleContinue} loading={importing} disabled={!canContinue() || importing}>
                 {(mode === 'siigo' && step === 2) || (mode === 'contactos' && step === 1)
                   ? 'Importar ahora'
                   : `Continuar → ${steps[step + 1]}`}
@@ -1074,6 +1196,22 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
             )}
           </div>
         </div>
+
+        {/* Barra de progreso */}
+        {importing && (
+          <div className="px-6 py-4 border-t border-slate-100 bg-slate-50">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-slate-700">{progressMsg}</p>
+              <span className="text-sm font-bold text-primary-600">{progress}%</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="h-full bg-primary-500 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

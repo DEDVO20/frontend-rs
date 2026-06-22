@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { PageLoader } from '@/components/ui/Spinner'
 import { toast } from 'sonner'
 import {
-  Plus, Search, Eye, Trash2, X,
+  Plus, Search, Eye, Trash2, X, Paperclip, FileText,
 } from 'lucide-react'
 
 function fmtDate(d: string) {
@@ -270,16 +270,37 @@ function NewRequestModal({ onClose }: { companies: any[]; onClose: () => void })
   const qc = useQueryClient()
   const [form, setForm] = useState({ request_type_id: '', title: '', description: '', priority: 'medium' })
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const [files, setFiles] = useState<File[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: types } = useQuery({
     queryKey: ['request-types'],
     queryFn: async () => { const { data } = await api.get('/api/requests/types'); return data },
   })
 
+  const addFiles = (newFiles: FileList | null) => {
+    if (!newFiles) return
+    setFiles(prev => [...prev, ...Array.from(newFiles)])
+  }
+
+  const removeFile = (idx: number) => setFiles(prev => prev.filter((_, i) => i !== idx))
+
   const createMut = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post('/api/requests', form)
-      return data
+      // 1. Crear solicitud
+      const { data: request } = await api.post('/api/requests', form)
+
+      // 2. Subir archivos adjuntos
+      for (const file of files) {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('title', `Adjunto: ${file.name}`)
+        fd.append('category', 'request_attachment')
+        fd.append('description', `Adjunto de solicitud: ${form.title}`)
+        await api.post('/api/documents/upload', fd).catch(() => {})
+      }
+
+      return request
     },
     onSuccess: () => { toast.success('Solicitud creada'); qc.invalidateQueries({ queryKey: ['requests'] }); onClose() },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error'),
@@ -325,6 +346,38 @@ function NewRequestModal({ onClose }: { companies: any[]; onClose: () => void })
                 <option value="urgent">Urgente</option>
               </select>
             </label>
+
+            {/* Archivos adjuntos */}
+            <div>
+              <span className="text-xs font-medium text-slate-500">Archivos adjuntos</span>
+              <input ref={fileRef} type="file" className="hidden" multiple
+                accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx,.csv"
+                onChange={e => { addFiles(e.target.files); e.target.value = '' }} />
+
+              {files.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {files.map((f, i) => (
+                    <div key={i} className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                      <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span className="text-xs text-slate-700 flex-1 truncate">{f.name}</span>
+                      <span className="text-[10px] text-slate-400 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                      <button onClick={() => removeFile(i)} className="text-slate-400 hover:text-red-500 shrink-0">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-slate-200 rounded-lg text-xs font-medium text-slate-500 hover:border-primary-300 hover:text-primary-600 transition-colors"
+              >
+                <Paperclip className="w-4 h-4" />
+                {files.length ? 'Agregar más archivos' : 'Adjuntar archivos (PDF, imágenes, Excel)'}
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
             <Button variant="secondary" onClick={onClose}>Cancelar</Button>
