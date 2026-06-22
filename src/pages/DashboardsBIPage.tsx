@@ -7,7 +7,7 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
 import {
-  Plus, BarChart3, ExternalLink, Trash2, Pencil, X, Maximize2,
+  Plus, BarChart3, ExternalLink, Trash2, Pencil, X,
 } from 'lucide-react'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff']
@@ -73,22 +73,17 @@ export function DashboardsBIPage() {
               {all.map((d: any) => (
                 <div key={d.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden group hover:shadow-md transition-shadow">
                   {/* Preview */}
-                  <div className="relative bg-slate-100 h-44 overflow-hidden">
-                    <iframe
-                      src={d.embed_url}
-                      className="w-full h-full pointer-events-none"
-                      title={d.title}
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <button
-                        onClick={() => setViewTarget(d)}
-                        className="px-4 py-2 bg-white rounded-lg text-sm font-medium text-slate-800 shadow-lg flex items-center gap-2 hover:bg-slate-50 transition-colors"
-                      >
-                        <Maximize2 className="w-4 h-4" /> Ver completo
-                      </button>
+                  <a href={d.embed_url} target="_blank" rel="noreferrer"
+                    className="relative bg-gradient-to-br from-slate-100 to-slate-50 h-44 flex flex-col items-center justify-center gap-3 cursor-pointer hover:from-primary-50 hover:to-primary-100 transition-colors">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                      d.tool === 'powerbi' ? 'bg-amber-100' : 'bg-blue-100'
+                    }`}>
+                      <BarChart3 className={`w-7 h-7 ${d.tool === 'powerbi' ? 'text-amber-600' : 'text-blue-600'}`} />
                     </div>
-                  </div>
+                    <span className="text-xs font-medium text-slate-500 group-hover:text-primary-600 flex items-center gap-1">
+                      <ExternalLink className="w-3 h-3" /> Abrir reporte
+                    </span>
+                  </a>
 
                   {/* Info */}
                   <div className="p-4">
@@ -245,36 +240,28 @@ function DashboardViewer({ dashboard, onClose }: { dashboard: any; onClose: () =
   return (
     <>
       <div className="fixed inset-0 bg-black/80 z-50" onClick={onClose} />
-      <div className="fixed inset-4 z-50 bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50 shrink-0">
-          <div className="flex items-center gap-3">
-            <BarChart3 className="w-5 h-5 text-primary-500" />
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">{dashboard.title}</h2>
-              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                dashboard.tool === 'powerbi' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
-              }`}>
-                {dashboard.tool === 'powerbi' ? 'Power BI' : 'Looker'}
-              </span>
-            </div>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-8">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 text-center">
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${
+            dashboard.tool === 'powerbi' ? 'bg-amber-100' : 'bg-blue-100'
+          }`}>
+            <BarChart3 className={`w-8 h-8 ${dashboard.tool === 'powerbi' ? 'text-amber-600' : 'text-blue-600'}`} />
           </div>
-          <div className="flex items-center gap-2">
-            <a href={dashboard.embed_url} target="_blank" rel="noreferrer"
-              className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-              <ExternalLink className="w-4 h-4" />
+          <h2 className="text-lg font-bold text-slate-900">{dashboard.title}</h2>
+          <p className="text-sm text-slate-400 mt-1">
+            {dashboard.tool === 'powerbi' ? 'Power BI' : 'Looker Studio'}
+          </p>
+          <p className="text-sm text-slate-500 mt-4">
+            Este reporte se abrirá en una nueva pestaña del navegador.
+          </p>
+          <div className="flex items-center justify-center gap-3 mt-6">
+            <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+            <a href={dashboard.embed_url} target="_blank" rel="noreferrer">
+              <Button>
+                <ExternalLink className="w-4 h-4" /> Abrir reporte
+              </Button>
             </a>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-200 text-slate-500 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
           </div>
-        </div>
-        <div className="flex-1">
-          <iframe
-            src={dashboard.embed_url}
-            className="w-full h-full border-0"
-            title={dashboard.title}
-            allowFullScreen
-          />
         </div>
       </div>
     </>
