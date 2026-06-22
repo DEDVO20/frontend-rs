@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { ConfirmProvider } from '../ui/ConfirmDialog'
 import { Menu } from 'lucide-react'
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
+    <ConfirmProvider>
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -47,5 +49,6 @@ export function AppLayout() {
         </main>
       </div>
     </div>
+    </ConfirmProvider>
   )
 }

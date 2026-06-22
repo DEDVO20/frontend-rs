@@ -5,6 +5,7 @@ import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { toast } from 'sonner'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import {
   Building2, Search, Plus, Eye, Pencil, Trash2, X,
   CheckCircle2, FileText, LayoutGrid, ListTodo, Activity,
@@ -283,6 +284,7 @@ const MODULE_ICONS: Record<string, string> = {
 
 function ModulesPanel({ companyId }: { companyId: string }) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
 
   const { data: allServices } = useQuery({
     queryKey: ['all-services'],
@@ -343,7 +345,15 @@ function ModulesPanel({ companyId }: { companyId: string }) {
                   <p className="text-xs text-slate-400 truncate">{s.description ?? '—'}</p>
                 </div>
                 <button
-                  onClick={() => toggleMut.mutate({ serviceId: s.id, enable: !enabled })}
+                  onClick={() => confirm({
+                    title: enabled ? `¿Desactivar "${s.name}"?` : `¿Activar "${s.name}"?`,
+                    description: enabled
+                      ? 'El cliente perderá acceso a este módulo.'
+                      : 'El cliente tendrá acceso a este módulo y podrá utilizarlo.',
+                    type: enabled ? 'warning' : 'info',
+                    confirmLabel: enabled ? 'Desactivar' : 'Activar',
+                    onConfirm: () => toggleMut.mutateAsync({ serviceId: s.id, enable: !enabled }),
+                  })}
                   disabled={toggleMut.isPending}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 ${
                     enabled ? 'bg-primary-600' : 'bg-slate-300'
