@@ -22,17 +22,17 @@ export function ResetPasswordPage() {
     const token = params.get('access_token')
     const type = params.get('type')
 
-    if (!token || type !== 'recovery') {
-      // Also check query params as fallback
-      const query = new URLSearchParams(window.location.search)
-      const qToken = query.get('access_token')
-      if (qToken) {
-        setAccessToken(qToken)
-      } else {
-        setStatus('invalid')
-      }
-    } else {
+    // Check query param ?token=xxx (Zavu flow)
+    const query = new URLSearchParams(window.location.search)
+    const qToken = query.get('token') ?? query.get('access_token')
+
+    if (qToken) {
+      setAccessToken(qToken)
+    } else if (token && type === 'recovery') {
+      // Supabase hash fragment flow (legacy)
       setAccessToken(token)
+    } else {
+      setStatus('invalid')
     }
   }, [])
 
