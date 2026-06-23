@@ -158,6 +158,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
   const send = async () => {
     if (!message.trim()) { toast.error('Escribe un mensaje'); return }
     if (!contactable.length) { toast.error(`Ningún deudor tiene ${channel === 'email' ? 'email' : 'teléfono'} registrado`); return }
+    if (!companyId) { toast.error('Selecciona una empresa antes de enviar'); return }
     setSending(true)
     try {
       const { data } = await api.post('/api/collection/campaigns', {
@@ -165,6 +166,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
         channel,
         message_template: message,
         debtor_ids: targets.map(d => d.id),
+        company_id: companyId,
       })
       const sent = data.sent ?? contactable.length
       toast.success(`Campaña enviada a ${sent} de ${targets.length} deudores`)
