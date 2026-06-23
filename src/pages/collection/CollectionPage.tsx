@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
 import { Badge } from '@/components/ui/Badge'
@@ -675,6 +675,158 @@ function PlantillasPanel() {
   )
 }
 
+// ── Edit Debtor Modal ─────────────────────────────────────────────────────────
+
+const STATUS_OPTIONS = [
+  { value: 'pending',        label: 'Pendiente' },
+  { value: 'in_collection',  label: 'En gestión' },
+  { value: 'promised',       label: 'Prometido' },
+  { value: 'agreement',      label: 'Acuerdo' },
+  { value: 'partially_paid', label: 'Pago parcial' },
+  { value: 'paid',           label: 'Pagado' },
+  { value: 'defaulted',      label: 'En mora' },
+  { value: 'uncontactable',  label: 'No contactable' },
+]
+
+function EditDebtorModal({ debtorId, onClose, onSaved }: {
+  debtorId: string
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const qc = useQueryClient()
+
+  const { data: debtor, isLoading } = useQuery({
+    queryKey: ['debtor-detail', debtorId],
+    queryFn: async () => { const { data } = await api.get(`/api/collection/debtors/${debtorId}`); return data },
+  })
+
+  const [form, setForm] = useState<any>(null)
+
+  // Inicializa el form cuando llegan los datos
+  if (debtor && !form) {
+    setForm({
+      debtor_name:     debtor.debtor_name     ?? '',
+      debtor_document: debtor.debtor_document  ?? '',
+      phone:           debtor.phone           ?? '',
+      whatsapp:        debtor.whatsapp         ?? '',
+      email:           debtor.email            ?? '',
+      city:            debtor.city             ?? '',
+      status:          debtor.status           ?? 'pending',
+    })
+  }
+
+  const save = useMutation({
+    mutationFn: async () => {
+      await api.patch(`/api/collection/debtors/${debtorId}`, {
+        debtor_name:     form.debtor_name.trim()     || undefined,
+        phone:           form.phone.trim()           || undefined,
+        whatsapp:        form.whatsapp.trim()        || undefined,
+        email:           form.email.trim()           || undefined,
+        city:            form.city.trim()            || undefined,
+        status:          form.status                 || undefined,
+      })
+    },
+    onSuccess: () => {
+      toast.success('Deudor actualizado')
+      qc.invalidateQueries({ queryKey: ['debtors'] })
+      qc.invalidateQueries({ queryKey: ['debtor-detail', debtorId] })
+      onSaved()
+      onClose()
+    },
+    onError: (e: any) => {
+      toast.error(e.response?.data?.error ?? 'Error al actualizar')
+    },
+  })
+
+  const field = (label: string, key: string, type = 'text', placeholder = '') => (
+    <div>
+      <label className="block text-xs font-semibold text-slate-600 mb-1">{label}</label>
+      <input
+        type={type}
+        value={form?.[key] ?? ''}
+        onChange={e => setForm((f: any) => ({ ...f, [key]: e.target.value }))}
+        placeholder={placeholder}
+        className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+      />
+    </div>
+  )
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Editar deudor</p>
+            <h3 className="text-base font-bold text-slate-900">
+              {isLoading ? 'Cargando...' : (debtor?.debtor_name ?? '—')}
+            </h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        {isLoading || !form ? (
+          <div className="py-16 flex justify-center"><PageLoader /></div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              {field('Nombre completo', 'debtor_name', 'text', 'Nombre del deudor')}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Documento</label>
+                <input
+                  value={form.debtor_document}
+                  disabled
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-400 cursor-not-allowed"
+                />
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              {field('Teléfono', 'phone', 'tel', 'Ej: 3001234567')}
+              {field('WhatsApp', 'whatsapp', 'tel', 'Ej: 3001234567')}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              {field('Email', 'email', 'email', 'correo@empresa.com')}
+              {field('Ciudad', 'city', 'text', 'Bogotá')}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Estado de gestión</label>
+              <select
+                value={form.status}
+                onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {STATUS_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+          </div>
+        )}
+
+        {/* Footer */}
+        {!isLoading && form && (
+          <div className="flex gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
+            <Button variant="secondary" onClick={onClose} className="flex-1">Cancelar</Button>
+            <Button onClick={() => save.mutate()} loading={save.isPending} className="flex-1">
+              Guardar cambios
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Import modal ───────────────────────────────────────────────────────────────
 
 type ImportMode = 'siigo' | 'contactos'
@@ -1227,6 +1379,7 @@ export function CollectionPage() {
   const [selected,   setSelected]   = useState<string[]>([])
   const [showImport, setShowImport] = useState(false)
   const [viewDebtorId, setViewDebtorId] = useState<string | null>(null)
+  const [editDebtorId, setEditDebtorId] = useState<string | null>(null)
   const [companyId,  setCompanyId]  = useState('')
   const qc = useQueryClient()
 
@@ -1499,7 +1652,9 @@ export function CollectionPage() {
                                     title="Ver detalle">
                                     <Eye className="w-3.5 h-3.5" />
                                   </button>
-                                  <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                                  <button
+                                    onClick={() => setEditDebtorId(d.id)}
+                                    className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-600 transition-colors"
                                     title="Editar">
                                     <Pencil className="w-3.5 h-3.5" />
                                   </button>
@@ -1562,6 +1717,18 @@ export function CollectionPage() {
           key={viewDebtorId}
           id={viewDebtorId}
           onClose={() => setViewDebtorId(null)}
+        />
+      )}
+
+      {editDebtorId && (
+        <EditDebtorModal
+          key={editDebtorId}
+          debtorId={editDebtorId}
+          onClose={() => setEditDebtorId(null)}
+          onSaved={() => {
+            qc.invalidateQueries({ queryKey: ['debtors'] })
+            qc.invalidateQueries({ queryKey: ['collection-stats'] })
+          }}
         />
       )}
     </div>
