@@ -542,17 +542,14 @@ function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => v
   const uploadDoc = async (file: File) => {
     setUploading(true)
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('title', `Entrega: ${task?.title ?? 'Tarea'}`)
-      formData.append('category', 'task_delivery')
-      const { data: doc } = await api.post('/api/documents/upload', formData)
+      const { uploadFile } = await import('@/lib/upload')
+      const doc = await uploadFile(file, `Entrega: ${task?.title ?? 'Tarea'}`, 'task_delivery')
       await api.patch(`/api/tasks/${id}`, { document_id: doc.id, status: 'in_progress' })
       toast.success('Documento subido exitosamente')
       qc.invalidateQueries({ queryKey: ['task-detail', id] })
       qc.invalidateQueries({ queryKey: ['tasks'] })
     } catch (e: any) {
-      toast.error(e.response?.data?.error ?? 'Error al subir documento')
+      toast.error(e.message ?? 'Error al subir documento')
     } finally {
       setUploading(false)
     }

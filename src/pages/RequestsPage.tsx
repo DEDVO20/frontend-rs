@@ -290,14 +290,10 @@ function NewRequestModal({ onClose }: { companies: any[]; onClose: () => void })
       // 1. Crear solicitud
       const { data: request } = await api.post('/api/requests', form)
 
-      // 2. Subir archivos adjuntos
+      // 2. Subir archivos adjuntos (directo a Supabase)
+      const { uploadFile } = await import('@/lib/upload')
       for (const file of files) {
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('title', `Adjunto: ${file.name}`)
-        fd.append('category', 'request_attachment')
-        fd.append('description', `Adjunto de solicitud: ${form.title}`)
-        await api.post('/api/documents/upload', fd).catch(() => {})
+        await uploadFile(file, `Adjunto: ${file.name}`, 'request_attachment').catch(() => {})
       }
 
       return request
