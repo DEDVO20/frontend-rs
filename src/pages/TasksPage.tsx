@@ -323,7 +323,12 @@ export function TasksPage() {
                         </button>
                       </td>
                       <td className="px-4 py-3">
-                        <p className={`font-medium ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                        <p className={`font-medium flex items-center gap-1.5 ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                          {t.requires_document && (
+                            <span title={t.document_id ? 'Documento adjunto' : 'Requiere adjuntar documento'}>
+                              <Paperclip className={`w-3.5 h-3.5 shrink-0 ${t.document_id ? 'text-emerald-500' : 'text-amber-500'}`} />
+                            </span>
+                          )}
                           {t.title}
                         </p>
                         {t.services?.name && (
@@ -408,8 +413,8 @@ export function TasksPage() {
 
 function NewTaskModal({ companies, services, onClose }: { companies: any[]; services: any[]; onClose: () => void }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState({ company_id: '', title: '', due_date: '', owner_type: 'rs_team', service_id: '' })
-  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const [form, setForm] = useState({ company_id: '', title: '', due_date: '', owner_type: 'rs_team', service_id: '', requires_document: false })
+  const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
   const createMut = useMutation({
     mutationFn: async () => {
@@ -469,6 +474,26 @@ function NewTaskModal({ companies, services, onClose }: { companies: any[]; serv
               {services.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
+
+          {/* Requiere documento */}
+          <button
+            type="button"
+            onClick={() => set('requires_document', !form.requires_document)}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-colors text-left ${
+              form.requires_document ? 'border-primary-300 bg-primary-50' : 'border-slate-200 bg-white hover:bg-slate-50'
+            }`}
+          >
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${form.requires_document ? 'bg-primary-100' : 'bg-slate-100'}`}>
+              <Paperclip className={`w-4 h-4 ${form.requires_document ? 'text-primary-600' : 'text-slate-400'}`} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-slate-900">Requiere documento adjunto</p>
+              <p className="text-xs text-slate-400">El responsable debe subir un archivo para completarla</p>
+            </div>
+            <div className={`w-10 h-6 rounded-full relative transition-colors shrink-0 ${form.requires_document ? 'bg-primary-600' : 'bg-slate-300'}`}>
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${form.requires_document ? 'translate-x-5' : 'translate-x-1'}`} />
+            </div>
+          </button>
         </div>
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
           <Button variant="secondary" onClick={onClose}>Cancelar</Button>
