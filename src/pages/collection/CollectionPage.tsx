@@ -43,13 +43,13 @@ function getTramoColor(days: number): string {
 }
 
 function renderPreview(template: string, debtor: any): string {
-  const saldo = debtor.outstanding_balance ?? 0
+  const saldo = debtor.outstanding_balance ?? (debtor.collection_debts ?? []).reduce((acc: number, x: any) => acc + (x.outstanding_amount ?? 0), 0)
   return template
     .replace(/\{\{nombre\}\}/g, debtor.debtor_name ?? '')
     .replace(/\{\{saldo\}\}/g, formatCurrency(saldo))
     .replace(/\{\{dias_mora\}\}/g, String(debtor.days_overdue ?? 0))
-    .replace(/\{\{empresa\}\}/g, debtor.company?.name ?? '')
-    .replace(/\{\{asesor\}\}/g, 'RS Back Office')
+    .replace(/\{\{empresa\}\}/g, debtor.company?.name ?? debtor.companies?.name ?? '')
+    .replace(/\{\{asesor\}\}/g, debtor.assigned_user?.full_name ?? 'RS Back Office')
     .replace(/\{\{facturas\}\}/g, String(debtor.collection_debts?.length ?? 0))
 }
 
