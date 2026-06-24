@@ -185,7 +185,7 @@ export function TasksPage() {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-400">{todayStr}</span>
-            <Button size="sm" onClick={() => setShowNew(true)}><Plus className="w-3.5 h-3.5" /> Nueva tarea</Button>
+            {isAdmin && <Button size="sm" onClick={() => setShowNew(true)}><Plus className="w-3.5 h-3.5" /> Nueva tarea</Button>}
           </div>
         </div>
 
@@ -242,7 +242,7 @@ export function TasksPage() {
               ))}
             </div>
 
-            <Button size="sm" onClick={() => setShowNew(true)}><Plus className="w-3.5 h-3.5" /> Nueva tarea</Button>
+            {isAdmin && <Button size="sm" onClick={() => setShowNew(true)}><Plus className="w-3.5 h-3.5" /> Nueva tarea</Button>}
 
             {/* Owner filter */}
             <div className="flex gap-1 border border-slate-200 rounded-lg overflow-hidden">
