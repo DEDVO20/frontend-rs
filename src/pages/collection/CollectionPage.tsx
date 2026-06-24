@@ -57,9 +57,9 @@ function renderPreview(template: string, debtor: any): string {
     }
 
     const docNum = x.siigo_document
-    const dateStr = x.due_date ?? ''
+    const datePart = x.due_date ? ` (${x.due_date})` : ''
 
-    return `- ${docNum}: ${copFormatted}${usdPart} (${dateStr})`
+    return `- ${docNum}: ${copFormatted}${usdPart}${datePart}`
   }).join('\n')
 
   return template
@@ -235,7 +235,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
             }}
             className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
             <option value="">Sin plantilla</option>
-            {(templates ?? []).map((t: any) => (
+            {(templates ?? []).filter((t: any) => t.channel === channel).map((t: any) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </select>
@@ -248,7 +248,14 @@ function MasivoPanel({ companyId }: { companyId: string }) {
               { id: 'sms',     label: '📱 SMS' },
               { id: 'email',   label: '📧 Email' },
             ] as const).map(ch => (
-              <button key={ch.id} onClick={() => setChannel(ch.id)}
+              <button key={ch.id} onClick={() => {
+                setChannel(ch.id)
+                const currentTpl = (templates ?? []).find((t: any) => t.id === plantilla)
+                if (currentTpl && currentTpl.channel !== ch.id) {
+                  setPlantilla('')
+                  setMessage('')
+                }
+              }}
                 className={`flex-1 text-xs py-2 rounded-lg font-medium transition-colors ${channel === ch.id ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
                 {ch.label}
               </button>
