@@ -44,13 +44,31 @@ function getTramoColor(days: number): string {
 
 function renderPreview(template: string, debtor: any): string {
   const saldo = debtor.outstanding_balance ?? (debtor.collection_debts ?? []).reduce((acc: number, x: any) => acc + (x.outstanding_amount ?? 0), 0)
+  const debtsList = (debtor.collection_debts ?? []).filter((x: any) => (x.outstanding_amount ?? 0) > 0)
+  const debtsToUse = debtsList.length > 0 ? debtsList : (debtor.collection_debts ?? [])
+  
+  const facturasStr = debtsToUse.map((x: any) => {
+    const copFormatted = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(x.outstanding_amount ?? 0).replace(/\s/g, '')
+
+    let usdPart = ''
+    if (x.currency === 'USD' && (x.total_balance ?? 0) > 0) {
+      const usdFormatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(x.total_balance ?? 0).replace(/\s/g, '')
+      usdPart = ` [USD ${usdFormatted}]`
+    }
+
+    const docNum = x.siigo_document
+    const dateStr = x.due_date ?? ''
+
+    return `- ${docNum}: ${copFormatted}${usdPart} (${dateStr})`
+  }).join('\n')
+
   return template
     .replace(/\{\{nombre\}\}/g, debtor.debtor_name ?? '')
     .replace(/\{\{saldo\}\}/g, formatCurrency(saldo))
     .replace(/\{\{dias_mora\}\}/g, String(debtor.days_overdue ?? 0))
     .replace(/\{\{empresa\}\}/g, debtor.company?.name ?? debtor.companies?.name ?? '')
     .replace(/\{\{asesor\}\}/g, debtor.assigned_user?.full_name ?? 'RS Back Office')
-    .replace(/\{\{facturas\}\}/g, String(debtor.collection_debts?.length ?? 0))
+    .replace(/\{\{facturas\}\}/g, facturasStr)
 }
 
 type TabKey = 'active' | 'paid' | 'gestion' | 'masivo' | 'plantillas'
