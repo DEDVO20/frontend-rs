@@ -12,6 +12,7 @@ import {
   Handshake, ClipboardList, Send, ArrowUpDown, Clock, FileText, Edit3, Trash2, X, Eye, Pencil,
 } from 'lucide-react'
 import { DebtorDrawer } from './DebtorDrawer'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -582,6 +583,7 @@ function TemplateModal({ editing, onClose, onSaved }: {
 
 function PlantillasPanel() {
   const qc = useQueryClient()
+  const confirmDlg = useConfirm()
   const [modalOpen,  setModalOpen]  = useState(false)
   const [editTarget, setEditTarget] = useState<any | null>(null)
 
@@ -594,15 +596,22 @@ function PlantillasPanel() {
   const openEdit   = (t: any) => { setEditTarget(t); setModalOpen(true) }
   const onSaved    = () => qc.invalidateQueries({ queryKey: ['collection-templates'] })
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar esta plantilla?')) return
-    try {
-      await api.delete(`/api/collection/templates/${id}`)
-      toast.success('Plantilla eliminada')
-      qc.invalidateQueries({ queryKey: ['collection-templates'] })
-    } catch {
-      toast.error('Error al eliminar la plantilla')
-    }
+  const handleDelete = (id: string) => {
+    confirmDlg({
+      title: '¿Eliminar esta plantilla?',
+      description: 'Esta acción no se puede deshacer.',
+      type: 'danger',
+      confirmLabel: 'Eliminar',
+      onConfirm: async () => {
+        try {
+          await api.delete(`/api/collection/templates/${id}`)
+          toast.success('Plantilla eliminada')
+          qc.invalidateQueries({ queryKey: ['collection-templates'] })
+        } catch {
+          toast.error('Error al eliminar la plantilla')
+        }
+      },
+    })
   }
 
   return (

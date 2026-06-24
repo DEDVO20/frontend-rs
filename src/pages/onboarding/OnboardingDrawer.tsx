@@ -66,6 +66,8 @@ export function OnboardingDrawer({ id, onClose }: Props) {
   const [reviewingDoc, setReviewingDoc] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [showRejectInput, setShowRejectInput] = useState<string | null>(null)
 
   const { data: item, isLoading } = useQuery({
     queryKey: ['onboarding-detail', id],
@@ -355,28 +357,46 @@ export function OnboardingDrawer({ id, onClose }: Props) {
                                       qc.invalidateQueries({ queryKey: ['onboarding-detail', id] })
                                       setReviewingDoc(null)
                                       setPreviewUrl(null)
-                                    } catch (e: any) { alert(e.response?.data?.error ?? 'Error') }
+                                    } catch (e: any) { toast.error(e.response?.data?.error ?? 'Error') }
                                   }}
                                   className="flex-1 py-1.5 rounded-lg bg-emerald-500 text-white text-xs font-semibold hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1"
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" /> Aprobar
                                 </button>
                                 <button
-                                  onClick={async () => {
-                                    const reason = prompt('Motivo del rechazo:')
-                                    if (!reason) return
-                                    try {
-                                      await api.patch(`/api/onboarding/${id}/kyc/documents/${doc.id}`, { status: 'rejected', notes: reason })
-                                      qc.invalidateQueries({ queryKey: ['onboarding-detail', id] })
-                                      setReviewingDoc(null)
-                                      setPreviewUrl(null)
-                                    } catch (e: any) { alert(e.response?.data?.error ?? 'Error') }
-                                  }}
+                                  onClick={() => setShowRejectInput(showRejectInput === doc.id ? null : doc.id)}
                                   className="flex-1 py-1.5 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600 transition-colors flex items-center justify-center gap-1"
                                 >
                                   <AlertCircle className="w-3.5 h-3.5" /> Rechazar
                                 </button>
                               </div>
+                              {showRejectInput === doc.id && (
+                                <div className="space-y-2 pt-2">
+                                  <textarea
+                                    rows={2}
+                                    value={rejectReason}
+                                    onChange={e => setRejectReason(e.target.value)}
+                                    placeholder="Motivo del rechazo..."
+                                    className="w-full text-sm border border-red-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none"
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={async () => {
+                                        if (!rejectReason.trim()) { toast.error('Ingresa un motivo'); return }
+                                        try {
+                                          await api.patch(`/api/onboarding/${id}/kyc/documents/${doc.id}`, { status: 'rejected', notes: rejectReason })
+                                          qc.invalidateQueries({ queryKey: ['onboarding-detail', id] })
+                                          setReviewingDoc(null); setPreviewUrl(null); setShowRejectInput(null); setRejectReason('')
+                                        } catch (e: any) { toast.error(e.response?.data?.error ?? 'Error') }
+                                      }}
+                                      className="flex-1 py-1.5 rounded-lg bg-red-500 text-white text-xs font-semibold hover:bg-red-600"
+                                    >Confirmar rechazo</button>
+                                    <button onClick={() => { setShowRejectInput(null); setRejectReason('') }}
+                                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-500 hover:bg-slate-50"
+                                    >Cancelar</button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </li>

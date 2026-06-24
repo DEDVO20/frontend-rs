@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { formatDate } from '@/lib/utils'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import {
   Search, Upload, Download, Eye, Trash2, X, Grid3x3, List,
   FileText, Edit3, Send,
@@ -148,6 +149,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
 function DetailPanel({ doc, onClose, onDeleted }: { doc: any; onClose: () => void; onDeleted: () => void }) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const ext = extLabel(doc.mime_type, doc.original_name)
   const sm  = STATUS_META[doc.status ?? 'published'] ?? STATUS_META.published
 
@@ -247,7 +249,7 @@ function DetailPanel({ doc, onClose, onDeleted }: { doc: any; onClose: () => voi
           <Edit3 className="w-4 h-4" /> Editar
         </button>
         <button
-          onClick={() => { if (confirm('¿Eliminar este documento?')) deleteMut.mutate() }}
+          onClick={() => confirm({ title: '¿Eliminar este documento?', description: 'Esta acción no se puede deshacer.', type: 'danger', confirmLabel: 'Eliminar', onConfirm: async () => { await deleteMut.mutateAsync() } })}
           className="flex items-center justify-center gap-2 w-full py-2 text-sm font-medium text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
         >
           <Trash2 className="w-4 h-4" /> Eliminar
@@ -260,6 +262,7 @@ function DetailPanel({ doc, onClose, onDeleted }: { doc: any; onClose: () => voi
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export function DocumentsPage() {
+  const confirmFn = useConfirm()
   const [search,       setSearch]       = useState('')
   const [statusTab,    setStatusTab]    = useState<'all'|'published'|'review'|'draft'>('all')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -422,7 +425,7 @@ export function DocumentsPage() {
                                   <Download className="w-3.5 h-3.5" />
                                 </a>
                               )}
-                              <button onClick={e => { e.stopPropagation(); if (confirm('¿Eliminar?')) api.delete(`/api/documents/${doc.id}`).then(() => qc.invalidateQueries({ queryKey: ['documents'] })) }}
+                              <button onClick={e => { e.stopPropagation(); confirmFn({ title: '¿Eliminar este documento?', type: 'danger', confirmLabel: 'Eliminar', onConfirm: async () => { await api.delete(`/api/documents/${doc.id}`); qc.invalidateQueries({ queryKey: ['documents'] }) } }) }}
                                 className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500" title="Eliminar">
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>

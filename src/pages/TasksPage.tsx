@@ -178,13 +178,13 @@ export function TasksPage() {
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
 
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <p className="text-xs text-slate-400">Admin / <span className="text-primary-600 font-medium">Tareas</span></p>
             <h2 className="text-xl font-bold text-slate-900">Gestión de tareas</h2>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400">{todayStr}</span>
+            <span className="text-xs text-slate-400 hidden sm:inline">{todayStr}</span>
             {isAdmin && <Button size="sm" onClick={() => setShowNew(true)}><Plus className="w-3.5 h-3.5" /> Nueva tarea</Button>}
           </div>
         </div>
@@ -267,7 +267,7 @@ export function TasksPage() {
           </div>
 
           {/* Dropdown filters */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <SearchSelect
               label="Por empresa"
               value={companyFilter}
@@ -292,103 +292,112 @@ export function TasksPage() {
             <span className="text-xs text-slate-400">{total} tareas</span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-8"></th>
-                  <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tarea</th>
-                  <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Empresa</th>
-                  <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vencimiento</th>
-                  <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
-                  <th className="text-right px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {isLoading ? (
-                  <tr><td colSpan={6} className="py-10"><PageLoader /></td></tr>
-                ) : filtered.map((t: any) => {
+          {isLoading ? (
+            <div className="py-10"><PageLoader /></div>
+          ) : (
+            <>
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y divide-slate-50">
+                {filtered.map((t: any) => {
                   const isOverdue = t.status !== 'done' && t.due_date && t.due_date < today
                   const st = isOverdue ? STATUS_LABELS.overdue : (STATUS_LABELS[t.status] ?? STATUS_LABELS.pending)
-                  const isRS = t.owner_type === 'rs_team'
                   return (
-                    <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => t.status !== 'done' && completeMut.mutate(t.id)}
-                          className="shrink-0"
-                          disabled={t.status === 'done'}
-                        >
+                    <div key={t.id} onClick={() => setViewTaskId(t.id)} className="px-4 py-3 active:bg-slate-50 cursor-pointer">
+                      <div className="flex items-start gap-3">
+                        <button onClick={e => { e.stopPropagation(); t.status !== 'done' && completeMut.mutate(t.id) }} className="mt-0.5 shrink-0">
                           {st.icon}
                         </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className={`font-medium flex items-center gap-1.5 ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>
-                          {t.requires_document && (
-                            <span title={t.document_id ? 'Documento adjunto' : 'Requiere adjuntar documento'}>
-                              <Paperclip className={`w-3.5 h-3.5 shrink-0 ${t.document_id ? 'text-emerald-500' : 'text-amber-500'}`} />
-                            </span>
-                          )}
-                          {t.title}
-                        </p>
-                        {t.services?.name && (
-                          <span className="text-[10px] text-slate-400">{t.services.name}</span>
-                        )}
-                        {isRS && (
-                          <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] font-medium bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full">
-                            ⚙ RS
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-md bg-primary-100 flex items-center justify-center text-[10px] font-bold text-primary-700 shrink-0">
-                            {(companyName(t.company_id)?.[0] ?? '?').toUpperCase()}
-                          </span>
-                          <span className="text-sm text-slate-700 truncate max-w-[140px]">{companyName(t.company_id)}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium flex items-center gap-1.5 ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                            {t.requires_document && <Paperclip className={`w-3.5 h-3.5 shrink-0 ${t.document_id ? 'text-emerald-500' : 'text-amber-500'}`} />}
+                            <span className="truncate">{t.title}</span>
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.cls}`}>• {st.label}</span>
+                            {t.due_date && <span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-slate-400'}`}>📅 {fmtDate(t.due_date)}</span>}
+                            <span className="text-xs text-slate-400">{companyName(t.company_id)}</span>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
-                          {t.due_date ? fmtDate(t.due_date) : '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>
-                          • {st.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => setViewTaskId(t.id)}
-                            className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors" title="Ver detalle">
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
-                          {isAdmin && (
-                            <button
-                              onClick={() => {
-                                toast('¿Eliminar esta tarea?', {
-                                  action: { label: 'Eliminar', onClick: () => deleteMut.mutate(t.id) },
-                                  cancel: { label: 'Cancelar', onClick: () => {} },
-                                  duration: 8000,
-                                })
-                              }}
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   )
                 })}
-                {!isLoading && !filtered.length && (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400">No hay tareas con esos filtros</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider w-8"></th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tarea</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Empresa</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Vencimiento</th>
+                      <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
+                      <th className="text-right px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {filtered.map((t: any) => {
+                      const isOverdue = t.status !== 'done' && t.due_date && t.due_date < today
+                      const st = isOverdue ? STATUS_LABELS.overdue : (STATUS_LABELS[t.status] ?? STATUS_LABELS.pending)
+                      const isRS = t.owner_type === 'rs_team'
+                      return (
+                        <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
+                          <td className="px-4 py-3">
+                            <button onClick={() => t.status !== 'done' && completeMut.mutate(t.id)} className="shrink-0" disabled={t.status === 'done'}>
+                              {st.icon}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className={`font-medium flex items-center gap-1.5 ${t.status === 'done' ? 'line-through text-slate-400' : 'text-slate-900'}`}>
+                              {t.requires_document && <Paperclip className={`w-3.5 h-3.5 shrink-0 ${t.document_id ? 'text-emerald-500' : 'text-amber-500'}`} />}
+                              {t.title}
+                            </p>
+                            {t.services?.name && <span className="text-[10px] text-slate-400">{t.services.name}</span>}
+                            {isRS && <span className="ml-1.5 inline-flex items-center gap-0.5 text-[10px] font-medium bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full">⚙ RS</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded-md bg-primary-100 flex items-center justify-center text-[10px] font-bold text-primary-700 shrink-0">
+                                {(companyName(t.company_id)?.[0] ?? '?').toUpperCase()}
+                              </span>
+                              <span className="text-sm text-slate-700 truncate max-w-[140px]">{companyName(t.company_id)}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : 'text-slate-600'}`}>
+                              {t.due_date ? fmtDate(t.due_date) : '—'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>• {st.label}</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button onClick={() => setViewTaskId(t.id)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors">
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              {isAdmin && (
+                                <button onClick={() => toast('¿Eliminar esta tarea?', { action: { label: 'Eliminar', onClick: () => deleteMut.mutate(t.id) }, cancel: { label: 'Cancelar', onClick: () => {} }, duration: 8000 })}
+                                  className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {!filtered.length && (
+                <p className="px-4 py-12 text-center text-slate-400">No hay tareas con esos filtros</p>
+              )}
+            </>
+          )}
 
           {/* Pagination */}
           {total > 50 && (
