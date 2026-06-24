@@ -1,12 +1,10 @@
-import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 import {
-  X, Eye, Download, User, Calendar, Building2, Tag, AlertCircle, FileText, CheckCircle2,
+  X, Eye, Download, User, Calendar, Building2, Tag, AlertCircle, FileText,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
-import { Button } from '@/components/ui/Button'
 import { toast } from 'sonner'
 
 interface Props {
