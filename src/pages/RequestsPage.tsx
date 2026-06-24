@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import {
   Plus, Search, Eye, Trash2, X, Paperclip, FileText,
 } from 'lucide-react'
+import { RequestDrawer } from './RequestDrawer'
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -36,6 +37,7 @@ export function RequestsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [companyFilter, setCompanyFilter] = useState('')
   const [showNew, setShowNew] = useState(false)
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null)
 
   const { data: companiesData } = useQuery({
     queryKey: ['companies-list'],
@@ -217,7 +219,11 @@ export function RequestsPage() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors" title="Ver detalle">
+                            <button
+                              onClick={() => setSelectedRequestId(r.id)}
+                              className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors"
+                              title="Ver detalle"
+                            >
                               <Eye className="w-3.5 h-3.5" />
                             </button>
                             <button
@@ -260,6 +266,13 @@ export function RequestsPage() {
       </div>
 
       {showNew && <NewRequestModal companies={companies} onClose={() => setShowNew(false)} />}
+      {selectedRequestId && (
+        <RequestDrawer
+          id={selectedRequestId}
+          companies={companies}
+          onClose={() => setSelectedRequestId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -287,14 +300,28 @@ function NewRequestModal({ onClose }: { companies: any[]; onClose: () => void })
 
   const createMut = useMutation({
     mutationFn: async () => {
-      // 1. Crear solicitud
-      const { data: request } = await api.post('/api/requests', form)
-
-      // 2. Subir archivos adjuntos (directo a Supabase)
+      // 1. Subir archivos adjuntos primero (directo a Supabase)
       const { uploadFile } = await import('@/lib/upload')
+      const uploadedFiles = []
       for (const file of files) {
-        await uploadFile(file, `Adjunto: ${file.name}`, 'request_attachment').catch(() => {})
+        try {
+          const doc = await uploadFile(file, `Adjunto: ${file.name}`, 'request_attachment')
+          uploadedFiles.push({
+            id: doc.id,
+            file_url: doc.file_url,
+            name: file.name,
+            size: file.size,
+          })
+        } catch (err) {
+          console.error("Error al subir archivo:", file.name, err)
+        }
       }
+
+      // 2. Crear solicitud con adjuntos en metadata
+      const { data: request } = await api.post('/api/requests', {
+        ...form,
+        metadata: { files: uploadedFiles },
+      })
 
       return request
     },
