@@ -8,7 +8,7 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { formatDate } from '@/lib/utils'
 import {
   Search, Upload, Download, Eye, Trash2, X, Grid3x3, List,
-  FileText, Edit3, Send, Folder,
+  FileText, Edit3, Send,
 } from 'lucide-react'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -260,19 +260,20 @@ function DetailPanel({ doc, onClose, onDeleted }: { doc: any; onClose: () => voi
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export function DocumentsPage() {
-  const [search,     setSearch]     = useState('')
-  const [statusTab,  setStatusTab]  = useState<'all'|'published'|'review'|'draft'>('all')
-  const [viewMode,   setViewMode]   = useState<'list'|'grid'>('list')
-  const [page,       setPage]       = useState(1)
-  const [selectedDoc, setSelectedDoc] = useState<any | null>(null)
-  const [showUpload, setShowUpload] = useState(false)
+  const [search,       setSearch]       = useState('')
+  const [statusTab,    setStatusTab]    = useState<'all'|'published'|'review'|'draft'>('all')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [typeFilter,   setTypeFilter]   = useState('')
+  const [viewMode,     setViewMode]     = useState<'list'|'grid'>('list')
+  const [page,         setPage]         = useState(1)
+  const [selectedDoc,  setSelectedDoc]  = useState<any | null>(null)
+  const [showUpload,   setShowUpload]   = useState(false)
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
-    queryKey: ['documents', page, statusTab],
+    queryKey: ['documents', page],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), limit: '20' })
-      if (statusTab !== 'all') params.set('status', statusTab)
+      const params = new URLSearchParams({ page: String(page), limit: '100' })
       const { data } = await api.get(`/api/documents?${params}`)
       return data
     },
@@ -280,19 +281,23 @@ export function DocumentsPage() {
 
   const allDocs: any[] = data?.data ?? []
 
-  const rows = search
-    ? allDocs.filter((d: any) =>
-        d.title?.toLowerCase().includes(search.toLowerCase()) ||
-        d.original_name?.toLowerCase().includes(search.toLowerCase()) ||
-        d.company?.name?.toLowerCase().includes(search.toLowerCase()) ||
-        d.category?.toLowerCase().includes(search.toLowerCase())
-      )
-    : allDocs
-
-  const total      = data?.total ?? 0
-  const published  = allDocs.filter(d => (d.status ?? 'published') === 'published').length
-  const inReview   = allDocs.filter(d => d.status === 'review').length
-  const drafts     = allDocs.filter(d => d.status === 'draft').length
+  const rows = allDocs.filter((d: any) => {
+    const docStatus = d.status ?? 'published'
+    if (statusTab !== 'all' && docStatus !== statusTab) return false
+    if (search) {
+      const q = search.toLowerCase()
+      if (!(d.title?.toLowerCase().includes(q) || d.original_name?.toLowerCase().includes(q) || d.company?.name?.toLowerCase().includes(q) || d.category?.toLowerCase().includes(q)))
+        return false
+    }
+    if (categoryFilter && (d.category ?? 'general') !== categoryFilter) return false
+    if (typeFilter) {
+      const ext = extLabel(d.mime_type, d.original_name).toLowerCase()
+      if (typeFilter === 'pdf' && ext !== 'pdf') return false
+      if (typeFilter === 'excel' && !['xls', 'xlsx'].includes(ext)) return false
+      if (typeFilter === 'word' && !['doc', 'docx'].includes(ext)) return false
+    }
+    return true
+  })
 
   return (
     <div className="flex flex-col h-full">
@@ -300,111 +305,76 @@ export function DocumentsPage() {
 
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Sidebar carpetas ── */}
-        <aside className="hidden md:flex flex-col w-52 shrink-0 border-r border-slate-100 bg-slate-50 p-3 overflow-y-auto">
-          <div className="flex items-center gap-2 px-2 py-1.5 mb-3">
-            <Folder className="w-4 h-4 text-slate-400" />
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Carpetas</p>
-          </div>
-          <p className="text-[10px] text-slate-400 px-2 mb-2">{total} documentos · {/* companies count */}—</p>
-
-          {/* Quick filters */}
-          {[
-            { id: 'all',    label: 'Todos',       emoji: '🗂️', count: total },
-            { id: 'recent', label: 'Recientes',   emoji: '🕐', count: null },
-            { id: 'review', label: 'En revisión', emoji: '🔍', count: inReview },
-            { id: 'draft',  label: 'Borradores',  emoji: '✏️', count: drafts },
-          ].map(f => (
-            <button key={f.id}
-              onClick={() => { if (f.id !== 'recent') setStatusTab(f.id as any) }}
-              className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs w-full text-left transition-colors mb-0.5 ${statusTab === f.id ? 'bg-primary-100 text-primary-700 font-medium' : 'text-slate-600 hover:bg-slate-200'}`}
-            >
-              <span>{f.emoji}</span>
-              <span className="flex-1">{f.label}</span>
-              {f.count !== null && <span className="text-[10px] text-slate-400">{f.count}</span>}
-            </button>
-          ))}
-
-          {/* Por módulo */}
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 mt-4 mb-2">Por módulo</p>
-          {MODULE_FOLDERS.map(f => (
-            <button key={f.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs w-full text-left text-slate-600 hover:bg-slate-200 transition-colors mb-0.5">
-              <span>{f.emoji}</span> {f.label}
-            </button>
-          ))}
-
-          {/* Por tipo */}
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 mt-4 mb-2">Por tipo</p>
-          {TYPE_FOLDERS.map(f => (
-            <button key={f.id}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs w-full text-left text-slate-600 hover:bg-slate-200 transition-colors mb-0.5">
-              <span>{f.emoji}</span> {f.label}
-            </button>
-          ))}
-        </aside>
-
         {/* ── Main content ── */}
         <div className={`flex-1 flex overflow-hidden ${selectedDoc ? 'flex-row' : ''}`}>
           <div className="flex-1 flex flex-col overflow-hidden">
 
             {/* Toolbar */}
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between px-5 py-3 border-b border-slate-100 bg-white shrink-0">
-              {/* Search */}
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder="Buscar documento, empresa, módulo…"
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
+            <div className="flex flex-col gap-3 px-4 md:px-5 py-3 border-b border-slate-100 bg-white shrink-0">
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+                <div className="relative w-full sm:w-72">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="Buscar documento, empresa, módulo…"
+                    className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-primary-100 text-primary-600' : 'text-slate-400 hover:bg-slate-100'}`}>
+                      <Grid3x3 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-primary-100 text-primary-600' : 'text-slate-400 hover:bg-slate-100'}`}>
+                      <List className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <Button size="sm" className="ml-auto sm:ml-0" onClick={() => setShowUpload(true)}>
+                    <Upload className="w-3.5 h-3.5" /> Subir
+                  </Button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {/* Status tabs */}
+              {/* Filters row */}
+              <div className="flex flex-wrap gap-2">
+                {/* Status */}
                 <div className="flex items-center bg-slate-100 rounded-lg p-0.5 text-xs">
                   {(['all','published','review','draft'] as const).map(s => (
                     <button key={s}
-                      onClick={() => setStatusTab(s)}
-                      className={`px-3 py-1.5 rounded-md font-medium transition-colors ${statusTab === s ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                      onClick={() => { setStatusTab(s); setCategoryFilter(''); setTypeFilter('') }}
+                      className={`px-2.5 py-1.5 rounded-md font-medium transition-colors ${statusTab === s ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       {s === 'all' ? 'Todos' : s === 'published' ? 'Publicados' : s === 'review' ? 'Revisión' : 'Borrador'}
                     </button>
                   ))}
                 </div>
 
-                {/* View toggle */}
-                <div className="flex items-center gap-1 ml-auto sm:ml-0">
-                  <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-primary-100 text-primary-600' : 'text-slate-400 hover:bg-slate-100'}`}>
-                    <Grid3x3 className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-primary-100 text-primary-600' : 'text-slate-400 hover:bg-slate-100'}`}>
-                    <List className="w-4 h-4" />
-                  </button>
-                </div>
+                <span className="hidden sm:block w-px h-6 bg-slate-200 self-center" />
 
-                <Button size="sm" onClick={() => setShowUpload(true)}>
-                  <Upload className="w-3.5 h-3.5" /> Subir documento
-                </Button>
+                {/* Module filters */}
+                {MODULE_FOLDERS.map(f => (
+                  <button key={f.id}
+                    onClick={() => { setCategoryFilter(categoryFilter === f.id ? '' : f.id); setTypeFilter('') }}
+                    className={`text-xs px-2.5 py-1.5 rounded-full font-medium border transition-colors ${
+                      categoryFilter === f.id ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}>
+                    {f.emoji} {f.label}
+                  </button>
+                ))}
+
+                <span className="hidden sm:block w-px h-6 bg-slate-200 self-center" />
+
+                {/* Type filters */}
+                {TYPE_FOLDERS.map(f => (
+                  <button key={f.id}
+                    onClick={() => { setTypeFilter(typeFilter === f.id ? '' : f.id); setCategoryFilter('') }}
+                    className={`text-xs px-2.5 py-1.5 rounded-full font-medium border transition-colors ${
+                      typeFilter === f.id ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}>
+                    {f.emoji} {f.label}
+                  </button>
+                ))}
               </div>
-            </div>
-
-            {/* KPI chips */}
-            <div className="flex gap-3 px-5 py-3 border-b border-slate-100 bg-white shrink-0 overflow-x-auto">
-              {[
-                { emoji: '📁', label: 'Total',        val: total,     color: 'text-slate-700' },
-                { emoji: '✅', label: 'Publicados',    val: published, color: 'text-emerald-600' },
-                { emoji: '🔍', label: 'En revisión',  val: inReview,  color: 'text-yellow-600' },
-                { emoji: '✏️', label: 'Borradores',   val: drafts,    color: 'text-slate-500' },
-              ].map(k => (
-                <div key={k.label} className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg shrink-0">
-                  <span className="text-sm">{k.emoji}</span>
-                  <div>
-                    <p className={`text-sm font-bold ${k.color}`}>{k.val}</p>
-                    <p className="text-[10px] text-slate-400 leading-tight">{k.label}</p>
-                  </div>
-                </div>
-              ))}
             </div>
 
             {/* Document list */}
