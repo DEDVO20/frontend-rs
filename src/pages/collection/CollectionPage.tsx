@@ -235,8 +235,8 @@ function MasivoPanel({ companyId }: { companyId: string }) {
             }}
             className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
             <option value="">Sin plantilla</option>
-            {(templates ?? []).filter((t: any) => t.channel === channel).map((t: any) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
+            {(templates ?? []).filter((t: any) => t.channel === channel || t.source === 'zavu').map((t: any) => (
+              <option key={t.id} value={t.id}>{t.source === 'zavu' ? `⚡ ${t.name}` : t.name}</option>
             ))}
           </select>
         </div>
@@ -661,32 +661,52 @@ function PlantillasPanel() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {(data ?? []).map((t: any) => (
-                <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-900">{t.name}</td>
-                  <td className="px-4 py-3 text-slate-500 capitalize">{t.channel}</td>
-                  <td className="px-4 py-3 text-slate-500">{t.tramo != null ? `${t.tramo}+ días` : '—'}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500">🌐 Global</td>
-                  <td className="px-4 py-3">
-                    {t.is_active !== false
-                      ? <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Activa</span>
-                      : <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-400"><span className="w-1.5 h-1.5 rounded-full bg-slate-300" />Inactiva</span>
-                    }
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(t)}
-                        className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600" title="Editar">
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => handleDelete(t.id)}
-                        className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500" title="Eliminar">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {(data ?? []).map((t: any) => {
+                const isZavu = t.source === 'zavu'
+                return (
+                  <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900">{t.name}</span>
+                        {isZavu && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">Zavu</span>
+                        )}
+                      </div>
+                      {isZavu && t.variables?.length > 0 && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">Variables: {t.variables.join(', ')}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 capitalize">{t.channel}</td>
+                    <td className="px-4 py-3 text-slate-500">{t.tramo != null ? `${t.tramo}+ días` : isZavu ? t.category ?? '—' : '—'}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">{isZavu ? `🟢 ${t.language?.toUpperCase() ?? ''}` : '🌐 Global'}</td>
+                    <td className="px-4 py-3">
+                      {isZavu ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />Aprobada
+                        </span>
+                      ) : t.is_active !== false ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />Activa</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-400"><span className="w-1.5 h-1.5 rounded-full bg-slate-300" />Inactiva</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {!isZavu && (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEdit(t)}
+                            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600" title="Editar">
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button onClick={() => handleDelete(t.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500" title="Eliminar">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
