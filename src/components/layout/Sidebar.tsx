@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/authStore'
 import {
   LayoutDashboard, Building2, UserCheck, ClipboardList,
-  FileText, MessageSquareMore, Landmark, BarChart3,
+  FileText, MessageSquareMore, Landmark, BarChart3, Repeat,
   Users, Settings, Globe, LogOut, X,
 } from 'lucide-react'
 
@@ -45,6 +45,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Sistema',
     items: [
+      { to: '/app/task-templates', label: 'Tareas recurrentes', icon: Repeat, adminOnly: true },
       { to: '/app/profiles', label: 'Usuarios', icon: Users, adminOnly: true },
       { to: '/app/settings', label: 'Configuración', icon: Settings, adminOnly: true },
       { to: '/', label: 'Ver sitio web', icon: Globe },
