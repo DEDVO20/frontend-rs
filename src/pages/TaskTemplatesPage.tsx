@@ -9,7 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { toast } from 'sonner'
 import {
   Plus, Search, Pencil, Trash2, X, Clock, Repeat,
-  CheckCircle2, XCircle,
+  CheckCircle2, XCircle, Play,
 } from 'lucide-react'
 
 const FREQ_LABELS: Record<string, { label: string; color: any; icon: string }> = {
@@ -212,27 +212,8 @@ export function TaskTemplatesPage() {
           )}
         </div>
 
-        {/* Cron info */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-4 h-4 text-slate-400" />
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cron jobs activos</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-slate-600">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span><strong>Generar tareas</strong> — 1ro de cada mes, 6:00 AM</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              <span><strong>Recordatorios</strong> — Diario, 7:00 AM</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              <span><strong>Marcar vencidas</strong> — Diario, 1:00 AM</span>
-            </div>
-          </div>
-        </div>
+        {/* Cron info + historial */}
+        <CronPanel />
       </div>
 
       {showModal && (
@@ -241,6 +222,140 @@ export function TaskTemplatesPage() {
           services={services ?? []}
           onClose={() => { setShowModal(false); setEditTarget(null) }}
         />
+      )}
+    </div>
+  )
+}
+
+// ── Template Modal ────────────────────────────────────────────────────────────
+
+// ── Cron Panel ────────────────────────────────────────────────────────────────
+
+const JOB_LABELS: Record<string, { label: string; dot: string; schedule: string }> = {
+  'generate-tasks': { label: 'Generar tareas',  dot: 'bg-emerald-500', schedule: '1ro de cada mes, 6:00 AM' },
+  'send-reminders': { label: 'Recordatorios',   dot: 'bg-blue-500',    schedule: 'Diario, 7:00 AM' },
+  'mark-overdue':   { label: 'Marcar vencidas', dot: 'bg-amber-500',   schedule: 'Diario, 1:00 AM' },
+}
+
+function fmtDateTime(d: string) {
+  return new Date(d).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+function CronPanel() {
+  const qc = useQueryClient()
+  const confirm = useConfirm()
+  const [running, setRunning] = useState('')
+
+  const { data: logs, isLoading } = useQuery({
+    queryKey: ['cron-logs'],
+    queryFn: async () => { const { data } = await api.get('/api/tasks/cron-logs'); return data },
+  })
+
+  const runJob = async (job: string) => {
+    setRunning(job)
+    try {
+      if (job === 'generate-tasks') {
+        const now = new Date()
+        await api.post('/api/tasks/generate', { year: now.getFullYear(), month: now.getMonth() + 1 })
+      } else if (job === 'send-reminders') {
+        await api.post('/api/tasks/reminders')
+      } else if (job === 'mark-overdue') {
+        await api.post('/api/tasks/mark-overdue')
+      }
+      toast.success(`Job "${JOB_LABELS[job]?.label}" ejecutado`)
+      qc.invalidateQueries({ queryKey: ['cron-logs'] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+    } catch (e: any) {
+      toast.error(e.response?.data?.error ?? 'Error al ejecutar')
+    } finally { setRunning('') }
+  }
+
+  const handleConfirmRun = (job: string) => {
+    let description = ''
+    if (job === 'generate-tasks') {
+      description = 'Se generarán las tareas recurrentes correspondientes al mes y año actuales.'
+    } else if (job === 'send-reminders') {
+      description = 'Se enviarán correos recordatorios para las tareas que vencen mañana.'
+    } else if (job === 'mark-overdue') {
+      description = 'Se marcarán como vencidas todas las tareas pendientes cuya fecha límite sea anterior a hoy.'
+    }
+
+    confirm({
+      title: `¿Ejecutar "${JOB_LABELS[job]?.label}" manualmente?`,
+      description,
+      type: 'warning',
+      confirmLabel: 'Ejecutar',
+      onConfirm: () => runJob(job),
+    })
+  }
+
+  const cronLogs: any[] = logs ?? []
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-slate-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4 text-slate-400" />
+            <h3 className="text-sm font-bold text-slate-900">Cron jobs</h3>
+          </div>
+          <span className="text-xs text-slate-400">{cronLogs.length} ejecuciones</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+          {Object.entries(JOB_LABELS).map(([key, j]) => {
+            const isRunning = running === key
+            return (
+              <div key={key} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${j.dot}`} />
+                    <span className="text-xs font-bold text-slate-700 truncate">{j.label}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 truncate">{j.schedule}</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  loading={isRunning}
+                  disabled={!!running}
+                  onClick={() => handleConfirmRun(key)}
+                  className="px-2.5 py-1 text-xs shrink-0 h-8 gap-1.5"
+                >
+                  {!isRunning && <Play className="w-3 h-3 fill-current text-slate-500" />}
+                  {!isRunning && 'Ejecutar'}
+                </Button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {isLoading ? <div className="py-6"><PageLoader /></div> : cronLogs.length > 0 ? (
+        <div className="divide-y divide-slate-50 max-h-[300px] overflow-y-auto">
+          {cronLogs.map((log: any) => {
+            const j = JOB_LABELS[log.job_name] ?? { label: log.job_name, dot: 'bg-slate-400', schedule: '' }
+            const ok = log.status === 'success'
+            return (
+              <div key={log.id} className="flex items-center gap-3 px-4 py-2.5 text-xs">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                <span className="font-medium text-slate-900 w-32 shrink-0">{j.label}</span>
+                <span className={`font-medium ${ok ? 'text-emerald-600' : 'text-red-600'}`}>{ok ? 'Exitoso' : 'Fallido'}</span>
+                {log.result && Object.keys(log.result).length > 0 && (
+                  <span className="text-slate-400 truncate max-w-[200px]">{JSON.stringify(log.result)}</span>
+                )}
+                {log.error && <span className="text-red-500 truncate max-w-[200px]">{log.error}</span>}
+                {log.duration_ms != null && <span className="text-slate-300">{log.duration_ms}ms</span>}
+                <span className="text-slate-400 ml-auto shrink-0">{fmtDateTime(log.executed_at)}</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="text-center py-8 text-slate-400">
+          <Clock className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+          <p className="text-sm">Sin ejecuciones registradas aún</p>
+          <p className="text-xs mt-1">Las ejecuciones aparecerán automáticamente cuando el cron se ejecute</p>
+        </div>
       )}
     </div>
   )
