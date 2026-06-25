@@ -538,7 +538,7 @@ export function LandingPage() {
 
           <div className="border-t border-slate-800 pt-6 flex flex-col md:flex-row justify-between items-center gap-2 text-xs">
             <p>© 2025 Finto. Todos los derechos reservados.</p>
-            <p>Bogotá, Colombia · info@rsbackoffice.com</p>
+            <p>Bogotá, Colombia · finto@finto.la</p>
           </div>
         </div>
       </footer>

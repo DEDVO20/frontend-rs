@@ -8,7 +8,13 @@ import './index.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 1, staleTime: 30_000 },
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60_000,         // 5 minutos — no refetch si los datos tienen menos de 5 min
+      gcTime: 10 * 60_000,            // 10 minutos en cache antes de limpiar
+      refetchOnWindowFocus: false,     // no refrescar al volver a la pestaña
+      refetchOnReconnect: true,        // sí refrescar si se reconecta internet
+    },
   },
 })
 
