@@ -65,9 +65,9 @@ export function ResetPasswordPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-xl bg-primary-500 flex items-center justify-center mx-auto mb-3">
-            <span className="text-white font-bold text-lg">RS</span>
+            <span className="text-white font-bold text-lg">F</span>
           </div>
-          <p className="text-sm text-slate-400">RS Back Office</p>
+          <p className="text-sm text-slate-400">Finto</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
@@ -180,7 +180,7 @@ export function ResetPasswordPage() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          © {new Date().getFullYear()} RS Back Office · Todos los derechos reservados
+          © {new Date().getFullYear()} Finto · Todos los derechos reservados
         </p>
       </div>
     </div>

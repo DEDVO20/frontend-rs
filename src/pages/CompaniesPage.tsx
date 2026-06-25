@@ -16,16 +16,16 @@ function fmtDate(d: string) {
 }
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  active:   { label: 'Activa', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  activa:   { label: 'Activa', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  active: { label: 'Activa', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  activa: { label: 'Activa', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   approved: { label: 'Activa', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   inactive: { label: 'Inactiva', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-  nueva:    { label: 'Nueva', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
-  new:      { label: 'Nueva', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+  nueva: { label: 'Nueva', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
+  new: { label: 'Nueva', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
 }
 
 const isActive = (s: string) => s === 'active' || s === 'activa' || s === 'approved'
-const isNew    = (s: string) => s === 'new' || s === 'nueva'
+const isNew = (s: string) => s === 'new' || s === 'nueva'
 
 const FILTERS = [
   { key: '', label: 'Todas' },
@@ -49,20 +49,20 @@ function getAvatarColor(name: string) {
 type DetailTab = 'info' | 'modules' | 'tasks' | 'docs' | 'activity'
 
 const DEPARTAMENTOS = [
-  'Amazonas','Antioquia','Arauca','Atlántico','Bolívar','Boyacá','Caldas','Caquetá',
-  'Casanare','Cauca','Cesar','Chocó','Córdoba','Cundinamarca','Guainía','Guaviare',
-  'Huila','La Guajira','Magdalena','Meta','Nariño','Norte de Santander','Putumayo',
-  'Quindío','Risaralda','San Andrés','Santander','Sucre','Tolima','Valle del Cauca',
-  'Vaupés','Vichada','Bogotá D.C.',
+  'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá',
+  'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 'Guainía', 'Guaviare',
+  'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 'Norte de Santander', 'Putumayo',
+  'Quindío', 'Risaralda', 'San Andrés', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca',
+  'Vaupés', 'Vichada', 'Bogotá D.C.',
 ]
 
 const SECTORES = [
-  'Tecnología','Comercio','Construcción','Salud','Educación','Servicios','Manufactura',
-  'Agroindustria','Financiero','Transporte','Energía','Telecomunicaciones','Consultoría','Otro',
+  'Tecnología', 'Comercio', 'Construcción', 'Salud', 'Educación', 'Servicios', 'Manufactura',
+  'Agroindustria', 'Financiero', 'Transporte', 'Energía', 'Telecomunicaciones', 'Consultoría', 'Otro',
 ]
 
 const TAMANOS = [
-  'Microempresa','Pequeña empresa','Mediana empresa','Gran empresa',
+  'Microempresa', 'Pequeña empresa', 'Mediana empresa', 'Gran empresa',
 ]
 
 function NewCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
@@ -113,7 +113,7 @@ function NewCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreate
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
           <div>
             <h2 className="text-lg font-bold text-slate-900">Nueva empresa</h2>
-            <p className="text-xs text-slate-400">Ingresa los datos del nuevo cliente RS Back Office</p>
+            <p className="text-xs text-slate-400">Ingresa los datos del nuevo cliente Finto</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 transition-colors">
             <X className="w-5 h-5" />
@@ -219,11 +219,10 @@ function NewCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreate
                         key={s.id}
                         type="button"
                         onClick={() => toggleService(s.id)}
-                        className={`flex items-center gap-2 p-3 rounded-xl border text-left text-sm transition-colors ${
-                          checked
+                        className={`flex items-center gap-2 p-3 rounded-xl border text-left text-sm transition-colors ${checked
                             ? 'border-primary-300 bg-primary-50 text-primary-700'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                        }`}
+                          }`}
                       >
                         {checked && <CheckCircle2 className="w-4 h-4 text-primary-500 shrink-0" />}
                         <span>{icon} {s.name}</span>
@@ -335,9 +334,8 @@ function ModulesPanel({ companyId }: { companyId: string }) {
             return (
               <div
                 key={s.id}
-                className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${
-                  enabled ? 'border-primary-200 bg-primary-50/30' : 'border-slate-200 bg-slate-50'
-                }`}
+                className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${enabled ? 'border-primary-200 bg-primary-50/30' : 'border-slate-200 bg-slate-50'
+                  }`}
               >
                 <span className="text-xl shrink-0">{icon}</span>
                 <div className="flex-1 min-w-0">
@@ -355,13 +353,11 @@ function ModulesPanel({ companyId }: { companyId: string }) {
                     onConfirm: () => toggleMut.mutateAsync({ serviceId: s.id, enable: !enabled }),
                   })}
                   disabled={toggleMut.isPending}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 ${
-                    enabled ? 'bg-primary-600' : 'bg-slate-300'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 ${enabled ? 'bg-primary-600' : 'bg-slate-300'
+                    }`}
                 >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
-                    enabled ? 'translate-x-6' : 'translate-x-1'
-                  }`} />
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
                 </button>
               </div>
             )
@@ -397,10 +393,10 @@ export function CompaniesPage() {
 
   const filtered = allCompanies.filter(c => {
     const st = c.status ?? ''
-    if (filter === 'active')   return isActive(st)
-    if (filter === 'new')      return isNew(st)
+    if (filter === 'active') return isActive(st)
+    if (filter === 'new') return isNew(st)
     if (filter === 'inactive') return st === 'inactive' || st === 'inactiva'
-    if (filter === 'mora')     return false
+    if (filter === 'mora') return false
     return true
   })
 
@@ -462,11 +458,11 @@ export function CompaniesPage() {
   const co = detail // alias
 
   const DETAIL_TABS: { key: DetailTab; label: string; icon: any }[] = [
-    { key: 'info',     label: 'Información', icon: Building2 },
-    { key: 'modules',  label: 'Módulos',     icon: LayoutGrid },
-    { key: 'tasks',    label: 'Tareas',      icon: ListTodo },
-    { key: 'docs',     label: 'Documentos',  icon: FileText },
-    { key: 'activity', label: 'Actividad',   icon: Activity },
+    { key: 'info', label: 'Información', icon: Building2 },
+    { key: 'modules', label: 'Módulos', icon: LayoutGrid },
+    { key: 'tasks', label: 'Tareas', icon: ListTodo },
+    { key: 'docs', label: 'Documentos', icon: FileText },
+    { key: 'activity', label: 'Actividad', icon: Activity },
   ]
 
   return (
@@ -505,11 +501,10 @@ export function CompaniesPage() {
                 <button
                   key={f.key}
                   onClick={() => setFilter(f.key)}
-                  className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
-                    filter === f.key
+                  className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${filter === f.key
                       ? 'bg-primary-600 text-white border-primary-600'
                       : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
+                    }`}
                 >
                   {f.label}
                 </button>
@@ -528,9 +523,8 @@ export function CompaniesPage() {
                 <button
                   key={c.id}
                   onClick={() => { setSelectedId(c.id); setDetailTab('info'); setEditing(false) }}
-                  className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${
-                    isSelected ? 'bg-primary-50 border-l-4 border-primary-500' : 'hover:bg-slate-50 border-l-4 border-transparent'
-                  }`}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${isSelected ? 'bg-primary-50 border-l-4 border-primary-500' : 'hover:bg-slate-50 border-l-4 border-transparent'
+                    }`}
                 >
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0 ${getAvatarColor(c.name ?? '')}`}>
                     {(c.name ?? '?')[0]!.toUpperCase()}
@@ -606,7 +600,7 @@ export function CompaniesPage() {
                                   .catch((e: any) => toast.error(e.response?.data?.error ?? 'Error al desactivar'))
                               },
                             },
-                            cancel: { label: 'Cancelar', onClick: () => {} },
+                            cancel: { label: 'Cancelar', onClick: () => { } },
                             duration: 10000,
                           },
                         )
@@ -628,11 +622,10 @@ export function CompaniesPage() {
                   <button
                     key={t.key}
                     onClick={() => setDetailTab(t.key)}
-                    className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                      detailTab === t.key
+                    className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${detailTab === t.key
                         ? 'border-primary-500 text-primary-600'
                         : 'border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
+                      }`}
                   >
                     <t.icon className="w-4 h-4" />
                     {t.label}
@@ -769,10 +762,9 @@ export function CompaniesPage() {
                                 {t.due_date && <span className="text-xs text-slate-400">📅 {fmtDate(t.due_date)}</span>}
                               </div>
                             </div>
-                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                              t.status === 'done' || t.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
-                              isOverdue ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
-                            }`}>
+                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${t.status === 'done' || t.status === 'completed' ? 'bg-emerald-50 text-emerald-700' :
+                                isOverdue ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'
+                              }`}>
                               {t.status === 'done' || t.status === 'completed' ? 'Completada' : isOverdue ? 'Vencida' : 'Pendiente'}
                             </span>
                           </div>
@@ -799,9 +791,8 @@ export function CompaniesPage() {
                             <p className="text-sm font-medium text-slate-900 truncate">{doc.title ?? doc.name ?? doc.file_name ?? '—'}</p>
                             <p className="text-xs text-slate-400">{doc.category ?? 'general'} · {doc.created_at ? fmtDate(doc.created_at) : '—'}</p>
                           </div>
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                            doc.status === 'available' || doc.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                          }`}>
+                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${doc.status === 'available' || doc.status === 'approved' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}>
                             {doc.status === 'available' || doc.status === 'approved' ? 'Disponible' : doc.status ?? '—'}
                           </span>
                         </div>

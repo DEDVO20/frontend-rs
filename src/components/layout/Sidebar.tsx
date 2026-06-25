@@ -26,28 +26,28 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Principal',
     items: [
-      { to: '/app/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
-      { to: '/app/companies',    label: 'Empresas',     icon: Building2,        adminOnly: true, badgeKey: 'companies',   badgeColor: 'bg-slate-600' },
-      { to: '/app/my-company',   label: 'Mi empresa',   icon: Building2,        clientOnly: true },
-      { to: '/app/onboarding',   label: 'Onboarding',   icon: UserCheck,        adminOnly: true, module: 'onboarding' },
-      { to: '/app/tasks',        label: 'Tareas',       icon: ClipboardList,    badgeKey: 'overdueTasks', badgeColor: 'bg-red-500' },
-      { to: '/app/documents',    label: 'Documentos',   icon: FileText,         badgeKey: 'documents',   badgeColor: 'bg-slate-600' },
-      { to: '/app/requests',     label: 'Solicitudes',  icon: MessageSquareMore, badgeKey: 'openRequests', badgeColor: 'bg-red-500' },
+      { to: '/app/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      { to: '/app/companies', label: 'Empresas', icon: Building2, adminOnly: true, badgeKey: 'companies', badgeColor: 'bg-slate-600' },
+      { to: '/app/my-company', label: 'Mi empresa', icon: Building2, clientOnly: true },
+      { to: '/app/onboarding', label: 'Onboarding', icon: UserCheck, adminOnly: true, module: 'onboarding' },
+      { to: '/app/tasks', label: 'Tareas', icon: ClipboardList, badgeKey: 'overdueTasks', badgeColor: 'bg-red-500' },
+      { to: '/app/documents', label: 'Documentos', icon: FileText, badgeKey: 'documents', badgeColor: 'bg-slate-600' },
+      { to: '/app/requests', label: 'Solicitudes', icon: MessageSquareMore, badgeKey: 'openRequests', badgeColor: 'bg-red-500' },
     ],
   },
   {
     title: 'Módulos',
     items: [
-      { to: '/app/collection',    label: 'Cartera',        icon: Landmark,   adminOnly: true, module: 'collection' },
+      { to: '/app/collection', label: 'Cartera', icon: Landmark, adminOnly: true, module: 'collection' },
       { to: '/app/dashboards-bi', label: 'Dashboards BI', icon: BarChart3 },
     ],
   },
   {
     title: 'Sistema',
     items: [
-      { to: '/app/profiles',    label: 'Usuarios',     icon: Users,           adminOnly: true },
-      { to: '/app/settings',    label: 'Configuración', icon: Settings,        adminOnly: true },
-      { to: '/',                label: 'Ver sitio web', icon: Globe },
+      { to: '/app/profiles', label: 'Usuarios', icon: Users, adminOnly: true },
+      { to: '/app/settings', label: 'Configuración', icon: Settings, adminOnly: true },
+      { to: '/', label: 'Ver sitio web', icon: Globe },
     ],
   },
 ]
@@ -101,10 +101,10 @@ export function Sidebar({ onClose }: Props) {
       <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-primary-500 flex items-center justify-center shrink-0">
-            <span className="text-white font-bold text-sm">RS</span>
+            <span className="text-white font-bold text-sm">F</span>
           </div>
           <div>
-            <p className="font-semibold text-sm leading-tight">RS Back Office</p>
+            <p className="font-semibold text-sm leading-tight">Finto</p>
             <p className="text-xs text-slate-400 leading-tight">Gestión Empresarial</p>
           </div>
         </div>

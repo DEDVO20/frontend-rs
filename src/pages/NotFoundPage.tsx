@@ -14,7 +14,7 @@ export function NotFoundPage() {
 
         {/* Logo */}
         <div className="w-12 h-12 rounded-xl bg-primary-500 flex items-center justify-center mx-auto mb-6">
-          <span className="text-white font-bold text-lg">RS</span>
+          <span className="text-white font-bold text-lg">F</span>
         </div>
 
         {/* Imagen */}
@@ -35,7 +35,7 @@ export function NotFoundPage() {
         </div>
 
         <p className="text-xs text-slate-400 mt-10">
-          © {new Date().getFullYear()} RS Back Office
+          © {new Date().getFullYear()} Finto
         </p>
       </div>
     </div>

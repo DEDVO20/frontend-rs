@@ -3,10 +3,10 @@ import { ArrowRight, ChevronRight, Menu, X, Phone } from 'lucide-react'
 import { useState } from 'react'
 
 const NAV_LINKS = [
-  { label: 'Servicios',      href: '#servicios' },
-  { label: 'Cómo funciona',  href: '#proceso' },
-  { label: 'Plataforma',     href: '#plataforma' },
-  { label: 'Contacto',       href: '#contacto' },
+  { label: 'Servicios', href: '#servicios' },
+  { label: 'Cómo funciona', href: '#proceso' },
+  { label: 'Plataforma', href: '#plataforma' },
+  { label: 'Contacto', href: '#contacto' },
 ]
 
 const SERVICES = [
@@ -88,12 +88,12 @@ const PROCESS_STEPS = [
 ]
 
 const PLATFORM_FEATURES = [
-  { emoji: '⚡', title: 'Información actualizada al instante',   desc: 'Los datos de su empresa se reflejan en el portal en tiempo real. Sin esperas, sin versiones desactualizadas.' },
-  { emoji: '🛡️', title: 'Seguridad de nivel bancario',           desc: 'Cifrado SSL, autenticación de dos factores y copias de seguridad automáticas diarias.' },
-  { emoji: '📱', title: 'Acceso desde cualquier dispositivo',    desc: 'Portal responsivo optimizado para computador, tableta y móvil. Su información siempre disponible.' },
-  { emoji: '🔗', title: 'Integración con su ERP',               desc: 'Conectamos con los principales sistemas contables y ERP del mercado colombiano sin fricciones.' },
-  { emoji: '📋', title: 'Reportes personalizados',              desc: 'Genere informes a la medida de su empresa: por período, área, proyecto o centro de costos.' },
-  { emoji: '🎯', title: 'Soporte dedicado',                     desc: 'Un equipo especializado asignado a su empresa, con tiempos de respuesta garantizados por SLA.' },
+  { emoji: '⚡', title: 'Información actualizada al instante', desc: 'Los datos de su empresa se reflejan en el portal en tiempo real. Sin esperas, sin versiones desactualizadas.' },
+  { emoji: '🛡️', title: 'Seguridad de nivel bancario', desc: 'Cifrado SSL, autenticación de dos factores y copias de seguridad automáticas diarias.' },
+  { emoji: '📱', title: 'Acceso desde cualquier dispositivo', desc: 'Portal responsivo optimizado para computador, tableta y móvil. Su información siempre disponible.' },
+  { emoji: '🔗', title: 'Integración con su ERP', desc: 'Conectamos con los principales sistemas contables y ERP del mercado colombiano sin fricciones.' },
+  { emoji: '📋', title: 'Reportes personalizados', desc: 'Genere informes a la medida de su empresa: por período, área, proyecto o centro de costos.' },
+  { emoji: '🎯', title: 'Soporte dedicado', desc: 'Un equipo especializado asignado a su empresa, con tiempos de respuesta garantizados por SLA.' },
 ]
 
 export function LandingPage() {
@@ -108,10 +108,10 @@ export function LandingPage() {
           {/* Logo */}
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm">RS</span>
+              <span className="text-white font-bold text-sm">F</span>
             </div>
             <div>
-              <p className="font-semibold text-slate-900 text-sm leading-tight">RS Back Office</p>
+              <p className="font-semibold text-slate-900 text-sm leading-tight">Finto</p>
               <p className="text-xs text-slate-400 leading-tight">Gestión Empresarial</p>
             </div>
           </div>
@@ -214,9 +214,9 @@ export function LandingPage() {
           {/* Stats row */}
           <div className="flex flex-wrap justify-center gap-6 mb-12">
             {[
-              { value: '+5',   label: 'Empresas activas' },
-              { value: '14+',  label: 'Meses en el mercado' },
-              { value: '99%',  label: 'Satisfacción clientes' },
+              { value: '+5', label: 'Empresas activas' },
+              { value: '14+', label: 'Meses en el mercado' },
+              { value: '99%', label: 'Satisfacción clientes' },
             ].map(s => (
               <div key={s.label} className="text-center px-6">
                 <p className="text-3xl font-bold text-primary-400">{s.value}</p>
@@ -246,8 +246,8 @@ export function LandingPage() {
                 <div className="flex-1 p-5 grid grid-cols-3 gap-3">
                   {[
                     { label: 'Facturación', val: '$84.2M', change: '↑ 12.4%' },
-                    { label: 'Cartera',     val: '$21.7M', change: '↑ 8.1%' },
-                    { label: 'Tesorería',   val: '97.3%',  change: '↑ 3.2%' },
+                    { label: 'Cartera', val: '$21.7M', change: '↑ 8.1%' },
+                    { label: 'Tesorería', val: '97.3%', change: '↑ 3.2%' },
                   ].map(k => (
                     <div key={k.label} className="bg-slate-700/40 rounded-xl p-3">
                       <p className="text-[10px] text-slate-400 mb-1">{k.label}</p>
@@ -367,10 +367,10 @@ export function LandingPage() {
               <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
                 <div className="bg-slate-900 px-5 py-4 flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
-                    <span className="text-white font-bold text-xs">RS</span>
+                    <span className="text-white font-bold text-xs">F</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-white text-xs leading-tight">RS Back Office</p>
+                    <p className="font-semibold text-white text-xs leading-tight">Finto</p>
                     <p className="text-[10px] text-slate-400 leading-tight">Gestión Empresarial</p>
                   </div>
                 </div>
@@ -500,10 +500,10 @@ export function LandingPage() {
             <div className="max-w-xs">
               <div className="flex items-center gap-2.5 mb-3">
                 <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
-                  <span className="text-white font-bold text-xs">RS</span>
+                  <span className="text-white font-bold text-xs">F</span>
                 </div>
                 <div>
-                  <p className="font-semibold text-white text-sm leading-tight">RS Back Office</p>
+                  <p className="font-semibold text-white text-sm leading-tight">Finto</p>
                   <p className="text-[10px] text-slate-400 leading-tight">Gestión Empresarial</p>
                 </div>
               </div>
@@ -537,7 +537,7 @@ export function LandingPage() {
           </div>
 
           <div className="border-t border-slate-800 pt-6 flex flex-col md:flex-row justify-between items-center gap-2 text-xs">
-            <p>© 2025 RS Back Office. Todos los derechos reservados.</p>
+            <p>© 2025 Finto. Todos los derechos reservados.</p>
             <p>Bogotá, Colombia · info@rsbackoffice.com</p>
           </div>
         </div>

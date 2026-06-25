@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 
 const schema = z.object({
-  email:    z.string().email('Email inválido'),
+  email: z.string().email('Email inválido'),
   password: z.string().min(6, 'Mínimo 6 caracteres'),
 })
 
@@ -34,7 +34,7 @@ const FEATURES = [
 
 export function LoginPage() {
   const { login } = useAuthStore()
-  const navigate   = useNavigate()
+  const navigate = useNavigate()
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
@@ -64,10 +64,10 @@ export function LoginPage() {
           {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
             <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-base">RS</span>
+              <span className="text-white font-bold text-base">F</span>
             </div>
             <div>
-              <p className="font-semibold text-white text-sm leading-tight">RS Back Office</p>
+              <p className="font-semibold text-white text-sm leading-tight">Finto</p>
               <p className="text-xs text-slate-400 leading-tight">Gestión empresarial</p>
             </div>
           </div>
@@ -102,7 +102,7 @@ export function LoginPage() {
           {/* Testimonial */}
           <div className="mt-auto bg-white/5 border border-white/10 rounded-2xl p-5">
             <p className="text-sm text-slate-300 italic leading-relaxed mb-4">
-              "RS Back Office transformó la manera en que gestionamos nuestra contabilidad.
+              "Finto transformó la manera en que gestionamos nuestra contabilidad.
               Tenemos visibilidad total y nunca más perdemos una fecha tributaria."
             </p>
             <div className="flex items-center gap-3">
@@ -122,10 +122,10 @@ export function LoginPage() {
           {/* Logo mobile */}
           <div className="flex lg:hidden items-center gap-3 mb-8">
             <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm">RS</span>
+              <span className="text-white font-bold text-sm">F</span>
             </div>
             <div>
-              <p className="font-semibold text-slate-900 text-sm leading-tight">RS Back Office</p>
+              <p className="font-semibold text-slate-900 text-sm leading-tight">Finto</p>
               <p className="text-xs text-slate-400 leading-tight">Gestión empresarial</p>
             </div>
           </div>
@@ -176,7 +176,7 @@ export function LoginPage() {
           </div>
 
           <p className="text-center text-slate-300 text-xs mt-8">
-            © {new Date().getFullYear()} RS Back Office · Todos los derechos reservados
+            © {new Date().getFullYear()} Finto · Todos los derechos reservados
           </p>
         </div>
       </div>

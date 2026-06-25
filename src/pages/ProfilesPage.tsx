@@ -12,11 +12,11 @@ import {
 } from 'lucide-react'
 
 const ROLE_LABELS: Record<string, { label: string; color: string; icon: any }> = {
-  admin:       { label: 'Super Administrador', color: 'text-red-600',     icon: <ShieldCheck className="w-3.5 h-3.5 text-red-500" /> },
-  rs_admin:    { label: 'Administrador RS',    color: 'text-amber-600',   icon: <Shield className="w-3.5 h-3.5 text-amber-500" /> },
-  rs_staff:    { label: 'Staff RS',            color: 'text-primary-600', icon: <Users className="w-3.5 h-3.5 text-primary-500" /> },
-  client_owner:{ label: 'Admin empresa',       color: 'text-blue-600',    icon: <Users className="w-3.5 h-3.5 text-blue-500" /> },
-  client_user: { label: 'Usuario empresa',     color: 'text-slate-600',   icon: <Users className="w-3.5 h-3.5 text-slate-400" /> },
+  admin: { label: 'Super Administrador', color: 'text-red-600', icon: <ShieldCheck className="w-3.5 h-3.5 text-red-500" /> },
+  rs_admin: { label: 'Administrador RS', color: 'text-amber-600', icon: <Shield className="w-3.5 h-3.5 text-amber-500" /> },
+  rs_staff: { label: 'Staff RS', color: 'text-primary-600', icon: <Users className="w-3.5 h-3.5 text-primary-500" /> },
+  client_owner: { label: 'Admin empresa', color: 'text-blue-600', icon: <Users className="w-3.5 h-3.5 text-blue-500" /> },
+  client_user: { label: 'Usuario empresa', color: 'text-slate-600', icon: <Users className="w-3.5 h-3.5 text-slate-400" /> },
 }
 
 const AVATAR_COLORS = [
@@ -50,9 +50,9 @@ export function ProfilesPage() {
 
   const filtered = search
     ? profiles.filter(p =>
-        (p.full_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-        (p.email ?? '').toLowerCase().includes(search.toLowerCase())
-      )
+      (p.full_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.email ?? '').toLowerCase().includes(search.toLowerCase())
+    )
     : profiles
 
   const toggleActive = useMutation({
@@ -81,7 +81,7 @@ export function ProfilesPage() {
             <p className="text-xs text-slate-400">{activeCount} activos</p>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Personal RS</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Personal Finto</p>
             <p className="text-3xl font-bold text-primary-600 mt-1">{adminCount}</p>
             <p className="text-xs text-slate-400">Administradores y staff</p>
           </div>
@@ -120,11 +120,10 @@ export function ProfilesPage() {
               <button
                 key={f.key}
                 onClick={() => { setRoleFilter(f.key); setPage(1) }}
-                className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${
-                  roleFilter === f.key
+                className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${roleFilter === f.key
                     ? 'bg-primary-600 text-white border-primary-600'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 {f.label}
               </button>
@@ -180,9 +179,8 @@ export function ProfilesPage() {
                           {p.companies?.name ?? '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                            p.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                          }`}>
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${p.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}>
                             {p.active ? <CheckCircle2 className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
                             {p.active ? 'Activo' : 'Inactivo'}
                           </span>
@@ -199,15 +197,14 @@ export function ProfilesPage() {
                                     label: p.active ? 'Desactivar' : 'Reactivar',
                                     onClick: () => toggleActive.mutate({ id: p.id, active: !p.active }),
                                   },
-                                  cancel: { label: 'Cancelar', onClick: () => {} },
+                                  cancel: { label: 'Cancelar', onClick: () => { } },
                                   duration: 8000,
                                 })
                               }}
-                              className={`text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors ${
-                                p.active
+                              className={`text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors ${p.active
                                   ? 'border-slate-200 text-slate-500 hover:text-red-600 hover:border-red-200'
                                   : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-                              }`}
+                                }`}
                             >
                               {p.active ? 'Desactivar' : 'Reactivar'}
                             </button>
@@ -304,8 +301,8 @@ function InviteModal({ onClose }: { onClose: () => void }) {
                 onChange={e => set('role', e.target.value)}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
-                <option value="rs_staff">Staff RS</option>
-                <option value="rs_admin">Administrador RS</option>
+                <option value="rs_staff">Staff Finto</option>
+                <option value="rs_admin">Administrador Finto</option>
                 <option value="admin">Super Administrador</option>
               </select>
             </div>

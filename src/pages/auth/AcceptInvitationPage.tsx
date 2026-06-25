@@ -63,9 +63,9 @@ export function AcceptInvitationPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-xl bg-primary-500 flex items-center justify-center mx-auto mb-3">
-            <span className="text-white font-bold text-lg">RS</span>
+            <span className="text-white font-bold text-lg">F</span>
           </div>
-          <p className="text-sm text-slate-400">RS Back Office</p>
+          <p className="text-sm text-slate-400">Finto</p>
           <p className="text-xs text-slate-400">Gestión empresarial</p>
         </div>
 
@@ -117,7 +117,7 @@ export function AcceptInvitationPage() {
               <div className="px-6 pt-6 pb-4">
                 <h2 className="text-lg font-bold text-slate-900">Crear tu cuenta</h2>
                 <p className="text-sm text-slate-400 mt-1">
-                  Has sido invitado a unirte a <strong className="text-slate-700">{invite.companyName || 'RS Back Office'}</strong>
+                  Has sido invitado a unirte a <strong className="text-slate-700">{invite.companyName || 'Finto'}</strong>
                 </p>
               </div>
 
@@ -208,7 +208,7 @@ export function AcceptInvitationPage() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          © {new Date().getFullYear()} RS Back Office · Todos los derechos reservados
+          © {new Date().getFullYear()} Finto · Todos los derechos reservados
         </p>
       </div>
     </div>

@@ -17,18 +17,18 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 // ── helpers ────────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<string, { label: string; color: any }> = {
-  pending:        { label: 'Pendiente',      color: 'gray'   },
-  in_collection:  { label: 'En gestión',     color: 'blue'   },
-  promised:       { label: 'Prometido',      color: 'yellow' },
-  agreement:      { label: 'Acuerdo',        color: 'teal'   },
-  partially_paid: { label: 'Pago parcial',   color: 'orange' },
-  paid:           { label: 'Pagado',         color: 'green'  },
-  defaulted:      { label: 'En mora',        color: 'red'    },
-  uncontactable:  { label: 'No contactable', color: 'gray'   },
+  pending: { label: 'Pendiente', color: 'gray' },
+  in_collection: { label: 'En gestión', color: 'blue' },
+  promised: { label: 'Prometido', color: 'yellow' },
+  agreement: { label: 'Acuerdo', color: 'teal' },
+  partially_paid: { label: 'Pago parcial', color: 'orange' },
+  paid: { label: 'Pagado', color: 'green' },
+  defaulted: { label: 'En mora', color: 'red' },
+  uncontactable: { label: 'No contactable', color: 'gray' },
 }
 
 function getTramo(days: number): string {
-  if (days <= 0)  return '—'
+  if (days <= 0) return '—'
   if (days <= 30) return '1-30 días'
   if (days <= 60) return '31-60 días'
   if (days <= 90) return '61-90 días'
@@ -46,7 +46,7 @@ function renderPreview(template: string, debtor: any): string {
   const saldo = debtor.outstanding_balance ?? (debtor.collection_debts ?? []).reduce((acc: number, x: any) => acc + (x.outstanding_amount ?? 0), 0)
   const debtsList = (debtor.collection_debts ?? []).filter((x: any) => (x.outstanding_amount ?? 0) > 0)
   const debtsToUse = debtsList.length > 0 ? debtsList : (debtor.collection_debts ?? [])
-  
+
   const facturasStr = debtsToUse.map((x: any) => {
     const copFormatted = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(x.outstanding_amount ?? 0).replace(/\s/g, '')
 
@@ -67,7 +67,7 @@ function renderPreview(template: string, debtor: any): string {
     .replace(/\{\{saldo\}\}/g, formatCurrency(saldo))
     .replace(/\{\{dias_mora\}\}/g, String(debtor.days_overdue ?? 0))
     .replace(/\{\{empresa\}\}/g, debtor.company?.name ?? debtor.companies?.name ?? '')
-    .replace(/\{\{asesor\}\}/g, debtor.assigned_user?.full_name ?? 'RS Back Office')
+    .replace(/\{\{asesor\}\}/g, debtor.assigned_user?.full_name ?? 'Finto')
     .replace(/\{\{facturas\}\}/g, facturasStr)
 }
 
@@ -95,13 +95,13 @@ function KpiCard({ icon: Icon, iconBg, label, value, sub, subColor = 'text-slate
 // ── Envío masivo panel ─────────────────────────────────────────────────────────
 
 function MasivoPanel({ companyId }: { companyId: string }) {
-  const [channel,  setChannel]  = useState<'whatsapp'|'sms'|'email'>('whatsapp')
-  const [message,  setMessage]  = useState('')
-  const [tramo,    setTramo]    = useState('')
-  const [statusF,  setStatusF]  = useState('')
-  const [plantilla,setPlantilla]= useState('')
+  const [channel, setChannel] = useState<'whatsapp' | 'sms' | 'email'>('whatsapp')
+  const [message, setMessage] = useState('')
+  const [tramo, setTramo] = useState('')
+  const [statusF, setStatusF] = useState('')
+  const [plantilla, setPlantilla] = useState('')
   const [selected, setSelected] = useState<string[]>([])
-  const [sending,  setSending]  = useState(false)
+  const [sending, setSending] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['debtors-masivo', companyId],
@@ -131,9 +131,9 @@ function MasivoPanel({ companyId }: { companyId: string }) {
     if (d.prev_max_tramo) return d.prev_max_tramo
     const debts: any[] = d.collection_debts ?? []
     if (debts.some((x: any) => (x.overdue_91_plus ?? 0) > 0)) return 91
-    if (debts.some((x: any) => (x.overdue_61_90 ?? 0) > 0))   return 61
-    if (debts.some((x: any) => (x.overdue_31_60 ?? 0) > 0))   return 31
-    if (debts.some((x: any) => (x.overdue_1_30  ?? 0) > 0))   return 1
+    if (debts.some((x: any) => (x.overdue_61_90 ?? 0) > 0)) return 61
+    if (debts.some((x: any) => (x.overdue_31_60 ?? 0) > 0)) return 31
+    if (debts.some((x: any) => (x.overdue_1_30 ?? 0) > 0)) return 1
     return 0
   }
 
@@ -141,10 +141,10 @@ function MasivoPanel({ companyId }: { companyId: string }) {
     if (statusF && d.status !== statusF) return false
     if (tramo) {
       const t = getMaxTramo(d)
-      if (tramo === '1-30'  && !(t >= 1  && t <= 30)) return false
+      if (tramo === '1-30' && !(t >= 1 && t <= 30)) return false
       if (tramo === '31-60' && !(t >= 31 && t <= 60)) return false
       if (tramo === '61-90' && !(t >= 61 && t <= 90)) return false
-      if (tramo === '91+'   && !(t >= 91))             return false
+      if (tramo === '91+' && !(t >= 91)) return false
     }
     return true
   })
@@ -245,8 +245,8 @@ function MasivoPanel({ companyId }: { companyId: string }) {
           <div className="flex gap-1.5">
             {([
               { id: 'whatsapp', label: '💬 WhatsApp' },
-              { id: 'sms',     label: '📱 SMS' },
-              { id: 'email',   label: '📧 Email' },
+              { id: 'sms', label: '📱 SMS' },
+              { id: 'email', label: '📧 Email' },
             ] as const).map(ch => (
               <button key={ch.id} onClick={() => {
                 setChannel(ch.id)
@@ -448,10 +448,10 @@ function TemplateModal({ editing, onClose, onSaved }: {
         : undefined
 
       const payload = {
-        name:      form.name.trim(),
-        channel:   form.channel,
-        body:      form.content.trim(),
-        tramo:     tramoNum,
+        name: form.name.trim(),
+        channel: form.channel,
+        body: form.content.trim(),
+        tramo: tramoNum,
         is_active: form.active,
         is_global: true,
       }
@@ -509,16 +509,15 @@ function TemplateModal({ editing, onClose, onSaved }: {
               <div className="grid grid-cols-3 gap-2">
                 {([
                   { id: 'whatsapp', label: 'WhatsApp', icon: '💬', active: 'bg-emerald-500 border-emerald-500 text-white', dot: 'bg-emerald-400' },
-                  { id: 'sms',      label: 'SMS',       icon: '📱', active: 'bg-blue-500 border-blue-500 text-white',    dot: 'bg-blue-400' },
-                  { id: 'email',    label: 'Email',     icon: '📧', active: 'bg-primary-600 border-primary-600 text-white', dot: 'bg-primary-400' },
+                  { id: 'sms', label: 'SMS', icon: '📱', active: 'bg-blue-500 border-blue-500 text-white', dot: 'bg-blue-400' },
+                  { id: 'email', label: 'Email', icon: '📧', active: 'bg-primary-600 border-primary-600 text-white', dot: 'bg-primary-400' },
                 ] as const).map(ch => (
                   <button key={ch.id} type="button"
                     onClick={() => setForm(f => ({ ...f, channel: ch.id }))}
-                    className={`flex flex-col items-center gap-1.5 py-3 rounded-xl font-medium text-xs transition-all border-2 ${
-                      form.channel === ch.id
+                    className={`flex flex-col items-center gap-1.5 py-3 rounded-xl font-medium text-xs transition-all border-2 ${form.channel === ch.id
                         ? `${ch.active} shadow-md`
                         : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}>
+                      }`}>
                     <span className="text-xl leading-none">{ch.icon}</span>
                     <span>{ch.label}</span>
                   </button>
@@ -531,18 +530,17 @@ function TemplateModal({ editing, onClose, onSaved }: {
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tramo mínimo (días)</label>
               <div className="grid grid-cols-4 gap-1.5">
                 {[
-                  { label: '1–30',  val: '1–30' },
+                  { label: '1–30', val: '1–30' },
                   { label: '31–60', val: '31–60' },
                   { label: '61–90', val: '61–90' },
-                  { label: '91+',   val: '91+' },
+                  { label: '91+', val: '91+' },
                 ].map(t => (
                   <button key={t.val} type="button"
                     onClick={() => setForm(f => ({ ...f, tramo_min: f.tramo_min === t.val ? '' : t.val }))}
-                    className={`py-2 rounded-lg text-xs font-medium border-2 transition-all ${
-                      form.tramo_min === t.val
+                    className={`py-2 rounded-lg text-xs font-medium border-2 transition-all ${form.tramo_min === t.val
                         ? 'bg-slate-800 border-slate-800 text-white'
                         : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                    }`}>
+                      }`}>
                     {t.label}
                   </button>
                 ))}
@@ -609,7 +607,7 @@ function TemplateModal({ editing, onClose, onSaved }: {
 function PlantillasPanel() {
   const qc = useQueryClient()
   const confirmDlg = useConfirm()
-  const [modalOpen,  setModalOpen]  = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<any | null>(null)
 
   const { data, isLoading } = useQuery({
@@ -618,8 +616,8 @@ function PlantillasPanel() {
   })
 
   const openCreate = () => { setEditTarget(null); setModalOpen(true) }
-  const openEdit   = (t: any) => { setEditTarget(t); setModalOpen(true) }
-  const onSaved    = () => qc.invalidateQueries({ queryKey: ['collection-templates'] })
+  const openEdit = (t: any) => { setEditTarget(t); setModalOpen(true) }
+  const onSaved = () => qc.invalidateQueries({ queryKey: ['collection-templates'] })
 
   const handleDelete = (id: string) => {
     confirmDlg({
@@ -655,7 +653,7 @@ function PlantillasPanel() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                {['Nombre','Canal','Tramo','Empresa','Estado',''].map(h => (
+                {['Nombre', 'Canal', 'Tramo', 'Empresa', 'Estado', ''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -734,14 +732,14 @@ function PlantillasPanel() {
 // ── Edit Debtor Modal ─────────────────────────────────────────────────────────
 
 const STATUS_OPTIONS = [
-  { value: 'pending',        label: 'Pendiente' },
-  { value: 'in_collection',  label: 'En gestión' },
-  { value: 'promised',       label: 'Prometido' },
-  { value: 'agreement',      label: 'Acuerdo' },
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'in_collection', label: 'En gestión' },
+  { value: 'promised', label: 'Prometido' },
+  { value: 'agreement', label: 'Acuerdo' },
   { value: 'partially_paid', label: 'Pago parcial' },
-  { value: 'paid',           label: 'Pagado' },
-  { value: 'defaulted',      label: 'En mora' },
-  { value: 'uncontactable',  label: 'No contactable' },
+  { value: 'paid', label: 'Pagado' },
+  { value: 'defaulted', label: 'En mora' },
+  { value: 'uncontactable', label: 'No contactable' },
 ]
 
 function EditDebtorModal({ debtorId, onClose, onSaved }: {
@@ -761,25 +759,25 @@ function EditDebtorModal({ debtorId, onClose, onSaved }: {
   // Inicializa el form cuando llegan los datos
   if (debtor && !form) {
     setForm({
-      debtor_name:     debtor.debtor_name     ?? '',
-      debtor_document: debtor.debtor_document  ?? '',
-      phone:           debtor.phone           ?? '',
-      whatsapp:        debtor.whatsapp         ?? '',
-      email:           debtor.email            ?? '',
-      city:            debtor.city             ?? '',
-      status:          debtor.status           ?? 'pending',
+      debtor_name: debtor.debtor_name ?? '',
+      debtor_document: debtor.debtor_document ?? '',
+      phone: debtor.phone ?? '',
+      whatsapp: debtor.whatsapp ?? '',
+      email: debtor.email ?? '',
+      city: debtor.city ?? '',
+      status: debtor.status ?? 'pending',
     })
   }
 
   const save = useMutation({
     mutationFn: async () => {
       await api.patch(`/api/collection/debtors/${debtorId}`, {
-        debtor_name:     form.debtor_name.trim()     || undefined,
-        phone:           form.phone.trim()           || undefined,
-        whatsapp:        form.whatsapp.trim()        || undefined,
-        email:           form.email.trim()           || undefined,
-        city:            form.city.trim()            || undefined,
-        status:          form.status                 || undefined,
+        debtor_name: form.debtor_name.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        whatsapp: form.whatsapp.trim() || undefined,
+        email: form.email.trim() || undefined,
+        city: form.city.trim() || undefined,
+        status: form.status || undefined,
       })
     },
     onSuccess: () => {
@@ -887,19 +885,19 @@ function EditDebtorModal({ debtorId, onClose, onSaved }: {
 
 type ImportMode = 'siigo' | 'contactos'
 
-const SIIGO_STEPS     = ['Seleccionar empresa', 'Cargar archivo', 'Previsualizar', 'Importar']
+const SIIGO_STEPS = ['Seleccionar empresa', 'Cargar archivo', 'Previsualizar', 'Importar']
 const CONTACTOS_STEPS = ['Cargar archivo', 'Confirmar', 'Importar']
 
 const CONTACT_COLS = [
-  { col: 'A', label: 'Empresa',              desc: 'Nombre largo de la empresa' },
-  { col: 'B', label: 'Abreviatura',           desc: 'Nombre corto o sigla' },
-  { col: 'C', label: 'Asesor',                desc: 'Siglas del asesor asignado' },
-  { col: 'D', label: 'NIT / Celular',         desc: 'NIT para matching · Celular → teléfono', highlight: true },
-  { col: 'E', label: 'Email Facturación',     desc: 'Correo del área de facturación' },
-  { col: 'F', label: 'Contacto Comercial',    desc: 'Nombre del contacto comercial' },
-  { col: 'G', label: 'Email Comercial',       desc: 'Correo del contacto comercial' },
-  { col: 'H', label: 'Contacto Tesorería',    desc: 'Nombre del contacto de tesorería' },
-  { col: 'I', label: 'Email Tesorería',       desc: 'Correo del contacto de tesorería' },
+  { col: 'A', label: 'Empresa', desc: 'Nombre largo de la empresa' },
+  { col: 'B', label: 'Abreviatura', desc: 'Nombre corto o sigla' },
+  { col: 'C', label: 'Asesor', desc: 'Siglas del asesor asignado' },
+  { col: 'D', label: 'NIT / Celular', desc: 'NIT para matching · Celular → teléfono', highlight: true },
+  { col: 'E', label: 'Email Facturación', desc: 'Correo del área de facturación' },
+  { col: 'F', label: 'Contacto Comercial', desc: 'Nombre del contacto comercial' },
+  { col: 'G', label: 'Email Comercial', desc: 'Correo del contacto comercial' },
+  { col: 'H', label: 'Contacto Tesorería', desc: 'Nombre del contacto de tesorería' },
+  { col: 'I', label: 'Email Tesorería', desc: 'Correo del contacto de tesorería' },
 ]
 
 function StepBar({ steps, step }: { steps: string[]; step: number }) {
@@ -908,9 +906,8 @@ function StepBar({ steps, step }: { steps: string[]; step: number }) {
       {steps.map((label, i) => (
         <div key={i} className="flex items-center flex-1 last:flex-none">
           <div className="flex items-center gap-2 shrink-0">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-              i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-400'
-            }`}>
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${i < step ? 'bg-emerald-500 text-white' : i === step ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-400'
+              }`}>
               {i < step ? '✓' : i + 1}
             </div>
             <span className={`text-xs font-medium hidden sm:block ${i === step ? 'text-slate-900' : 'text-slate-400'}`}>
@@ -1062,18 +1059,18 @@ function ResultPanel({ result }: { result: any }) {
 }
 
 function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
-  const [mode,      setMode]      = useState<ImportMode>('siigo')
-  const [step,      setStep]      = useState(0)
+  const [mode, setMode] = useState<ImportMode>('siigo')
+  const [step, setStep] = useState(0)
   const [companyId, setCompanyId] = useState('')
-  const [file,      setFile]      = useState<File | null>(null)
-  const [preview,   setPreview]   = useState<{ headers: string[]; rows: string[][] } | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<{ headers: string[]; rows: string[][] } | null>(null)
   const [importing, setImporting] = useState(false)
-  const [progress,  setProgress]  = useState(0)
+  const [progress, setProgress] = useState(0)
   const [progressMsg, setProgressMsg] = useState('')
-  const [result,    setResult]    = useState<{ imported: number; skipped: number; errors: string[] } | null>(null)
+  const [result, setResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null)
 
   const steps = mode === 'siigo' ? SIIGO_STEPS : CONTACTOS_STEPS
-  const done  = !!result
+  const done = !!result
 
   const { data: companies } = useQuery({
     queryKey: ['companies-list'],
@@ -1196,7 +1193,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   }
 
   const handleContinue = () => {
-    if (mode === 'siigo' && step === 2)  { handleImportSiigo();    return }
+    if (mode === 'siigo' && step === 2) { handleImportSiigo(); return }
     if (mode === 'contactos' && step === 1) { handleImportContactos(); return }
     setStep(s => s + 1)
   }
@@ -1211,16 +1208,14 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
             <button
               onClick={() => switchMode('siigo')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                mode === 'siigo' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
-              }`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'siigo' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
+                }`}>
               📊 Importar Siigo
             </button>
             <button
               onClick={() => switchMode('contactos')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                mode === 'contactos' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
-              }`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'contactos' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'
+                }`}>
               📞 Importar contactos
             </button>
           </div>
@@ -1337,12 +1332,10 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Estructura esperada del Excel</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {CONTACT_COLS.map(({ col, label, desc, highlight }) => (
-                        <div key={col} className={`flex items-start gap-3 p-3 rounded-xl border ${
-                          highlight ? 'bg-primary-50 border-primary-200' : 'bg-slate-50 border-slate-200'
-                        }`}>
-                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-xs font-bold shrink-0 ${
-                            highlight ? 'bg-primary-600 text-white' : 'bg-slate-200 text-slate-600'
+                        <div key={col} className={`flex items-start gap-3 p-3 rounded-xl border ${highlight ? 'bg-primary-50 border-primary-200' : 'bg-slate-50 border-slate-200'
                           }`}>
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-xs font-bold shrink-0 ${highlight ? 'bg-primary-600 text-white' : 'bg-slate-200 text-slate-600'
+                            }`}>
                             {col}
                           </span>
                           <div className="min-w-0">
@@ -1428,15 +1421,15 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export function CollectionPage() {
-  const [search,     setSearch]     = useState('')
-  const [status,     setStatus]     = useState('')
-  const [page,       setPage]       = useState(1)
-  const [tab,        setTab]        = useState<TabKey>('active')
-  const [selected,   setSelected]   = useState<string[]>([])
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
+  const [page, setPage] = useState(1)
+  const [tab, setTab] = useState<TabKey>('active')
+  const [selected, setSelected] = useState<string[]>([])
   const [showImport, setShowImport] = useState(false)
   const [viewDebtorId, setViewDebtorId] = useState<string | null>(null)
   const [editDebtorId, setEditDebtorId] = useState<string | null>(null)
-  const [companyId,  setCompanyId]  = useState('')
+  const [companyId, setCompanyId] = useState('')
   const qc = useQueryClient()
 
   const { data: companies } = useQuery({
@@ -1461,16 +1454,16 @@ export function CollectionPage() {
     queryKey: ['debtors', search, status, page, tab, companyId],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: '20' })
-      if (search)    params.set('search', search)
+      if (search) params.set('search', search)
       if (companyId) params.set('company_id', companyId)
-      if (tab === 'paid')        params.set('status', 'paid')
+      if (tab === 'paid') params.set('status', 'paid')
       else if (tab === 'gestion') params.set('status', 'in_collection')
-      else if (status)           params.set('status', status)
+      else if (status) params.set('status', status)
       const { data } = await api.get(`/api/collection/debtors?${params}`)
       return data
     },
     staleTime: 30_000,
-    enabled: ['active','paid','gestion'].includes(tab),
+    enabled: ['active', 'paid', 'gestion'].includes(tab),
   })
 
   const rows: any[] = data?.data ?? []
@@ -1482,10 +1475,10 @@ export function CollectionPage() {
     setSelected(prev => prev.length === rows.length ? [] : rows.map(r => r.id))
 
   const TABS: { key: TabKey; label: string; count?: number }[] = [
-    { key: 'active',     label: 'Cartera activa',  count: stats?.active },
-    { key: 'paid',       label: 'Pagados',          count: stats?.paid },
-    { key: 'gestion',    label: 'Gestión del día',  count: stats?.inCollection },
-    { key: 'masivo',     label: 'Envío masivo' },
+    { key: 'active', label: 'Cartera activa', count: stats?.active },
+    { key: 'paid', label: 'Pagados', count: stats?.paid },
+    { key: 'gestion', label: 'Gestión del día', count: stats?.inCollection },
+    { key: 'masivo', label: 'Envío masivo' },
     { key: 'plantillas', label: 'Plantillas' },
   ]
 
@@ -1497,15 +1490,15 @@ export function CollectionPage() {
 
         {/* KPIs fila 1 */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <KpiCard icon={Users}        iconBg="bg-slate-500"   label="Total deudores"
+          <KpiCard icon={Users} iconBg="bg-slate-500" label="Total deudores"
             value={stats?.total ?? '—'}
             sub={stats ? `${stats.active} activos · ${stats.paid} pagados` : undefined} />
-          <KpiCard icon={DollarSign}   iconBg="bg-red-500"     label="Saldo vencido"
+          <KpiCard icon={DollarSign} iconBg="bg-red-500" label="Saldo vencido"
             value={stats ? formatCurrency(stats.saldoVencido) : '—'}
             sub={stats ? `${stats.mora91} con mora 91+` : undefined} subColor="text-red-500" />
-          <KpiCard icon={PhoneOff}     iconBg="bg-amber-500"   label="Sin contacto"
+          <KpiCard icon={PhoneOff} iconBg="bg-amber-500" label="Sin contacto"
             value={stats?.noContact ?? '—'} sub="Sin teléfono ni email" />
-          <KpiCard icon={Handshake}    iconBg="bg-yellow-500"  label="Acuerdos activos"
+          <KpiCard icon={Handshake} iconBg="bg-yellow-500" label="Acuerdos activos"
             value={stats?.acuerdosActivos ?? '—'} sub="0 incumplidos" />
           <KpiCard icon={ClipboardList} iconBg="bg-primary-500" label="Tareas hoy"
             value={stats?.tasksHoy ?? '—'}
@@ -1567,9 +1560,8 @@ export function CollectionPage() {
           <div className="flex items-center gap-1 px-5 py-2 border-b border-slate-100 overflow-x-auto">
             {TABS.map(t => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
-                  tab === t.key ? 'bg-amber-400 text-slate-900' : 'text-slate-500 hover:bg-slate-100'
-                }`}>
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${tab === t.key ? 'bg-amber-400 text-slate-900' : 'text-slate-500 hover:bg-slate-100'
+                  }`}>
                 {t.label}
                 {t.count !== undefined && (
                   <span className={`text-[10px] font-bold rounded-full px-1.5 py-0.5 ${tab === t.key ? 'bg-slate-900/20' : 'bg-slate-200 text-slate-600'}`}>
@@ -1581,11 +1573,11 @@ export function CollectionPage() {
           </div>
 
           {/* Panels */}
-          {tab === 'masivo'     && <MasivoPanel key={companyId} companyId={companyId} />}
+          {tab === 'masivo' && <MasivoPanel key={companyId} companyId={companyId} />}
           {tab === 'plantillas' && <PlantillasPanel />}
 
           {/* Debtors table */}
-          {['active','paid','gestion'].includes(tab) && (
+          {['active', 'paid', 'gestion'].includes(tab) && (
             <>
               {/* Filters */}
               <div className="flex flex-col sm:flex-row gap-2 px-5 py-3 border-b border-slate-100 flex-wrap">
@@ -1627,7 +1619,7 @@ export function CollectionPage() {
                     {rows.map((d: any) => {
                       const s = STATUS_LABELS[d.status] ?? { label: d.status, color: 'gray' }
                       const saldo = d.outstanding_balance ?? d.collection_debts?.reduce((a: number, x: any) => a + (x.outstanding_amount ?? 0), 0) ?? 0
-                      const days  = d.days_overdue ?? 0
+                      const days = d.days_overdue ?? 0
                       return (
                         <div key={d.id} className="px-5 py-4 space-y-1.5">
                           <div className="flex items-start justify-between gap-2">
@@ -1662,7 +1654,7 @@ export function CollectionPage() {
                               checked={selected.length === rows.length && rows.length > 0}
                               onChange={toggleAll} className="rounded border-slate-300" />
                           </th>
-                          {['DEUDOR','EMPRESA','FACTURAS','ANTIGÜEDAD','SALDO VENCIDO','TRAMOS','CONTACTO','ESTADO','ACCIONES'].map(h => (
+                          {['DEUDOR', 'EMPRESA', 'FACTURAS', 'ANTIGÜEDAD', 'SALDO VENCIDO', 'TRAMOS', 'CONTACTO', 'ESTADO', 'ACCIONES'].map(h => (
                             <th key={h} className={`${h === 'ACCIONES' ? 'text-right' : 'text-left'} px-3 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider`}>{h}</th>
                           ))}
                         </tr>
@@ -1671,7 +1663,7 @@ export function CollectionPage() {
                         {rows.map((d: any) => {
                           const s = STATUS_LABELS[d.status] ?? { label: d.status, color: 'gray' }
                           const saldo = d.outstanding_balance ?? d.collection_debts?.reduce((a: number, x: any) => a + (x.outstanding_amount ?? 0), 0) ?? 0
-                          const days  = d.days_overdue ?? 0
+                          const days = d.days_overdue ?? 0
                           return (
                             <tr key={d.id} className="hover:bg-slate-50 transition-colors group">
                               <td className="px-4 py-3">
@@ -1716,13 +1708,15 @@ export function CollectionPage() {
                                   </button>
                                   <button
                                     onClick={() => toast('¿Eliminar este deudor?', {
-                                      action: { label: 'Eliminar', onClick: () => {
-                                        api.delete(`/api/collection/debtors/${d.id}`).then(() => {
-                                          toast.success('Deudor eliminado')
-                                          qc.invalidateQueries({ queryKey: ['debtors'] })
-                                        }).catch(() => toast.error('Error al eliminar'))
-                                      }},
-                                      cancel: { label: 'Cancelar', onClick: () => {} },
+                                      action: {
+                                        label: 'Eliminar', onClick: () => {
+                                          api.delete(`/api/collection/debtors/${d.id}`).then(() => {
+                                            toast.success('Deudor eliminado')
+                                            qc.invalidateQueries({ queryKey: ['debtors'] })
+                                          }).catch(() => toast.error('Error al eliminar'))
+                                        }
+                                      },
+                                      cancel: { label: 'Cancelar', onClick: () => { } },
                                       duration: 8000,
                                     })}
                                     className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
