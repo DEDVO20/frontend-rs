@@ -889,15 +889,11 @@ const SIIGO_STEPS = ['Seleccionar empresa', 'Cargar archivo', 'Previsualizar', '
 const CONTACTOS_STEPS = ['Cargar archivo', 'Confirmar', 'Importar']
 
 const CONTACT_COLS = [
-  { col: 'A', label: 'Empresa', desc: 'Nombre largo de la empresa' },
-  { col: 'B', label: 'Abreviatura', desc: 'Nombre corto o sigla' },
-  { col: 'C', label: 'Asesor', desc: 'Siglas del asesor asignado' },
-  { col: 'D', label: 'NIT / Celular', desc: 'NIT para matching · Celular → teléfono', highlight: true },
-  { col: 'E', label: 'Email Facturación', desc: 'Correo del área de facturación' },
-  { col: 'F', label: 'Contacto Comercial', desc: 'Nombre del contacto comercial' },
-  { col: 'G', label: 'Email Comercial', desc: 'Correo del contacto comercial' },
-  { col: 'H', label: 'Contacto Tesorería', desc: 'Nombre del contacto de tesorería' },
-  { col: 'I', label: 'Email Tesorería', desc: 'Correo del contacto de tesorería' },
+  { col: 'A', label: 'Empresa', desc: 'Nombre de la empresa (referencia)' },
+  { col: 'B', label: 'NIT', desc: 'NIT del deudor — clave de matching', highlight: true },
+  { col: 'C', label: 'Celular', desc: 'Número de celular (WhatsApp)' },
+  { col: 'D', label: 'Email Tesorería', desc: 'Correo del área de tesorería' },
+  { col: 'E', label: 'Teléfono', desc: 'Teléfono fijo' },
 ]
 
 function StepBar({ steps, step }: { steps: string[]; step: number }) {
@@ -1166,7 +1162,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
     if (!file) return
     setImporting(true)
     setProgress(0)
-    setProgressMsg('Procesando archivo Excel...')
+    setProgressMsg('Procesando archivo...')
     try {
       const fd = new FormData()
       fd.append('file', file)
@@ -1320,16 +1316,16 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 <div className="space-y-5">
                   <div>
                     <h4 className="text-sm font-bold text-slate-700 mb-0.5">Importar datos de contacto</h4>
-                    <p className="text-slate-500 text-sm">Actualiza teléfono, WhatsApp y email de deudores existentes en cartera usando su NIT como clave de matching.</p>
+                    <p className="text-slate-500 text-sm">Actualiza celular, teléfono y email de tesorería de deudores existentes usando el NIT como clave de matching.</p>
                   </div>
 
                   <FileDropZone
                     file={file} onFile={f => setFile(f)} onClear={() => setFile(null)}
-                    accept=".xlsx,.xls" hint="Archivo Excel (.xlsx) con la estructura de contactos" />
+                    accept=".xlsx,.xls,.csv" hint="Archivo Excel (.xlsx) o CSV con la estructura de contactos" />
 
                   {/* Estructura esperada */}
                   <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Estructura esperada del Excel</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Estructura esperada del archivo (Excel o CSV)</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {CONTACT_COLS.map(({ col, label, desc, highlight }) => (
                         <div key={col} className={`flex items-start gap-3 p-3 rounded-xl border ${highlight ? 'bg-primary-50 border-primary-200' : 'bg-slate-50 border-slate-200'
@@ -1354,7 +1350,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-sm font-bold text-slate-700 mb-0.5">Paso 2 — Confirmar importación</h4>
-                    <p className="text-slate-500 text-sm">El sistema actualizará teléfono, WhatsApp y emails de los deudores encontrados por NIT.</p>
+                    <p className="text-slate-500 text-sm">El sistema actualizará celular, teléfono y email de tesorería de los deudores encontrados por NIT.</p>
                   </div>
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 space-y-2">
                     <p className="font-semibold">⚠️ Esta acción sobrescribirá los datos de contacto existentes.</p>
@@ -1364,7 +1360,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
                     <span className="text-2xl">📄</span>
                     <div>
                       <p className="text-sm font-semibold text-slate-800">{file?.name}</p>
-                      <p className="text-xs text-slate-400">{file ? `${(file.size / 1024).toFixed(0)} KB · Excel` : ''}</p>
+                      <p className="text-xs text-slate-400">{file ? `${(file.size / 1024).toFixed(0)} KB · ${file.name.endsWith('.csv') ? 'CSV' : 'Excel'}` : ''}</p>
                     </div>
                   </div>
                 </div>
