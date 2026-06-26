@@ -1495,7 +1495,7 @@ export function CollectionPage() {
             sub={stats ? `${stats.active} activos · ${stats.paid} pagados` : undefined} />
           <KpiCard icon={DollarSign} iconBg="bg-red-500" label="Saldo vencido"
             value={stats ? formatCurrency(stats.saldoVencido) : '—'}
-            sub={stats ? `${stats.mora91} con mora 91+` : undefined} subColor="text-red-500" />
+            sub={stats ? `1-30: ${formatCurrency(stats.saldo1_30)} · 31-60: ${formatCurrency(stats.saldo31_60)} · 61-90: ${formatCurrency(stats.saldo61_90)} · 91+: ${formatCurrency(stats.saldo91Plus)}` : undefined} subColor="text-red-500" />
           <KpiCard icon={PhoneOff} iconBg="bg-amber-500" label="Sin contacto"
             value={stats?.noContact ?? '—'} sub="Sin teléfono ni email" />
           <KpiCard icon={Handshake} iconBg="bg-yellow-500" label="Acuerdos activos"
