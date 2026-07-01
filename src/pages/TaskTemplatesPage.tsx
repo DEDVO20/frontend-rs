@@ -31,7 +31,11 @@ export function TaskTemplatesPage() {
   const qc = useQueryClient()
   const confirm = useConfirm()
   const [search, setSearch] = useState('')
-  const [freqFilter, setFreqFilter] = useState('')
+  const [freqFilter, setFreqFilter]    = useState('')
+  const [ownerFilter, setOwnerFilter]  = useState('')
+  const [serviceFilter, setServiceFilter] = useState('')
+  const [activeFilter, setActiveFilter]   = useState('')
+  const [docFilter, setDocFilter]         = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editTarget, setEditTarget] = useState<any | null>(null)
 
@@ -54,8 +58,19 @@ export function TaskTemplatesPage() {
 
   const all: any[] = templates ?? []
 
+  const hasFilters = !!(search || freqFilter || ownerFilter || serviceFilter || activeFilter || docFilter)
+
+  const clearFilters = () => {
+    setSearch(''); setFreqFilter(''); setOwnerFilter('')
+    setServiceFilter(''); setActiveFilter(''); setDocFilter('')
+  }
+
   const filtered = all.filter(t => {
-    if (freqFilter && t.frequency !== freqFilter) return false
+    if (freqFilter    && t.frequency  !== freqFilter)          return false
+    if (ownerFilter   && t.owner_type !== ownerFilter)         return false
+    if (serviceFilter && t.service_id !== serviceFilter)       return false
+    if (activeFilter  && String(t.active) !== activeFilter)    return false
+    if (docFilter     && String(t.requires_document) !== docFilter) return false
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
@@ -98,19 +113,51 @@ export function TaskTemplatesPage() {
         </div>
 
         {/* Filters */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar plantilla..."
-              className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+        <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar plantilla..."
+                className="w-full pl-10 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+
+            <select value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+              <option value="">Responsable</option>
+              <option value="rs_team">⚙ Equipo Finto</option>
+              <option value="client">🏢 Cliente</option>
+            </select>
+
+            <select value={serviceFilter} onChange={e => setServiceFilter(e.target.value)}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+              <option value="">Servicio</option>
+              {(services ?? []).map((s: any) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+
+            <select value={activeFilter} onChange={e => setActiveFilter(e.target.value)}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+              <option value="">Estado</option>
+              <option value="true">Activa</option>
+              <option value="false">Inactiva</option>
+            </select>
+
+            <select value={docFilter} onChange={e => setDocFilter(e.target.value)}
+              className="text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white">
+              <option value="">Documento</option>
+              <option value="true">Requiere doc.</option>
+              <option value="false">Sin documento</option>
+            </select>
+
+            {hasFilters && (
+              <button onClick={clearFilters}
+                className="text-xs text-slate-500 flex items-center gap-1 hover:text-slate-700 whitespace-nowrap">
+                <X className="w-3 h-3" /> Limpiar filtros
+              </button>
+            )}
           </div>
-          {freqFilter && (
-            <button onClick={() => setFreqFilter('')}
-              className="text-xs text-slate-500 flex items-center gap-1 hover:text-slate-700">
-              <X className="w-3 h-3" /> Limpiar filtro
-            </button>
-          )}
         </div>
 
         {/* Table */}
@@ -205,7 +252,7 @@ export function TaskTemplatesPage() {
               {!filtered.length && (
                 <div className="text-center py-12 text-slate-400">
                   <Repeat className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-                  <p className="text-sm">{search || freqFilter ? 'Sin resultados con esos filtros' : 'No hay plantillas de tareas recurrentes'}</p>
+                  <p className="text-sm">{hasFilters ? 'Sin resultados con esos filtros' : 'No hay plantillas de tareas recurrentes'}</p>
                 </div>
               )}
             </>
@@ -256,7 +303,7 @@ function CronPanel() {
     try {
       if (job === 'generate-tasks') {
         const now = new Date()
-        await api.post('/api/tasks/generate', { year: now.getFullYear(), month: now.getMonth() + 1 })
+        await api.post('/api/tasks/generate', { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() })
       } else if (job === 'send-reminders') {
         await api.post('/api/tasks/reminders')
       } else if (job === 'mark-overdue') {
