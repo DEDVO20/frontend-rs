@@ -167,7 +167,7 @@ export function TasksPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); toast.success('Tarea eliminada') },
   })
 
-  const companyName = (id: string) => companies.find(c => c.id === id)?.name ?? '—'
+  const companyName = (t: any) => t.companies?.name ?? companies.find((c: any) => c.id === t.company_id)?.name ?? '—'
 
   const todayStr = new Date().toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
 
@@ -315,7 +315,7 @@ export function TasksPage() {
                           <div className="flex flex-wrap items-center gap-2 mt-1">
                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.cls}`}>• {st.label}</span>
                             {t.due_date && <span className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-slate-400'}`}>📅 {fmtDate(t.due_date)}</span>}
-                            <span className="text-xs text-slate-400">{companyName(t.company_id)}</span>
+                            <span className="text-xs text-slate-400">{companyName(t)}</span>
                           </div>
                         </div>
                       </div>
@@ -360,9 +360,9 @@ export function TasksPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-2">
                               <span className="w-6 h-6 rounded-md bg-primary-100 flex items-center justify-center text-[10px] font-bold text-primary-700 shrink-0">
-                                {(companyName(t.company_id)?.[0] ?? '?').toUpperCase()}
+                                {(companyName(t)?.[0] ?? '?').toUpperCase()}
                               </span>
-                              <span className="text-sm text-slate-700 truncate max-w-[140px]">{companyName(t.company_id)}</span>
+                              <span className="text-sm text-slate-700 truncate max-w-[140px]">{companyName(t)}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -413,7 +413,7 @@ export function TasksPage() {
       </div>
 
       {showNew && <NewTaskModal companies={companies} services={services} onClose={() => setShowNew(false)} />}
-      {viewTaskId && <TaskDrawer id={viewTaskId} onClose={() => setViewTaskId(null)} companyName={k => companyName(k)} />}
+      {viewTaskId && <TaskDrawer id={viewTaskId} onClose={() => setViewTaskId(null)} companyName={companyName} />}
     </div>
   )
 }
@@ -525,7 +525,7 @@ const TASK_STATUS: Record<string, { label: string; cls: string }> = {
   overdue:     { label: 'Vencida',     cls: 'bg-red-100 text-red-700' },
 }
 
-function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => void; companyName: (id: string) => string }) {
+function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => void; companyName: (t: any) => string }) {
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const isAdmin = ['admin', 'rs_admin', 'rs_staff'].includes(user?.role ?? '')
@@ -595,7 +595,7 @@ function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => v
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.cls}`}>• {st.label}</span>
               <h2 className="text-lg font-bold text-slate-900 mt-1">{t?.title ?? '—'}</h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                {companyName(t?.company_id)} · {t?.services?.name ?? 'Sin servicio'}
+                {companyName(t)} · {t?.services?.name ?? 'Sin servicio'}
                 {t?.owner_type === 'rs_team' && <span className="ml-1.5 text-[10px] font-medium bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full">⚙ RS</span>}
               </p>
             </div>
