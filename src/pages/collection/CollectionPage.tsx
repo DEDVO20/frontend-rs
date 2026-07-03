@@ -1054,7 +1054,7 @@ function ResultPanel({ result }: { result: any }) {
   )
 }
 
-function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: (importedCompanyId?: string) => void }) {
   const [mode, setMode] = useState<ImportMode>('siigo')
   const [step, setStep] = useState(0)
   const [companyId, setCompanyId] = useState('')
@@ -1151,7 +1151,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
         await new Promise(r => setTimeout(r, 400))
         setResult(finalResult)
         setStep(3)
-        onDone()
+        onDone(companyId || undefined)
       }
     } catch (e: any) {
       toast.error(e.message ?? 'Error al importar')
@@ -1750,10 +1750,10 @@ export function CollectionPage() {
       {showImport && (
         <ImportModal
           onClose={() => setShowImport(false)}
-          onDone={() => {
+          onDone={(importedCompanyId) => {
             qc.invalidateQueries({ queryKey: ['debtors'] })
             qc.invalidateQueries({ queryKey: ['collection-stats'] })
-            setShowImport(false)
+            if (importedCompanyId) { setCompanyId(importedCompanyId); setPage(1) }
           }}
         />
       )}
