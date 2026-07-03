@@ -142,6 +142,8 @@ export function TasksPage() {
       const { data } = await api.get(`/api/tasks?${params}`)
       return data
     },
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   })
 
   const allTasks: any[] = data?.data ?? []

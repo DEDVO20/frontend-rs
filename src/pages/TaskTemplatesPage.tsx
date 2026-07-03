@@ -56,6 +56,15 @@ export function TaskTemplatesPage() {
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error'),
   })
 
+  // Edición inline del "Servicio que entrega" desde la tabla
+  const providerMut = useMutation({
+    mutationFn: async ({ id, provider_service_id }: { id: string; provider_service_id: string | null }) => {
+      await api.patch(`/api/tasks/templates/${id}`, { provider_service_id })
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['task-templates'] }); toast.success('Dependencia actualizada') },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error'),
+  })
+
   const all: any[] = templates ?? []
 
   const hasFilters = !!(search || freqFilter || ownerFilter || serviceFilter || activeFilter || docFilter)
@@ -223,7 +232,27 @@ export function TaskTemplatesPage() {
                           <td className="px-4 py-3"><Badge label={`${f.icon} ${f.label}`} color={f.color} /></td>
                           <td className="px-4 py-3 text-xs text-slate-500">{t.create_day ?? '—'}</td>
                           <td className="px-4 py-3 text-xs text-slate-500">{t.due_day ?? '—'}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500">{OWNER_LABELS[t.owner_type] ?? t.owner_type}</td>
+                          <td className="px-4 py-3 text-xs text-slate-500">
+                            {OWNER_LABELS[t.owner_type] ?? t.owner_type}
+                            {t.owner_type === 'client' && (
+                              <select
+                                value={t.provider_service_id ?? ''}
+                                onChange={e => providerMut.mutate({ id: t.id, provider_service_id: e.target.value || null })}
+                                disabled={providerMut.isPending}
+                                onClick={e => e.stopPropagation()}
+                                className={`block mt-1 text-[10px] border rounded-md px-1.5 py-0.5 max-w-[150px] focus:outline-none focus:ring-1 focus:ring-primary-500 ${
+                                  t.provider_service_id
+                                    ? 'border-primary-200 bg-primary-50 text-primary-700'
+                                    : 'border-slate-200 bg-white text-slate-400'
+                                }`}
+                              >
+                                <option value="">↳ entrega: cliente</option>
+                                {(services ?? []).filter((s: any) => s.id !== t.service_id).map((s: any) => (
+                                  <option key={s.id} value={s.id}>↳ entrega: {s.name}</option>
+                                ))}
+                              </select>
+                            )}
+                          </td>
                           <td className="px-4 py-3">
                             {t.requires_document
                               ? <span className="text-xs text-amber-600">📎 Sí</span>
@@ -422,6 +451,7 @@ function TemplateModal({ editing, services, onClose }: { editing: any | null; se
     requires_document: editing?.requires_document ?? false,
     active:            editing?.active ?? true,
     description:       editing?.description ?? '',
+    provider_service_id: editing?.provider_service_id ?? '',
   })
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }))
 
@@ -433,6 +463,7 @@ function TemplateModal({ editing, services, onClose }: { editing: any | null; se
       if (body.create_day) body.create_day = parseInt(body.create_day)
       else delete body.create_day
       if (!body.description) delete body.description
+      body.provider_service_id = body.provider_service_id || null
 
       if (editing) await api.patch(`/api/tasks/templates/${editing.id}`, body)
       else await api.post('/api/tasks/templates', body)
@@ -499,6 +530,21 @@ function TemplateModal({ editing, services, onClose }: { editing: any | null; se
               <option value="client">🏢 Cliente</option>
             </select>
           </label>
+          {form.owner_type === 'client' && (
+            <label className="block">
+              <span className="text-xs font-medium text-slate-500">Servicio que entrega (opcional)</span>
+              <select value={form.provider_service_id} onChange={e => set('provider_service_id', e.target.value)}
+                className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">Ninguno — siempre la entrega el cliente</option>
+                {services.filter((s: any) => s.id !== form.service_id).map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Si el cliente tiene contratado este servicio, la tarea se asignará al equipo interno en vez de pedírsela al cliente.
+              </p>
+            </label>
+          )}
           <label className="block">
             <span className="text-xs font-medium text-slate-500">Descripción</span>
             <textarea rows={2} value={form.description} onChange={e => set('description', e.target.value)}
