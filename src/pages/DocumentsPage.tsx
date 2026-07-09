@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { formatDate } from '@/lib/utils'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { SearchSelect } from '@/components/ui/SearchSelect'
+import { useAuthStore } from '@/stores/authStore'
 import {
   Search, Upload, Download, Eye, Trash2, X, Grid3x3, List,
   FileText, Edit3, Send,
@@ -41,13 +43,6 @@ function extColor(ext: string) {
   return 'bg-slate-100 text-slate-600'
 }
 
-const MODULE_FOLDERS = [
-  { id: 'facturacion', label: 'Facturación',  emoji: '🧾' },
-  { id: 'contabilidad',label: 'Contabilidad', emoji: '📋' },
-  { id: 'tesoreria',   label: 'Tesorería',    emoji: '🏦' },
-  { id: 'personal',    label: 'Personal',      emoji: '👥' },
-]
-
 const TYPE_FOLDERS = [
   { id: 'pdf',   label: 'PDF',   emoji: '📕' },
   { id: 'excel', label: 'Excel', emoji: '📗' },
@@ -57,12 +52,36 @@ const TYPE_FOLDERS = [
 // ── Upload modal ───────────────────────────────────────────────────────────────
 
 function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [title, setTitle]       = useState('')
-  const [category, setCategory] = useState('general')
-  const [file, setFile]         = useState<File | null>(null)
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
+  const { user } = useAuthStore()
+  const isInternal = ['admin', 'rs_admin', 'rs_staff'].includes(user?.role ?? '')
+  const [title, setTitle]         = useState('')
+  const [companyId, setCompanyId] = useState('')
+  const [serviceId, setServiceId] = useState('')
+  const [file, setFile]           = useState<File | null>(null)
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Áreas contratadas: para internos según la empresa elegida, para clientes las suyas
+  const { data: areasData } = useQuery({
+    queryKey: ['document-areas', isInternal ? companyId : 'mine'],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (isInternal && companyId) params.set('company_id', companyId)
+      const { data } = await api.get(`/api/documents/areas?${params}`)
+      return data
+    },
+    staleTime: 120_000,
+  })
+  const areas: any[] = areasData ?? []
+
+  const { data: companiesData } = useQuery({
+    queryKey: ['companies-list'],
+    queryFn: async () => { const { data } = await api.get('/api/companies?limit=100'); return data },
+    staleTime: 120_000,
+    enabled: isInternal,
+  })
+  const companies: any[] = companiesData?.data ?? (Array.isArray(companiesData) ? companiesData : [])
 
   const handleSubmit = async () => {
     if (!file || !title.trim()) { setError('Complete todos los campos.'); return }
@@ -71,7 +90,8 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
       const fd = new FormData()
       fd.append('file', file)
       fd.append('title', title.trim())
-      fd.append('category', category)
+      if (serviceId) fd.append('service_id', serviceId)
+      if (isInternal && companyId) fd.append('company_id', companyId)
       await api.post('/api/documents/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       onSuccess()
       onClose()
@@ -117,17 +137,27 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             />
           </div>
 
+          {isInternal && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Empresa</label>
+              <select
+                value={companyId} onChange={e => { setCompanyId(e.target.value); setServiceId('') }}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">Sin empresa (general)</option>
+                {companies.map((c: any) => <option key={c.id} value={c.id}>{c.name ?? c.legal_name}</option>)}
+              </select>
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Módulo / Categoría</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Área (servicio contratado)</label>
             <select
-              value={category} onChange={e => setCategory(e.target.value)}
+              value={serviceId} onChange={e => setServiceId(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="general">General</option>
-              <option value="facturacion">Facturación</option>
-              <option value="contabilidad">Contabilidad</option>
-              <option value="tesoreria">Tesorería</option>
-              <option value="personal">Personal</option>
+              <option value="">Sin área</option>
+              {areas.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </div>
 
@@ -183,7 +213,7 @@ function DetailPanel({ doc, onClose, onDeleted }: { doc: any; onClose: () => voi
           <dl className="space-y-2 text-sm">
             {[
               { label: 'Empresa',  value: doc.company?.name ?? '—' },
-              { label: 'Módulo',   value: doc.category ?? 'general' },
+              { label: 'Área',     value: doc.service?.name ?? doc.category ?? 'general' },
               { label: 'Estado',   value: <Badge label={sm.label} color={sm.color} /> },
               { label: 'Tipo',     value: ext },
             ].map(({ label, value }) => (
@@ -261,11 +291,16 @@ function DetailPanel({ doc, onClose, onDeleted }: { doc: any; onClose: () => voi
 
 // ── Main page ──────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 50
+
 export function DocumentsPage() {
   const confirmFn = useConfirm()
+  const { user } = useAuthStore()
+  const isInternal = ['admin', 'rs_admin', 'rs_staff'].includes(user?.role ?? '')
   const [search,       setSearch]       = useState('')
   const [statusTab,    setStatusTab]    = useState<'all'|'published'|'review'|'draft'>('all')
-  const [categoryFilter, setCategoryFilter] = useState('')
+  const [areaFilter,   setAreaFilter]   = useState('')
+  const [companyFilter, setCompanyFilter] = useState('')
   const [typeFilter,   setTypeFilter]   = useState('')
   const [viewMode,     setViewMode]     = useState<'list'|'grid'>('list')
   const [page,         setPage]         = useState(1)
@@ -273,13 +308,39 @@ export function DocumentsPage() {
   const [showUpload,   setShowUpload]   = useState(false)
   const qc = useQueryClient()
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['documents', page],
+  // Áreas = servicios contratados. Clientes: los de su empresa; internos:
+  // los de la empresa seleccionada, o todos los servicios activos.
+  const { data: areasData } = useQuery({
+    queryKey: ['document-areas', isInternal ? companyFilter : 'mine'],
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), limit: '100' })
+      const params = new URLSearchParams()
+      if (isInternal && companyFilter) params.set('company_id', companyFilter)
+      const { data } = await api.get(`/api/documents/areas?${params}`)
+      return data
+    },
+    staleTime: 120_000,
+  })
+  const areas: any[] = areasData ?? []
+
+  // Empresas para el filtro (solo roles internos)
+  const { data: companiesData } = useQuery({
+    queryKey: ['companies-list'],
+    queryFn: async () => { const { data } = await api.get('/api/companies?limit=100'); return data },
+    staleTime: 120_000,
+    enabled: isInternal,
+  })
+  const companies: any[] = companiesData?.data ?? (Array.isArray(companiesData) ? companiesData : [])
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['documents', page, areaFilter, companyFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) })
+      if (areaFilter)    params.set('service_id', areaFilter)
+      if (companyFilter) params.set('company_id', companyFilter)
       const { data } = await api.get(`/api/documents?${params}`)
       return data
     },
+    placeholderData: (prev) => prev,
   })
 
   const allDocs: any[] = data?.data ?? []
@@ -292,7 +353,6 @@ export function DocumentsPage() {
       if (!(d.title?.toLowerCase().includes(q) || d.original_name?.toLowerCase().includes(q) || d.company?.name?.toLowerCase().includes(q) || d.category?.toLowerCase().includes(q)))
         return false
     }
-    if (categoryFilter && (d.category ?? 'general') !== categoryFilter) return false
     if (typeFilter) {
       const ext = extLabel(d.mime_type, d.original_name).toLowerCase()
       if (typeFilter === 'pdf' && ext !== 'pdf') return false
@@ -314,16 +374,18 @@ export function DocumentsPage() {
 
             {/* Toolbar */}
             <div className="flex flex-col gap-3 px-4 md:px-5 py-3 border-b border-slate-100 bg-white shrink-0">
-              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                <div className="relative w-full sm:w-72">
+
+              {/* Fila 1: búsqueda + vista + subir */}
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
                     value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="Buscar documento, empresa, módulo…"
+                    placeholder="Buscar documento…"
                     className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 shrink-0">
                   <div className="flex items-center gap-1">
                     <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-lg transition-colors ${viewMode === 'grid' ? 'bg-primary-100 text-primary-600' : 'text-slate-400 hover:bg-slate-100'}`}>
                       <Grid3x3 className="w-4 h-4" />
@@ -332,19 +394,18 @@ export function DocumentsPage() {
                       <List className="w-4 h-4" />
                     </button>
                   </div>
-                  <Button size="sm" className="ml-auto sm:ml-0" onClick={() => setShowUpload(true)}>
+                  <Button size="sm" onClick={() => setShowUpload(true)}>
                     <Upload className="w-3.5 h-3.5" /> Subir
                   </Button>
                 </div>
               </div>
 
-              {/* Filters row */}
-              <div className="flex flex-wrap gap-2">
-                {/* Status */}
+              {/* Fila 2: estado + tipo de archivo */}
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex items-center bg-slate-100 rounded-lg p-0.5 text-xs">
                   {(['all','published','review','draft'] as const).map(s => (
                     <button key={s}
-                      onClick={() => { setStatusTab(s); setCategoryFilter(''); setTypeFilter('') }}
+                      onClick={() => { setStatusTab(s); setPage(1) }}
                       className={`px-2.5 py-1.5 rounded-md font-medium transition-colors ${statusTab === s ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                     >
                       {s === 'all' ? 'Todos' : s === 'published' ? 'Publicados' : s === 'review' ? 'Revisión' : 'Borrador'}
@@ -354,29 +415,35 @@ export function DocumentsPage() {
 
                 <span className="hidden sm:block w-px h-6 bg-slate-200 self-center" />
 
-                {/* Module filters */}
-                {MODULE_FOLDERS.map(f => (
-                  <button key={f.id}
-                    onClick={() => { setCategoryFilter(categoryFilter === f.id ? '' : f.id); setTypeFilter('') }}
-                    className={`text-xs px-2.5 py-1.5 rounded-full font-medium border transition-colors ${
-                      categoryFilter === f.id ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}>
-                    {f.emoji} {f.label}
-                  </button>
-                ))}
-
-                <span className="hidden sm:block w-px h-6 bg-slate-200 self-center" />
-
-                {/* Type filters */}
                 {TYPE_FOLDERS.map(f => (
                   <button key={f.id}
-                    onClick={() => { setTypeFilter(typeFilter === f.id ? '' : f.id); setCategoryFilter('') }}
+                    onClick={() => { setTypeFilter(typeFilter === f.id ? '' : f.id); setPage(1) }}
                     className={`text-xs px-2.5 py-1.5 rounded-full font-medium border transition-colors ${
                       typeFilter === f.id ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                     }`}>
                     {f.emoji} {f.label}
                   </button>
                 ))}
+              </div>
+
+              {/* Fila 3: filtros desplegables — área y empresa */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SearchSelect
+                  label="Por área"
+                  value={areaFilter}
+                  onChange={v => { setAreaFilter(v); setPage(1) }}
+                  placeholder="Todas las áreas"
+                  options={areas.map((a: any) => ({ value: a.id, label: a.name ?? '—' }))}
+                />
+                {isInternal && (
+                  <SearchSelect
+                    label="Por empresa"
+                    value={companyFilter}
+                    onChange={v => { setCompanyFilter(v); setAreaFilter(''); setPage(1) }}
+                    placeholder="Todas las empresas"
+                    options={companies.map((c: any) => ({ value: c.id, label: c.name ?? c.legal_name ?? '—', color: 'bg-primary-500' }))}
+                  />
+                )}
               </div>
             </div>
 
@@ -407,7 +474,7 @@ export function DocumentsPage() {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-slate-900 truncate">{doc.title ?? doc.original_name}</p>
                               <p className="text-xs text-slate-400 truncate">
-                                {doc.company?.name ?? '—'} · {doc.category ?? 'general'} · {doc.created_at ? formatDate(doc.created_at) : '—'}
+                                {doc.company?.name ?? '—'} · {doc.service?.name ?? doc.category ?? 'general'} · {doc.created_at ? formatDate(doc.created_at) : '—'}
                               </p>
                             </div>
                             <Badge label={sm.label} color={sm.color} />
@@ -446,7 +513,10 @@ export function DocumentsPage() {
                             <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-xs font-bold mb-3 ${extColor(ext)}`}>
                               {ext}
                             </span>
-                            <p className="text-xs font-medium text-slate-900 line-clamp-2 mb-2">{doc.title ?? doc.original_name}</p>
+                            <p className="text-xs font-medium text-slate-900 line-clamp-2 mb-1">{doc.title ?? doc.original_name}</p>
+                            <p className="text-[10px] text-slate-400 truncate mb-2">
+                              {doc.company?.name ?? '—'} · {doc.service?.name ?? doc.category ?? 'general'}
+                            </p>
                             <Badge label={sm.label} color={sm.color} />
                           </div>
                         )
@@ -461,12 +531,12 @@ export function DocumentsPage() {
                     </div>
                   )}
 
-                  {data && data.total > 20 && (
+                  {data && data.total > PAGE_SIZE && (
                     <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
-                      <span>Página {page} de {Math.ceil(data.total / 20)}</span>
+                      <span>Página {page} de {Math.ceil(data.total / PAGE_SIZE)}</span>
                       <div className="flex gap-2">
                         <Button variant="secondary" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</Button>
-                        <Button variant="secondary" size="sm" disabled={page >= Math.ceil(data.total / 20)} onClick={() => setPage(p => p + 1)}>Siguiente</Button>
+                        <Button variant="secondary" size="sm" disabled={page >= Math.ceil(data.total / PAGE_SIZE)} onClick={() => setPage(p => p + 1)}>Siguiente</Button>
                       </div>
                     </div>
                   )}

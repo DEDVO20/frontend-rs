@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
@@ -9,6 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import {
   Building2, Search, Plus, Eye, Pencil, Trash2, X,
   CheckCircle2, FileText, LayoutGrid, ListTodo, Activity,
+  FileSignature, Upload, Download,
 } from 'lucide-react'
 
 function fmtDate(d: string) {
@@ -46,7 +47,7 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-type DetailTab = 'info' | 'modules' | 'tasks' | 'docs' | 'activity'
+type DetailTab = 'info' | 'modules' | 'tasks' | 'docs' | 'proposals' | 'activity'
 
 const DEPARTAMENTOS = [
   'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá',
@@ -368,6 +369,147 @@ function ModulesPanel({ companyId }: { companyId: string }) {
   )
 }
 
+// ── Propuestas: documentos o imágenes con propuestas hechas al cliente ───────
+
+function ProposalsPanel({ companyId }: { companyId: string }) {
+  const qc = useQueryClient()
+  const confirm = useConfirm()
+  const [title, setTitle] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['company-proposals', companyId],
+    queryFn: async () => {
+      const { data } = await api.get(`/api/documents?company_id=${companyId}&category=propuesta&limit=100`)
+      return data
+    },
+  })
+  const proposals: any[] = data?.data ?? []
+
+  const isImage = (p: any) => p.mime_type?.startsWith('image/')
+
+  const handleUpload = async () => {
+    if (!file) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('title', title.trim() || file.name)
+      fd.append('category', 'propuesta')
+      fd.append('company_id', companyId)
+      await api.post('/api/documents/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      toast.success('Propuesta subida')
+      setTitle(''); setFile(null)
+      if (fileRef.current) fileRef.current.value = ''
+      qc.invalidateQueries({ queryKey: ['company-proposals', companyId] })
+    } catch (e: any) {
+      toast.error(e.response?.data?.error ?? 'Error al subir la propuesta')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Subir propuesta */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-1 h-5 bg-primary-500 rounded-full" />
+          <h3 className="text-xs font-bold text-primary-600 uppercase tracking-wider">Nueva propuesta</h3>
+        </div>
+        <p className="text-xs text-slate-400 mb-4">Sube un documento o imagen con la propuesta presentada al cliente</p>
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="Título — Ej: Propuesta servicios contables 2026"
+            className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <input
+            ref={fileRef} type="file" className="hidden"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+            onChange={e => {
+              const f = e.target.files?.[0] ?? null
+              setFile(f)
+              if (f && !title.trim()) setTitle(f.name.replace(/\.[^.]+$/, ''))
+            }}
+          />
+          <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()}>
+            <Upload className="w-3.5 h-3.5" /> {file ? file.name.slice(0, 24) + (file.name.length > 24 ? '…' : '') : 'Elegir archivo'}
+          </Button>
+          <Button size="sm" onClick={handleUpload} loading={uploading} disabled={!file}>
+            Subir propuesta
+          </Button>
+        </div>
+      </div>
+
+      {/* Listado */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5">
+        <h3 className="text-sm font-bold text-slate-900 mb-4">Propuestas ({proposals.length})</h3>
+        {isLoading ? (
+          <div className="py-8 flex justify-center"><PageLoader /></div>
+        ) : proposals.length ? (
+          <div className="space-y-2">
+            {proposals.map((p: any) => (
+              <div key={p.id} className="flex items-center gap-3 py-2.5 border-b border-slate-50 last:border-0 group">
+                {isImage(p) && p.file_url ? (
+                  <img src={p.file_url} alt={p.title ?? ''} className="w-10 h-10 rounded-lg object-cover border border-slate-200 shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
+                    <FileSignature className="w-4 h-4 text-primary-500" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">{p.title ?? p.original_name ?? '—'}</p>
+                  <p className="text-xs text-slate-400">
+                    {p.original_name ?? '—'} · {p.created_at ? fmtDate(p.created_at) : '—'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  {p.file_url && (
+                    <a href={p.file_url} target="_blank" rel="noreferrer"
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors" title="Ver">
+                      <Eye className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                  {p.file_url && (
+                    <a href={p.file_url} download
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-primary-600 transition-colors" title="Descargar">
+                      <Download className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                  <button
+                    onClick={() => confirm({
+                      title: '¿Eliminar esta propuesta?',
+                      description: p.title ?? p.original_name,
+                      type: 'danger',
+                      confirmLabel: 'Eliminar',
+                      onConfirm: async () => {
+                        await api.delete(`/api/documents/${p.id}`)
+                        qc.invalidateQueries({ queryKey: ['company-proposals', companyId] })
+                      },
+                    })}
+                    className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors" title="Eliminar">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-10 text-slate-400">
+            <FileSignature className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+            <p className="text-sm">Aún no hay propuestas para esta empresa</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function CompaniesPage() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
@@ -453,7 +595,9 @@ export function CompaniesPage() {
   const allTasks: any[] = Array.isArray(companyTasks) ? companyTasks : (companyTasks?.data ?? [])
   const pendingTasks = allTasks.filter((t: any) => t.status !== 'done' && t.status !== 'completed')
   const overdueTasks = pendingTasks.filter((t: any) => t.due_date && t.due_date < today)
-  const allDocs: any[] = Array.isArray(companyDocs) ? companyDocs : (companyDocs?.data ?? [])
+  // Las propuestas (category 'propuesta') tienen su propia pestaña
+  const allDocs: any[] = (Array.isArray(companyDocs) ? companyDocs : (companyDocs?.data ?? []))
+    .filter((d: any) => d.category !== 'propuesta')
 
   const co = detail // alias
 
@@ -462,6 +606,7 @@ export function CompaniesPage() {
     { key: 'modules', label: 'Módulos', icon: LayoutGrid },
     { key: 'tasks', label: 'Tareas', icon: ListTodo },
     { key: 'docs', label: 'Documentos', icon: FileText },
+    { key: 'proposals', label: 'Propuestas', icon: FileSignature },
     { key: 'activity', label: 'Actividad', icon: Activity },
   ]
 
@@ -802,6 +947,10 @@ export function CompaniesPage() {
                     <p className="text-sm text-slate-400 text-center py-8">Sin documentos para esta empresa</p>
                   )}
                 </div>
+              )}
+
+              {detailTab === 'proposals' && (
+                <ProposalsPanel companyId={selectedId!} />
               )}
 
               {detailTab === 'activity' && (

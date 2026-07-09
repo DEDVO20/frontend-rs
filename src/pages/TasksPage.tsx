@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import {
   CheckCircle2, Circle, Clock, Plus, Search, Trash2,
-  ChevronDown, X, AlertTriangle, Eye, Upload, FileText, Paperclip,
+  X, AlertTriangle, Eye, Upload, FileText, Paperclip,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/authStore'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { SearchSelect } from '@/components/ui/SearchSelect'
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -22,88 +24,12 @@ const STATUS_LABELS: Record<string, { label: string; cls: string; icon: any }> =
   overdue:     { label: 'Vencida',     cls: 'bg-red-100 text-red-700',       icon: <AlertTriangle className="w-4 h-4 text-red-500" /> },
 }
 
-// ── Searchable dropdown ───────────────────────────────────────────────────────
-
-function SearchSelect({ value, onChange, options, placeholder, label }: {
-  value: string; onChange: (v: string) => void
-  options: { value: string; label: string; color?: string }[]
-  placeholder: string; label: string
-}) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState('')
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  const filtered = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
-  const selected = options.find(o => o.value === value)
-
-  return (
-    <div ref={ref} className="relative">
-      <label className="block text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{label}</label>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white hover:border-slate-300 transition-colors text-left"
-      >
-        <span className={selected ? 'text-slate-800' : 'text-slate-400'}>
-          {selected ? selected.label : placeholder}
-        </span>
-        <div className="flex items-center gap-1 shrink-0">
-          {value && (
-            <span onClick={e => { e.stopPropagation(); onChange(''); setOpen(false) }}
-              className="text-slate-400 hover:text-slate-600 p-0.5">
-              <X className="w-3 h-3" />
-            </span>
-          )}
-          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-        </div>
-      </button>
-      {open && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
-          <div className="p-2 border-b border-slate-100">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <input
-                autoFocus
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar..."
-                className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-100 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-            </div>
-          </div>
-          <div className="max-h-48 overflow-y-auto">
-            {filtered.map(o => (
-              <button
-                key={o.value}
-                onClick={() => { onChange(o.value); setOpen(false); setSearch('') }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2 transition-colors ${
-                  value === o.value ? 'bg-primary-50 text-primary-700 font-medium' : 'text-slate-700'
-                }`}
-              >
-                {o.color && <span className={`w-2 h-2 rounded-full shrink-0 ${o.color}`} />}
-                {o.label}
-              </button>
-            ))}
-            {!filtered.length && (
-              <p className="px-3 py-4 text-sm text-slate-400 text-center">Sin resultados</p>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function TasksPage() {
   const qc = useQueryClient()
   const { user } = useAuthStore()
+  const confirm = useConfirm()
   const isAdmin = ['admin', 'rs_admin', 'rs_staff'].includes(user?.role ?? '')
   const [page, setPage] = useState(1)
   const [searchQ, setSearchQ] = useState('')
@@ -162,12 +88,36 @@ export function TasksPage() {
   const completeMut = useMutation({
     mutationFn: (id: string) => api.patch(`/api/tasks/${id}`, { status: 'done' }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); toast.success('Tarea completada') },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al completar la tarea'),
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/api/tasks/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); toast.success('Tarea eliminada') },
   })
+
+  const confirmComplete = (t: any) => {
+    if (t.status === 'done') return
+    // Si el flujo normal no le permite completarla, abrir el detalle
+    // (ahí un admin puede hacer el cierre manual)
+    const canComplete = (t.owner_type === 'client' && !isAdmin) || (t.owner_type === 'rs_team' && isAdmin)
+    if (!canComplete) {
+      setViewTaskId(t.id)
+      return
+    }
+    if (t.requires_document && !t.document_id) {
+      toast.warning('Esta tarea requiere un documento adjunto antes de completarse')
+      setViewTaskId(t.id)
+      return
+    }
+    confirm({
+      title: '¿Marcar tarea como completada?',
+      description: t.title,
+      type: 'info',
+      confirmLabel: 'Completar',
+      onConfirm: () => completeMut.mutateAsync(t.id).then(() => {}),
+    })
+  }
 
   const companyName = (t: any) => t.companies?.name ?? companies.find((c: any) => c.id === t.company_id)?.name ?? '—'
 
@@ -306,7 +256,7 @@ export function TasksPage() {
                   return (
                     <div key={t.id} onClick={() => setViewTaskId(t.id)} className="px-4 py-3 active:bg-slate-50 cursor-pointer">
                       <div className="flex items-start gap-3">
-                        <button onClick={e => { e.stopPropagation(); t.status !== 'done' && completeMut.mutate(t.id) }} className="mt-0.5 shrink-0">
+                        <button onClick={e => { e.stopPropagation(); confirmComplete(t) }} className="mt-0.5 shrink-0">
                           {st.icon}
                         </button>
                         <div className="flex-1 min-w-0">
@@ -347,7 +297,7 @@ export function TasksPage() {
                       return (
                         <tr key={t.id} className="hover:bg-slate-50 transition-colors group">
                           <td className="px-4 py-3">
-                            <button onClick={() => t.status !== 'done' && completeMut.mutate(t.id)} className="shrink-0" disabled={t.status === 'done'}>
+                            <button onClick={() => confirmComplete(t)} className="shrink-0" disabled={t.status === 'done'}>
                               {st.icon}
                             </button>
                           </td>
@@ -381,7 +331,13 @@ export function TasksPage() {
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
                               {isAdmin && (
-                                <button onClick={() => toast('¿Eliminar esta tarea?', { action: { label: 'Eliminar', onClick: () => deleteMut.mutate(t.id) }, cancel: { label: 'Cancelar', onClick: () => {} }, duration: 8000 })}
+                                <button onClick={() => confirm({
+                                  title: '¿Eliminar esta tarea?',
+                                  description: t.title,
+                                  type: 'danger',
+                                  confirmLabel: 'Eliminar',
+                                  onConfirm: () => deleteMut.mutateAsync(t.id).then(() => {}),
+                                })}
                                   className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -530,8 +486,11 @@ const TASK_STATUS: Record<string, { label: string; cls: string }> = {
 function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => void; companyName: (t: any) => string }) {
   const qc = useQueryClient()
   const { user } = useAuthStore()
+  const confirm = useConfirm()
   const isAdmin = ['admin', 'rs_admin', 'rs_staff'].includes(user?.role ?? '')
+  const canManualClose = ['admin', 'rs_admin'].includes(user?.role ?? '')
   const [uploading, setUploading] = useState(false)
+  const [closeReason, setCloseReason] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const { data: task, isLoading } = useQuery({
@@ -548,6 +507,19 @@ function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => v
       qc.invalidateQueries({ queryKey: ['tasks'] })
     },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error'),
+  })
+
+  const closeMut = useMutation({
+    mutationFn: async (reason: string) => {
+      await api.post(`/api/tasks/${id}/close`, { reason })
+    },
+    onSuccess: () => {
+      toast.success('Tarea cerrada manualmente')
+      qc.invalidateQueries({ queryKey: ['task-detail', id] })
+      qc.invalidateQueries({ queryKey: ['tasks'] })
+      setCloseReason('')
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al cerrar la tarea'),
   })
 
   const uploadDoc = async (file: File) => {
@@ -703,7 +675,11 @@ function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => v
                 <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
                 <div>
                   <p className="text-sm font-semibold text-emerald-800">Tarea completada</p>
-                  <p className="text-xs text-emerald-600">Esta tarea fue finalizada exitosamente.</p>
+                  <p className="text-xs text-emerald-600">
+                    {t?.closed_manually
+                      ? <>Cierre manual por administrador{t?.closed_at ? ` · ${fmtDate(t.closed_at)}` : ''}{t?.closure_reason ? <> — <span className="italic">{t.closure_reason}</span></> : ''}</>
+                      : 'Esta tarea fue finalizada exitosamente.'}
+                  </p>
                 </div>
               </div>
             )
@@ -747,6 +723,38 @@ function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => v
                     loading={updateMut.isPending}>
                     <Clock className="w-4 h-4" /> Marcar en progreso
                   </Button>
+                )}
+
+                {/* Cierre manual (admin) — disponible en cualquier tarea no completada */}
+                {canManualClose && (
+                  <div className="border border-amber-200 bg-amber-50/50 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                      <p className="text-xs font-bold text-amber-700 uppercase tracking-wider">Cierre manual (admin)</p>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Marca la tarea como completada sin cumplir el flujo normal. Quedará registrado quién la cerró y el motivo.
+                    </p>
+                    <textarea
+                      value={closeReason}
+                      onChange={e => setCloseReason(e.target.value)}
+                      placeholder="Motivo del cierre (obligatorio)..."
+                      rows={2}
+                      className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none bg-white"
+                    />
+                    <Button className="w-full" variant="secondary"
+                      disabled={closeReason.trim().length < 3}
+                      loading={closeMut.isPending}
+                      onClick={() => confirm({
+                        title: '¿Cerrar esta tarea manualmente?',
+                        description: `"${t?.title}" se marcará como completada fuera del flujo normal.`,
+                        type: 'warning',
+                        confirmLabel: 'Cerrar tarea',
+                        onConfirm: () => closeMut.mutateAsync(closeReason.trim()).then(() => {}),
+                      })}>
+                      <CheckCircle2 className="w-4 h-4" /> Cerrar manualmente
+                    </Button>
+                  </div>
                 )}
               </div>
             )
