@@ -15,6 +15,7 @@ const ROLE_LABELS: Record<string, { label: string; color: string; icon: any }> =
   admin: { label: 'Super Administrador', color: 'text-red-600', icon: <ShieldCheck className="w-3.5 h-3.5 text-red-500" /> },
   rs_admin: { label: 'Administrador RS', color: 'text-amber-600', icon: <Shield className="w-3.5 h-3.5 text-amber-500" /> },
   rs_staff: { label: 'Staff RS', color: 'text-primary-600', icon: <Users className="w-3.5 h-3.5 text-primary-500" /> },
+  contador: { label: 'Contador / Controller', color: 'text-emerald-600', icon: <Users className="w-3.5 h-3.5 text-emerald-500" /> },
   client_owner: { label: 'Admin empresa', color: 'text-blue-600', icon: <Users className="w-3.5 h-3.5 text-blue-500" /> },
   client_user: { label: 'Usuario empresa', color: 'text-slate-600', icon: <Users className="w-3.5 h-3.5 text-slate-400" /> },
 }
@@ -63,7 +64,7 @@ export function ProfilesPage() {
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error'),
   })
 
-  const adminCount = profiles.filter(p => ['admin', 'rs_admin', 'rs_staff'].includes(p.role)).length
+  const adminCount = profiles.filter(p => ['admin', 'rs_admin', 'rs_staff', 'contador'].includes(p.role)).length
   const clientCount = profiles.filter(p => ['client_owner', 'client_user'].includes(p.role)).length
   const activeCount = profiles.filter(p => p.active).length
 
@@ -114,6 +115,7 @@ export function ProfilesPage() {
               { key: 'admin', label: 'Super Admin' },
               { key: 'rs_admin', label: 'Admin RS' },
               { key: 'rs_staff', label: 'Staff RS' },
+              { key: 'contador', label: 'Contador' },
               { key: 'client_owner', label: 'Admin empresa' },
               { key: 'client_user', label: 'Usuario' },
             ].map(f => (
@@ -302,6 +304,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 <option value="rs_staff">Staff Finto</option>
+                <option value="contador">Contador / Controller</option>
                 <option value="rs_admin">Administrador Finto</option>
                 <option value="admin">Super Administrador</option>
               </select>

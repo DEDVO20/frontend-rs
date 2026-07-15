@@ -20,6 +20,7 @@ import { ProfilesPage } from '@/pages/ProfilesPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { RequestsPage } from '@/pages/RequestsPage'
 import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
+import { AccountingPage } from '@/pages/accounting/AccountingPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -33,6 +34,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function SmartDashboard() {
   const role = useAuthStore(s => s.user?.role ?? '')
+  // El contador aterriza directo en su dashboard contable
+  if (role === 'contador') return <Navigate to="/app/accounting" replace />
   return INTERNAL_ROLES.includes(role) ? <DashboardPage /> : <ClientDashboard />
 }
 
@@ -51,6 +54,7 @@ export const router = createBrowserRouter([
       { path: 'dashboard',    element: <SmartDashboard /> },
       { path: 'my-company',   element: <MyCompanyPage /> },
       { path: 'collection',   element: <CollectionPage /> },
+      { path: 'accounting',   element: <AccountingPage /> },
       { path: 'onboarding',   element: <OnboardingPage /> },
       { path: 'tasks',        element: <TasksPage /> },
       { path: 'documents',    element: <DocumentsPage /> },
