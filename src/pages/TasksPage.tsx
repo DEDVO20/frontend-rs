@@ -709,7 +709,13 @@ function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => v
                 {/* Completar */}
                 {canComplete && !needsDoc && (
                   <Button className="w-full"
-                    onClick={() => updateMut.mutate({ status: 'done' }, { onSuccess: () => toast.success('Tarea completada') })}
+                    onClick={() => confirm({
+                      title: '¿Marcar tarea como completada?',
+                      description: t?.title,
+                      type: 'info',
+                      confirmLabel: 'Completar',
+                      onConfirm: () => updateMut.mutateAsync({ status: 'done' }).then(() => { toast.success('Tarea completada') }),
+                    })}
                     loading={updateMut.isPending}>
                     <CheckCircle2 className="w-4 h-4" />
                     {t?.status === 'in_progress' ? 'Aprobar y completar' : 'Marcar como completada'}
