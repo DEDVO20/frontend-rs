@@ -67,6 +67,7 @@ function renderPreview(template: string, debtor: any): string {
     .replace(/\{\{saldo\}\}/g, formatCurrency(saldo))
     .replace(/\{\{dias_mora\}\}/g, String(debtor.days_overdue ?? 0))
     .replace(/\{\{empresa\}\}/g, debtor.company?.name ?? debtor.companies?.name ?? '')
+    .replace(/\{\{company\}\}/g, debtor.company?.name ?? debtor.companies?.name ?? '')
     .replace(/\{\{asesor\}\}/g, debtor.assigned_user?.full_name ?? 'Finto')
     .replace(/\{\{facturas\}\}/g, facturasStr)
 }
@@ -174,8 +175,14 @@ function MasivoPanel({ companyId }: { companyId: string }) {
 
   const firstTarget = targets[0]
 
+  // WhatsApp fuera de la ventana de 24h solo acepta plantillas aprobadas por Meta
+  const selectedTpl = (templates ?? []).find((t: any) => t.id === plantilla)
+  const isZavuTpl   = selectedTpl?.source === 'zavu'
+  const needsZavuTpl = channel === 'whatsapp' && !isZavuTpl
+
   const send = async () => {
     if (!message.trim()) { toast.error('Escribe un mensaje'); return }
+    if (needsZavuTpl) { toast.error('Para WhatsApp debes seleccionar una plantilla aprobada por Meta — el texto libre rebota fuera de la ventana de 24 horas'); return }
     if (!contactable.length) { toast.error(`Ningún deudor tiene ${channel === 'email' ? 'email' : 'teléfono'} registrado`); return }
     if (!companyId) { toast.error('Selecciona una empresa antes de enviar'); return }
     setSending(true)
@@ -184,6 +191,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
         name: `Campaña ${new Date().toLocaleDateString('es-CO')}`,
         channel,
         message_template: message,
+        ...(channel === 'whatsapp' && isZavuTpl && { zavu_template_id: selectedTpl.zavu_id }),
         debtor_ids: targets.map(d => d.id),
         company_id: companyId,
       })
@@ -234,10 +242,12 @@ function MasivoPanel({ companyId }: { companyId: string }) {
               applyTemplate(tpl ?? null)
             }}
             className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
-            <option value="">Sin plantilla</option>
-            {(templates ?? []).filter((t: any) => t.channel === channel || t.source === 'zavu').map((t: any) => (
-              <option key={t.id} value={t.id}>{t.source === 'zavu' ? `⚡ ${t.name}` : t.name}</option>
-            ))}
+            <option value="">{channel === 'whatsapp' ? 'Seleccionar plantilla aprobada…' : 'Sin plantilla'}</option>
+            {(templates ?? [])
+              .filter((t: any) => channel === 'whatsapp' ? t.source === 'zavu' : (t.channel === channel && t.source !== 'zavu'))
+              .map((t: any) => (
+                <option key={t.id} value={t.id}>{t.source === 'zavu' ? `⚡ ${t.name}` : t.name}</option>
+              ))}
           </select>
         </div>
         <div>
@@ -326,20 +336,31 @@ function MasivoPanel({ companyId }: { companyId: string }) {
             <label className="block text-sm font-semibold text-slate-700 mb-1">
               Mensaje <span className="text-red-500">*</span>
             </label>
-            <p className="text-xs text-slate-400 mb-2">
-              Usa <code className="bg-slate-100 px-1 rounded">{'{{nombre}}'}</code>,{' '}
-              <code className="bg-slate-100 px-1 rounded">{'{{saldo}}'}</code>,{' '}
-              <code className="bg-slate-100 px-1 rounded">{'{{dias_mora}}'}</code>,{' '}
-              <code className="bg-slate-100 px-1 rounded">{'{{empresa}}'}</code>,{' '}
-              <code className="bg-slate-100 px-1 rounded">{'{{asesor}}'}</code>,{' '}
-              <code className="bg-slate-100 px-1 rounded">{'{{facturas}}'}</code> como variables
-            </p>
+            {channel === 'whatsapp' ? (
+              <p className="text-xs text-slate-400 mb-2">
+                {isZavuTpl
+                  ? '⚡ El texto lo define la plantilla aprobada por Meta — solo cambian las variables por deudor.'
+                  : 'WhatsApp requiere una plantilla aprobada por Meta: selecciónala arriba. El texto libre rebota fuera de la ventana de 24 horas.'}
+              </p>
+            ) : (
+              <p className="text-xs text-slate-400 mb-2">
+                Usa <code className="bg-slate-100 px-1 rounded">{'{{nombre}}'}</code>,{' '}
+                <code className="bg-slate-100 px-1 rounded">{'{{saldo}}'}</code>,{' '}
+                <code className="bg-slate-100 px-1 rounded">{'{{dias_mora}}'}</code>,{' '}
+                <code className="bg-slate-100 px-1 rounded">{'{{empresa}}'}</code>,{' '}
+                <code className="bg-slate-100 px-1 rounded">{'{{asesor}}'}</code>,{' '}
+                <code className="bg-slate-100 px-1 rounded">{'{{facturas}}'}</code> como variables
+              </p>
+            )}
             <textarea
               rows={6}
               value={message}
               onChange={e => setMessage(e.target.value)}
-              placeholder="Escribe el mensaje..."
-              className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              readOnly={channel === 'whatsapp' && isZavuTpl}
+              placeholder={channel === 'whatsapp' ? 'Selecciona una plantilla aprobada…' : 'Escribe el mensaje...'}
+              className={`w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none ${
+                channel === 'whatsapp' && isZavuTpl ? 'bg-slate-50 text-slate-600' : ''
+              }`}
             />
             <p className="text-xs text-slate-400 text-right mt-1">{message.length} caracteres</p>
           </div>
@@ -381,7 +402,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
             size="lg"
             onClick={send}
             loading={sending}
-            disabled={!message.trim() || contactable.length === 0}
+            disabled={!message.trim() || contactable.length === 0 || needsZavuTpl}
           >
             <Send className="w-4 h-4" />
             ✉️ Aprobar y enviar a {contactable.length} deudores
