@@ -96,6 +96,7 @@ function KpiCard({ icon: Icon, iconBg, label, value, sub, subColor = 'text-slate
 // ── Envío masivo panel ─────────────────────────────────────────────────────────
 
 function MasivoPanel({ companyId }: { companyId: string }) {
+  const qc = useQueryClient()
   const [channel, setChannel] = useState<'whatsapp' | 'sms' | 'email'>('whatsapp')
   const [message, setMessage] = useState('')
   const [tramo, setTramo] = useState('')
@@ -103,6 +104,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
   const [plantilla, setPlantilla] = useState('')
   const [selected, setSelected] = useState<string[]>([])
   const [sending, setSending] = useState(false)
+  const [histPage, setHistPage] = useState(1)
 
   const { data, isLoading } = useQuery({
     queryKey: ['debtors-masivo', companyId],
@@ -115,15 +117,30 @@ function MasivoPanel({ companyId }: { companyId: string }) {
     staleTime: 60_000,
   })
 
+  // Plantillas personalizadas de la empresa seleccionada + las globales
   const { data: templates } = useQuery({
-    queryKey: ['collection-templates'],
-    queryFn: async () => { const { data } = await api.get('/api/collection/templates'); return data },
+    queryKey: ['collection-templates', companyId],
+    queryFn: async () => {
+      const params = companyId ? `?company_id=${companyId}` : ''
+      const { data } = await api.get(`/api/collection/templates${params}`)
+      return data
+    },
   })
 
-  const { data: history } = useQuery({
-    queryKey: ['collection-campaigns'],
-    queryFn: async () => { const { data } = await api.get('/api/collection/campaigns'); return data },
+  const HIST_PAGE_SIZE = 5
+  const { data: historyData } = useQuery({
+    queryKey: ['collection-campaigns', companyId, histPage],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(histPage), limit: String(HIST_PAGE_SIZE) })
+      if (companyId) params.set('company_id', companyId)
+      const { data } = await api.get(`/api/collection/campaigns?${params}`)
+      return data
+    },
+    placeholderData: (prev: any) => prev,
   })
+  const history: any[] = historyData?.data ?? (Array.isArray(historyData) ? historyData : [])
+  const histTotal: number = historyData?.total ?? history.length
+  const histPages = Math.max(1, Math.ceil(histTotal / HIST_PAGE_SIZE))
 
   const allDebtors: any[] = data?.data ?? []
 
@@ -177,7 +194,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
 
   // WhatsApp fuera de la ventana de 24h solo acepta plantillas aprobadas por Meta
   const selectedTpl = (templates ?? []).find((t: any) => t.id === plantilla)
-  const isZavuTpl   = selectedTpl?.source === 'zavu'
+  const isZavuTpl = selectedTpl?.source === 'zavu'
   const needsZavuTpl = channel === 'whatsapp' && !isZavuTpl
 
   const send = async () => {
@@ -199,6 +216,8 @@ function MasivoPanel({ companyId }: { companyId: string }) {
       toast.success(`Campaña enviada a ${sent} de ${targets.length} deudores`)
       setMessage('')
       setSelected([])
+      setHistPage(1)
+      qc.invalidateQueries({ queryKey: ['collection-campaigns'] })
     } catch (e: any) {
       toast.error(e.response?.data?.error ?? 'Error al enviar')
     } finally {
@@ -358,9 +377,8 @@ function MasivoPanel({ companyId }: { companyId: string }) {
               onChange={e => setMessage(e.target.value)}
               readOnly={channel === 'whatsapp' && isZavuTpl}
               placeholder={channel === 'whatsapp' ? 'Selecciona una plantilla aprobada…' : 'Escribe el mensaje...'}
-              className={`w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none ${
-                channel === 'whatsapp' && isZavuTpl ? 'bg-slate-50 text-slate-600' : ''
-              }`}
+              className={`w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none ${channel === 'whatsapp' && isZavuTpl ? 'bg-slate-50 text-slate-600' : ''
+                }`}
             />
             <p className="text-xs text-slate-400 text-right mt-1">{message.length} caracteres</p>
           </div>
@@ -415,21 +433,51 @@ function MasivoPanel({ companyId }: { companyId: string }) {
         <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
           <Clock className="w-4 h-4 text-slate-400" />
           <p className="text-sm font-semibold text-slate-700">Historial de envíos masivos</p>
-          <span className="ml-auto text-xs text-slate-400">{(history ?? []).length} envíos masivos registrados</span>
+          <span className="ml-auto text-xs text-slate-400">{histTotal} envíos registrados</span>
         </div>
-        {!(history ?? []).length ? (
+        {!history.length ? (
           <p className="text-center text-sm text-slate-400 py-8">Sin envíos masivos registrados aún.</p>
         ) : (
           <div className="divide-y divide-slate-50">
-            {(history ?? []).map((h: any) => (
-              <div key={h.id} className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium text-slate-900">{h.name}</p>
-                  <p className="text-xs text-slate-400">{h.channel} · {h.recipient_count ?? 0} destinatarios</p>
+            {history.map((h: any) => {
+              const recipients = h.debtor_ids?.length ?? 0
+              const chIcon = h.channel === 'whatsapp' ? '💬' : h.channel === 'sms' ? '📱' : h.channel === 'email' ? '📧' : '✉️'
+              const when = h.sent_at ?? h.created_at
+              const st = h.status === 'sent'
+                ? { label: 'Enviada', color: 'green' as const }
+                : h.status === 'failed'
+                  ? { label: 'Fallida', color: 'red' as const }
+                  : { label: h.status ?? 'Borrador', color: 'gray' as const }
+              return (
+                <div key={h.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{h.name}</p>
+                    <p className="text-xs text-slate-400">
+                      {chIcon} {h.channel} · {recipients} destinatario{recipients === 1 ? '' : 's'}
+                      {!companyId && h.companies?.name ? ` · ${h.companies.name}` : ''}
+                      {h.zavu_template_id ? ' · ⚡ plantilla Meta' : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    {when && (
+                      <span className="text-xs text-slate-400">
+                        {new Date(when).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                    )}
+                    <Badge label={st.label} color={st.color} />
+                  </div>
                 </div>
-                <Badge label={h.status ?? 'enviado'} color="green" />
-              </div>
-            ))}
+              )
+            })}
+          </div>
+        )}
+        {histPages > 1 && (
+          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
+            <span>Página {histPage} de {histPages}</span>
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" disabled={histPage === 1} onClick={() => setHistPage(p => p - 1)}>Anterior</Button>
+              <Button variant="secondary" size="sm" disabled={histPage >= histPages} onClick={() => setHistPage(p => p + 1)}>Siguiente</Button>
+            </div>
           </div>
         )}
       </div>
@@ -439,7 +487,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
 
 // ── Template modal ─────────────────────────────────────────────────────────────
 
-const EMPTY_FORM = { name: '', channel: 'whatsapp', tramo_min: '', content: '', active: true }
+const EMPTY_FORM = { name: '', channel: 'whatsapp', tramo_min: '', content: '', active: true, company_id: '' }
 const VARS = ['{{nombre}}', '{{saldo}}', '{{empresa}}', '{{dias_mora}}', '{{asesor}}', '{{facturas}}']
 
 function TemplateModal({ editing, onClose, onSaved }: {
@@ -449,10 +497,17 @@ function TemplateModal({ editing, onClose, onSaved }: {
 }) {
   const [form, setForm] = useState(() =>
     editing
-      ? { name: editing.name ?? '', channel: editing.channel ?? 'whatsapp', tramo_min: editing.tramo != null ? String(editing.tramo) : '', content: editing.body ?? editing.content ?? '', active: editing.is_active !== false }
+      ? { name: editing.name ?? '', channel: editing.channel ?? 'whatsapp', tramo_min: editing.tramo != null ? String(editing.tramo) : '', content: editing.body ?? editing.content ?? '', active: editing.is_active !== false, company_id: editing.company_id ?? '' }
       : EMPTY_FORM
   )
   const [saving, setSaving] = useState(false)
+
+  const { data: companiesData } = useQuery({
+    queryKey: ['companies-list'],
+    queryFn: async () => { const { data } = await api.get('/api/companies?limit=100'); return data },
+    staleTime: 120_000,
+  })
+  const companies: any[] = companiesData?.data ?? (Array.isArray(companiesData) ? companiesData : [])
 
   const isEdit = !!editing
 
@@ -474,7 +529,9 @@ function TemplateModal({ editing, onClose, onSaved }: {
         body: form.content.trim(),
         tramo: tramoNum,
         is_active: form.active,
-        is_global: true,
+        // Sin empresa = plantilla global; con empresa = personalizada
+        company_id: form.company_id || null,
+        is_global: !form.company_id,
       }
       if (isEdit) {
         await api.patch(`/api/collection/templates/${editing.id}`, payload)
@@ -536,8 +593,8 @@ function TemplateModal({ editing, onClose, onSaved }: {
                   <button key={ch.id} type="button"
                     onClick={() => setForm(f => ({ ...f, channel: ch.id }))}
                     className={`flex flex-col items-center gap-1.5 py-3 rounded-xl font-medium text-xs transition-all border-2 ${form.channel === ch.id
-                        ? `${ch.active} shadow-md`
-                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      ? `${ch.active} shadow-md`
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                       }`}>
                     <span className="text-xl leading-none">{ch.icon}</span>
                     <span>{ch.label}</span>
@@ -559,8 +616,8 @@ function TemplateModal({ editing, onClose, onSaved }: {
                   <button key={t.val} type="button"
                     onClick={() => setForm(f => ({ ...f, tramo_min: f.tramo_min === t.val ? '' : t.val }))}
                     className={`py-2 rounded-lg text-xs font-medium border-2 transition-all ${form.tramo_min === t.val
-                        ? 'bg-slate-800 border-slate-800 text-white'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      ? 'bg-slate-800 border-slate-800 text-white'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}>
                     {t.label}
                   </button>
@@ -571,9 +628,19 @@ function TemplateModal({ editing, onClose, onSaved }: {
             {/* Empresa */}
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-600 mb-1">Empresa (vacío = global)</label>
-              <div className="flex items-center gap-2 border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-slate-400 text-sm">
-                🌐 Global
-              </div>
+              <select
+                value={form.company_id}
+                onChange={e => setForm(f => ({ ...f, company_id: e.target.value }))}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">🌐 Global — disponible para todas las empresas</option>
+                {companies.map((c: any) => (
+                  <option key={c.id} value={c.id}>🏢 {c.name ?? c.legal_name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Las plantillas de una empresa solo aparecen en las campañas de esa empresa.
+              </p>
             </div>
           </div>
 
@@ -697,7 +764,13 @@ function PlantillasPanel() {
                     </td>
                     <td className="px-4 py-3 text-slate-500 capitalize">{t.channel}</td>
                     <td className="px-4 py-3 text-slate-500">{t.tramo != null ? `${t.tramo}+ días` : isZavu ? t.category ?? '—' : '—'}</td>
-                    <td className="px-4 py-3 text-xs text-slate-500">{isZavu ? `🟢 ${t.language?.toUpperCase() ?? ''}` : '🌐 Global'}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500">
+                      {isZavu
+                        ? `🟢 ${t.language?.toUpperCase() ?? ''}`
+                        : t.company_id
+                          ? <span className="inline-flex items-center gap-1 font-medium text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">🏢 {t.companies?.name ?? 'Empresa'}</span>
+                          : '🌐 Global'}
+                    </td>
                     <td className="px-4 py-3">
                       {isZavu ? (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-green-600">
@@ -1440,6 +1513,9 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: (import
 export function CollectionPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
+  const [contactF, setContactF] = useState('')
+  const [sortKey, setSortKey] = useState<'' | 'antiguedad' | 'mora' | 'saldo'>('')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
   const [tab, setTab] = useState<TabKey>('active')
   const [selected, setSelected] = useState<string[]>([])
@@ -1468,11 +1544,13 @@ export function CollectionPage() {
   })
 
   const { data, isLoading } = useQuery({
-    queryKey: ['debtors', search, status, page, tab, companyId],
+    queryKey: ['debtors', search, status, contactF, sortKey, sortDir, page, tab, companyId],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: '20' })
       if (search) params.set('search', search)
       if (companyId) params.set('company_id', companyId)
+      if (contactF) params.set('contact', contactF)
+      if (sortKey) { params.set('sort', sortKey); params.set('dir', sortDir) }
       if (tab === 'paid') params.set('status', 'paid')
       else if (tab === 'gestion') params.set('status', 'in_collection')
       else if (status) params.set('status', status)
@@ -1482,6 +1560,14 @@ export function CollectionPage() {
     staleTime: 30_000,
     enabled: ['active', 'paid', 'gestion'].includes(tab),
   })
+
+  // Clic en un botón de orden: 1º desc, 2º asc, 3º quita el orden
+  const toggleSort = (key: 'antiguedad' | 'mora' | 'saldo') => {
+    setPage(1)
+    if (sortKey !== key) { setSortKey(key); setSortDir('desc') }
+    else if (sortDir === 'desc') setSortDir('asc')
+    else setSortKey('')
+  }
 
   const rows: any[] = data?.data ?? []
 
@@ -1610,21 +1696,32 @@ export function CollectionPage() {
                     <option key={k} value={k}>{v.label}</option>
                   ))}
                 </select>
-                <select className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
-                  <option>Todos (Contacto)</option>
-                  <option>Con teléfono</option>
-                  <option>Con email</option>
-                  <option>Sin contacto</option>
+                <select
+                  value={contactF}
+                  onChange={e => { setContactF(e.target.value); setPage(1) }}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                  <option value="">Todos (Contacto)</option>
+                  <option value="phone">Con teléfono</option>
+                  <option value="email">Con email</option>
+                  <option value="none">Sin contacto</option>
                 </select>
-                <button className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">
-                  Antigüedad <ArrowUpDown className="w-3 h-3" />
-                </button>
-                <button className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">
-                  Mora <ArrowUpDown className="w-3 h-3" />
-                </button>
-                <button className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50">
-                  Saldo <ArrowUpDown className="w-3 h-3" />
-                </button>
+                {([
+                  { key: 'antiguedad', label: 'Antigüedad' },
+                  { key: 'mora', label: 'Mora' },
+                  { key: 'saldo', label: 'Saldo' },
+                ] as const).map(s => (
+                  <button key={s.key}
+                    onClick={() => toggleSort(s.key)}
+                    className={`inline-flex items-center gap-1 text-xs font-medium border rounded-lg px-3 py-1.5 transition-colors ${sortKey === s.key
+                        ? 'bg-primary-600 text-white border-primary-600'
+                        : 'text-slate-500 border-slate-200 hover:bg-slate-50'
+                      }`}>
+                    {s.label}
+                    {sortKey === s.key
+                      ? <span className="text-[10px]">{sortDir === 'desc' ? '▼' : '▲'}</span>
+                      : <ArrowUpDown className="w-3 h-3" />}
+                  </button>
+                ))}
               </div>
 
               {isLoading ? (
