@@ -6,14 +6,19 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { useAuthStore } from '@/stores/authStore'
 import {
   Building2, Search, Plus, Eye, Pencil, Trash2, X,
   CheckCircle2, FileText, LayoutGrid, ListTodo, Activity,
-  FileSignature, Upload, Download,
+  FileSignature, Upload, Download, Handshake,
 } from 'lucide-react'
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function fmtMoney(n: number) {
+  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
 }
 
 const STATUS_MAP: Record<string, { label: string; cls: string }> = {
@@ -47,7 +52,7 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-type DetailTab = 'info' | 'modules' | 'tasks' | 'docs' | 'proposals' | 'activity'
+type DetailTab = 'info' | 'modules' | 'tasks' | 'docs' | 'proposals' | 'participations' | 'activity'
 
 const DEPARTAMENTOS = [
   'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá',
@@ -510,8 +515,204 @@ function ProposalsPanel({ companyId }: { companyId: string }) {
   )
 }
 
+// ── Participación de Terceros: configuración por servicio contratado ─────────
+
+function NewTerceroModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState('')
+  const [ident, setIdent] = useState('')
+  const createMut = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/api/participations/third-parties', { name: name.trim(), identification: ident.trim() || undefined })
+      return data
+    },
+    onSuccess: (d: any) => { toast.success('Tercero creado'); qc.invalidateQueries({ queryKey: ['third-parties'] }); onCreated(d.id); onClose() },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al crear tercero'),
+  })
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-bold text-slate-900">Nuevo tercero</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="Empresa o persona"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Identificación (NIT / documento)</label>
+            <input value={ident} onChange={e => setIdent(e.target.value)} placeholder="900.123.456-7"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Button>
+            <Button className="flex-1" loading={createMut.isPending} disabled={name.trim().length < 2} onClick={() => createMut.mutate()}>Crear</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; terceros: any[]; onNewTercero: () => void }) {
+  const qc = useQueryClient()
+  const [value, setValue] = useState<string>(row.service_value != null ? String(row.service_value) : '')
+  const [hasThird, setHasThird] = useState<boolean>(row.has_third_party)
+  const [thirdId, setThirdId] = useState<string>(row.third_party?.id ?? '')
+  const [pct, setPct] = useState<string>(row.participation?.percentage != null ? String(row.participation.percentage) : '')
+  const [startDate, setStartDate] = useState<string>(row.participation?.start_date ?? '')
+  const [active, setActive] = useState<boolean>(row.participation?.active ?? true)
+
+  const selectedTercero = terceros.find((t: any) => t.id === thirdId)
+  const valueNum = Number(value) || 0
+  const pctNum = Number(pct) || 0
+  const preview = Math.round(valueNum * (pctNum / 100) * 100) / 100
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      await api.put('/api/participations/config', {
+        company_service_id: row.company_service_id,
+        service_value:      valueNum,
+        has_third_party:    hasThird,
+        third_party_id:     hasThird ? thirdId : null,
+        percentage:         hasThird ? pctNum : undefined,
+        start_date:         hasThird ? (startDate || undefined) : undefined,
+        active,
+      })
+    },
+    onSuccess: () => { toast.success('Participación guardada'); qc.invalidateQueries({ queryKey: ['company-participations'] }) },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
+  })
+
+  const canSave = value !== '' && (!hasThird || (thirdId && pct !== '' && startDate))
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
+            <Handshake className="w-4 h-4 text-primary-500" />
+          </span>
+          <p className="text-sm font-semibold text-slate-900">{row.service?.name ?? '—'}</p>
+        </div>
+        {hasThird && preview > 0 && (
+          <span className="text-xs font-medium text-primary-700 bg-primary-50 px-2 py-1 rounded-full">
+            Participación: {fmtMoney(preview)}
+          </span>
+        )}
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor del servicio (antes de IVA)</label>
+          <input type="number" min={0} value={value} onChange={e => setValue(e.target.value)} placeholder="0"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+        </div>
+        <div className="flex items-end">
+          <button type="button" onClick={() => setHasThird(!hasThird)}
+            className={`w-full flex items-center gap-2 p-2.5 rounded-lg border text-sm transition-colors ${hasThird ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            <span className={`relative inline-flex h-5 w-9 items-center rounded-full shrink-0 transition-colors ${hasThird ? 'bg-primary-600' : 'bg-slate-300'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${hasThird ? 'translate-x-4' : 'translate-x-1'}`} />
+            </span>
+            Tiene tercero participante
+          </button>
+        </div>
+      </div>
+
+      {hasThird && (
+        <div className="grid sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-slate-100">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tercero</label>
+            <div className="flex gap-1.5">
+              <select value={thirdId} onChange={e => setThirdId(e.target.value)}
+                className="flex-1 border border-slate-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">Seleccionar…</option>
+                {terceros.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <button type="button" onClick={onNewTercero} title="Nuevo tercero"
+                className="px-2.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"><Plus className="w-4 h-4" /></button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Identificación</label>
+            <input readOnly value={selectedTercero?.identification ?? ''} placeholder="—"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Porcentaje de participación (%)</label>
+            <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha de inicio</label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
+            <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="rounded border-slate-300" />
+            Participación activa {!active && <span className="text-xs text-amber-600">(suspendida — no se procesa en el cron)</span>}
+          </label>
+        </div>
+      )}
+
+      <div className="flex justify-end mt-3">
+        <Button size="sm" loading={saveMut.isPending} disabled={!canSave} onClick={() => saveMut.mutate()}>Guardar</Button>
+      </div>
+    </div>
+  )
+}
+
+function ParticipationsPanel({ companyId }: { companyId: string }) {
+  const [showNewTercero, setShowNewTercero] = useState(false)
+
+  const { data: rows, isLoading } = useQuery({
+    queryKey: ['company-participations', companyId],
+    queryFn: async () => { const { data } = await api.get(`/api/participations/company/${companyId}`); return data },
+  })
+  const { data: terceros } = useQuery({
+    queryKey: ['third-parties'],
+    queryFn: async () => { const { data } = await api.get('/api/participations/third-parties'); return data },
+    staleTime: 120_000,
+  })
+
+  const services: any[] = rows ?? []
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-3">
+        <Handshake className="w-5 h-5 text-primary-500 shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Participación de terceros</p>
+          <p className="text-xs text-slate-400">Configura el valor mensual (antes de IVA) y la participación de un tercero por cada servicio contratado. El cron de fin de mes procesa solo las participaciones activas con porcentaje mayor a 0.</p>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="py-8 flex justify-center"><PageLoader /></div>
+      ) : services.length ? (
+        services.map((row: any) => (
+          <ServiceParticipationCard key={row.company_service_id} row={row} terceros={terceros ?? []} onNewTercero={() => setShowNewTercero(true)} />
+        ))
+      ) : (
+        <div className="text-center py-10 text-slate-400 bg-white border border-slate-200 rounded-xl">
+          <Handshake className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+          <p className="text-sm">Esta empresa no tiene servicios contratados activos</p>
+        </div>
+      )}
+
+      {showNewTercero && <NewTerceroModal onClose={() => setShowNewTercero(false)} onCreated={() => {}} />}
+    </div>
+  )
+}
+
 export function CompaniesPage() {
   const qc = useQueryClient()
+  const { user } = useAuthStore()
+  const canParticipations = ['admin', 'rs_admin', 'contador'].includes(user?.role ?? '')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -607,6 +808,7 @@ export function CompaniesPage() {
     { key: 'tasks', label: 'Tareas', icon: ListTodo },
     { key: 'docs', label: 'Documentos', icon: FileText },
     { key: 'proposals', label: 'Propuestas', icon: FileSignature },
+    ...(canParticipations ? [{ key: 'participations' as DetailTab, label: 'Participación de Terceros', icon: Handshake }] : []),
     { key: 'activity', label: 'Actividad', icon: Activity },
   ]
 
@@ -951,6 +1153,10 @@ export function CompaniesPage() {
 
               {detailTab === 'proposals' && (
                 <ProposalsPanel companyId={selectedId!} />
+              )}
+
+              {detailTab === 'participations' && (
+                <ParticipationsPanel companyId={selectedId!} />
               )}
 
               {detailTab === 'activity' && (

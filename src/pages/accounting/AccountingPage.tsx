@@ -10,10 +10,284 @@ import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
 import {
   Calculator, AlertTriangle, CalendarDays, CheckCircle2, Clock,
-  Building2, Plus, Pencil, Trash2, X, PlayCircle, ListChecks,
+  Building2, Plus, Pencil, Trash2, X, PlayCircle, ListChecks, Bell, Handshake,
 } from 'lucide-react'
 
-type Tab = 'dashboard' | 'clients' | 'analysis' | 'master'
+type Tab = 'dashboard' | 'clients' | 'analysis' | 'participations' | 'master'
+
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
+function fmtMoney(n: number) {
+  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n ?? 0)
+}
+
+const PART_STATUS: Record<string, { label: string; cls: string }> = {
+  pending:   { label: 'Pendiente',   cls: 'bg-amber-100 text-amber-700' },
+  review:    { label: 'Pend. revisión', cls: 'bg-red-100 text-red-700' },
+  validated: { label: 'Validada',    cls: 'bg-emerald-100 text-emerald-700' },
+}
+
+// ── Registro manual de facturación + conciliación ────────────────────────────
+
+function InvoicingModal({ item, onClose }: { item: any; onClose: () => void }) {
+  const qc = useQueryClient()
+  const inv = (Array.isArray(item.participation_invoicing) ? item.participation_invoicing[0] : item.participation_invoicing) ?? {}
+  const [form, setForm] = useState({
+    finto_invoice:             inv.finto_invoice ?? '',
+    finto_invoice_date:        inv.finto_invoice_date ?? '',
+    finto_invoice_value:       inv.finto_invoice_value != null ? String(inv.finto_invoice_value) : '',
+    third_party_invoice:       inv.third_party_invoice ?? '',
+    third_party_invoice_date:  inv.third_party_invoice_date ?? '',
+    third_party_invoice_value: inv.third_party_invoice_value != null ? String(inv.third_party_invoice_value) : '',
+    observations:              inv.observations ?? '',
+  })
+  const [result, setResult] = useState<{ status: string; reasons: string[] } | null>(null)
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.patch(`/api/participations/monthly/${item.id}/invoicing`, {
+        finto_invoice:             form.finto_invoice.trim() || null,
+        finto_invoice_date:        form.finto_invoice_date || null,
+        finto_invoice_value:       form.finto_invoice_value !== '' ? Number(form.finto_invoice_value) : null,
+        third_party_invoice:       form.third_party_invoice.trim() || null,
+        third_party_invoice_date:  form.third_party_invoice_date || null,
+        third_party_invoice_value: form.third_party_invoice_value !== '' ? Number(form.third_party_invoice_value) : null,
+        observations:              form.observations.trim() || null,
+      })
+      return data
+    },
+    onSuccess: (d: any) => {
+      setResult({ status: d.status, reasons: d.reasons ?? [] })
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      toast.success(d.status === 'validated' ? 'Conciliación correcta' : 'Guardado — quedó pendiente de revisión')
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
+  })
+
+  const p = item.participation ?? {}
+  const company = p.company_service?.companies?.name ?? '—'
+  const service = p.company_service?.services?.name ?? '—'
+  const tercero = p.third_party?.name ?? '—'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Registro de facturación</h3>
+            <p className="text-xs text-slate-400">{item.purchase_order} · {company} · {service}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+          {/* Referencia de lo calculado */}
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="bg-slate-50 rounded-lg p-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Valor servicio</p>
+              <p className="text-sm font-semibold text-slate-900">{fmtMoney(Number(item.service_value))}</p>
+            </div>
+            <div className="bg-slate-50 rounded-lg p-2">
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Porcentaje</p>
+              <p className="text-sm font-semibold text-slate-900">{item.percentage}%</p>
+            </div>
+            <div className="bg-primary-50 rounded-lg p-2">
+              <p className="text-[10px] font-bold text-primary-500 uppercase">Participación</p>
+              <p className="text-sm font-bold text-primary-700">{fmtMoney(Number(item.participation_value))}</p>
+            </div>
+          </div>
+
+          {/* Factura Finto */}
+          <div>
+            <p className="text-xs font-bold text-primary-600 uppercase tracking-wider mb-2">Factura de Finto</p>
+            <div className="grid grid-cols-3 gap-2">
+              <input value={form.finto_invoice} onChange={e => set('finto_invoice', e.target.value)} placeholder="N° factura"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="date" value={form.finto_invoice_date} onChange={e => set('finto_invoice_date', e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="number" min={0} value={form.finto_invoice_value} onChange={e => set('finto_invoice_value', e.target.value)} placeholder="Valor antes IVA"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+          </div>
+
+          {/* Factura tercero */}
+          <div>
+            <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Factura del tercero ({tercero})</p>
+            <div className="grid grid-cols-3 gap-2">
+              <input value={form.third_party_invoice} onChange={e => set('third_party_invoice', e.target.value)} placeholder="N° factura"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="date" value={form.third_party_invoice_date} onChange={e => set('third_party_invoice_date', e.target.value)}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="number" min={0} value={form.third_party_invoice_value} onChange={e => set('third_party_invoice_value', e.target.value)} placeholder="Valor antes IVA"
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Observaciones</label>
+            <textarea rows={2} value={form.observations} onChange={e => set('observations', e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none" />
+          </div>
+
+          {result && (
+            <div className={`rounded-lg p-3 text-sm ${result.status === 'validated' ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
+              <p className={`font-semibold ${result.status === 'validated' ? 'text-emerald-700' : 'text-red-700'}`}>
+                {result.status === 'validated' ? '✓ Conciliación correcta' : '⚠ Pendiente de revisión'}
+              </p>
+              {result.reasons.map((r, i) => <p key={i} className="text-xs text-red-600 mt-0.5">• {r}</p>)}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
+          <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+          <Button loading={saveMut.isPending} onClick={() => saveMut.mutate()}>Guardar y conciliar</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
+  const qc = useQueryClient()
+  const now = new Date()
+  const [year, setYear] = useState(now.getFullYear())
+  const [month, setMonth] = useState(now.getMonth() + 1)
+  const [statusF, setStatusF] = useState('')
+  const [page, setPage] = useState(1)
+  const [invoicingItem, setInvoicingItem] = useState<any | null>(null)
+
+  const { data: stats } = useQuery({
+    queryKey: ['participations', 'stats', year, month],
+    queryFn: async () => { const { data } = await api.get(`/api/participations/stats?year=${year}&month=${month}`); return data },
+  })
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['participations', 'monthly', year, month, statusF, page],
+    queryFn: async () => {
+      const params = new URLSearchParams({ year: String(year), month: String(month), page: String(page), limit: '20' })
+      if (statusF) params.set('status', statusF)
+      const { data } = await api.get(`/api/participations/monthly?${params}`)
+      return data
+    },
+    placeholderData: (prev: any) => prev,
+  })
+  const rows: any[] = data?.data ?? []
+  const total: number = data?.total ?? 0
+  const pages = Math.max(1, Math.ceil(total / 20))
+
+  const generateMut = useMutation({
+    mutationFn: async () => { const { data } = await api.post('/api/participations/generate', { year, month }); return data },
+    onSuccess: (d: any) => { toast.success(`${d.generated ?? 0} participación(es) generada(s)`); qc.invalidateQueries({ queryKey: ['participations'] }) },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al generar'),
+  })
+
+  const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2]
+
+  return (
+    <div className="space-y-4">
+      {/* Controles */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={year} onChange={e => { setYear(Number(e.target.value)); setPage(1) }}
+          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select value={month} onChange={e => { setMonth(Number(e.target.value)); setPage(1) }}
+          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
+          {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+        </select>
+        <div className="flex gap-1.5">
+          {([['', 'Todas'], ['pending', 'Pendientes'], ['review', 'Pend. revisión'], ['validated', 'Validadas']] as const).map(([k, l]) => (
+            <button key={k} onClick={() => { setStatusF(k); setPage(1) }}
+              className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${statusF === k ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {isAdmin && (
+          <Button size="sm" variant="secondary" className="ml-auto" loading={generateMut.isPending} onClick={() => generateMut.mutate()}>
+            Generar participaciones del mes
+          </Button>
+        )}
+      </div>
+
+      {/* Mini stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Total', value: stats?.total ?? 0, cls: 'text-slate-900' },
+          { label: 'Pendientes', value: stats?.pending ?? 0, cls: 'text-amber-600' },
+          { label: 'Pend. revisión', value: stats?.review ?? 0, cls: 'text-red-600' },
+          { label: 'Valor total', value: fmtMoney(stats?.total_value ?? 0), cls: 'text-primary-700' },
+        ].map(k => (
+          <div key={k.label} className="bg-white border border-slate-200 rounded-xl p-3">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{k.label}</p>
+            <p className={`text-xl font-bold mt-0.5 ${k.cls}`}>{k.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabla */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        {isLoading ? (
+          <div className="py-10"><PageLoader /></div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  {['Orden de compra', 'Cliente', 'Servicio', 'Tercero', 'Valor servicio', '%', 'Participación', 'Estado', ''].map(h => (
+                    <th key={h} className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {rows.map((r: any) => {
+                  const p = r.participation ?? {}
+                  const st = PART_STATUS[r.status] ?? PART_STATUS.pending
+                  return (
+                    <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-3 py-2.5 font-mono text-xs text-slate-700 whitespace-nowrap">{r.purchase_order}</td>
+                      <td className="px-3 py-2.5 text-slate-700">{p.company_service?.companies?.name ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-slate-500">{p.company_service?.services?.name ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-slate-500">{p.third_party?.name ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{fmtMoney(Number(r.service_value))}</td>
+                      <td className="px-3 py-2.5 text-slate-500">{r.percentage}%</td>
+                      <td className="px-3 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{fmtMoney(Number(r.participation_value))}</td>
+                      <td className="px-3 py-2.5"><span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>{st.label}</span></td>
+                      <td className="px-3 py-2.5 text-right">
+                        <button onClick={() => setInvoicingItem(r)} className="text-xs font-medium text-primary-600 hover:underline whitespace-nowrap">
+                          Registrar facturas
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {!rows.length && (
+              <p className="px-4 py-12 text-center text-slate-400 text-sm">
+                No hay participaciones para {MESES[month - 1]} {year}. {isAdmin && 'Usa "Generar participaciones del mes" para procesarlas.'}
+              </p>
+            )}
+          </div>
+        )}
+        {pages > 1 && (
+          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
+            <span>Página {page} de {pages}</span>
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+              <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => setPage(p => p + 1)}>Siguiente</Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {invoicingItem && <InvoicingModal item={invoicingItem} onClose={() => setInvoicingItem(null)} />}
+    </div>
+  )
+}
 
 // ── Modal crear/editar tarea de la plantilla maestra ─────────────────────────
 
@@ -23,10 +297,11 @@ function MasterItemModal({ item, onClose }: { item: any | null; onClose: () => v
   const [title, setTitle] = useState(item?.title ?? '')
   const [description, setDescription] = useState(item?.description ?? '')
   const [isMandatory, setIsMandatory] = useState<boolean>(item?.is_mandatory ?? true)
+  const [noticeDays, setNoticeDays] = useState<number>(item?.notice_days ?? 5)
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      const body = { title: title.trim(), description: description.trim() || undefined, is_mandatory: isMandatory }
+      const body = { title: title.trim(), description: description.trim() || undefined, is_mandatory: isMandatory, notice_days: noticeDays }
       if (item) await api.patch(`/api/accounting/master/${item.id}`, body)
       else      await api.post('/api/accounting/master', body)
     },
@@ -74,6 +349,23 @@ function MasterItemModal({ item, onClose }: { item: any | null; onClose: () => v
                 Opcional
               </button>
             </div>
+          </div>
+
+          {/* Anticipación: cuándo se crea la tarea y arrancan los recordatorios */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Anticipación (días antes del vencimiento)</label>
+            <div className="flex flex-wrap gap-1.5">
+              {[5, 10, 15, 30, 45, 60].map(n => (
+                <button key={n} type="button" onClick={() => setNoticeDays(n)}
+                  className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${noticeDays === n ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                  {n}
+                </button>
+              ))}
+              <input type="number" min={1} max={120} value={noticeDays}
+                onChange={e => setNoticeDays(Math.min(120, Math.max(1, Number(e.target.value) || 1)))}
+                className="w-20 border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">La tarea se crea y el contador empieza a recibir recordatorios {noticeDays} días antes del vencimiento.</p>
           </div>
 
           <div className="flex gap-2 pt-1">
@@ -166,6 +458,12 @@ export function AccountingPage() {
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al generar fichas'),
   })
 
+  const remindersMut = useMutation({
+    mutationFn: async () => { const { data } = await api.post('/api/accounting/run-reminders'); return data },
+    onSuccess: (d: any) => { toast.success(`Recordatorios enviados: ${d.reminded ?? 0} obligación(es)`) },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al enviar recordatorios'),
+  })
+
   const selectedInfo = companies.find(c => c.id === selectedCompany)
 
   const analysisRows = companies.filter(c =>
@@ -175,6 +473,7 @@ export function AccountingPage() {
     { key: 'dashboard', label: 'Dashboard',          icon: Calculator },
     { key: 'clients',   label: 'Calendarios',        icon: CalendarDays },
     { key: 'analysis',  label: 'Análisis',           icon: ListChecks },
+    { key: 'participations', label: 'Participaciones', icon: Handshake },
     { key: 'master',    label: 'Plantilla maestra',  icon: Building2, hidden: !isSuperAdmin },
   ]
 
@@ -197,6 +496,9 @@ export function AccountingPage() {
               </Button>
               <Button size="sm" variant="secondary" onClick={() => runCronMut.mutate()} loading={runCronMut.isPending}>
                 <PlayCircle className="w-3.5 h-3.5" /> Ejecutar cron
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => remindersMut.mutate()} loading={remindersMut.isPending}>
+                <Bell className="w-3.5 h-3.5" /> Enviar recordatorios
               </Button>
             </div>
           )}
@@ -416,6 +718,9 @@ export function AccountingPage() {
           </div>
         )}
 
+        {/* ── Participaciones de terceros ── */}
+        {tab === 'participations' && <ParticipationsTab isAdmin={isAdmin} />}
+
         {/* ── Plantilla maestra (solo Super Admin) ── */}
         {tab === 'master' && isSuperAdmin && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -441,6 +746,9 @@ export function AccountingPage() {
                       <p className="text-sm font-medium text-slate-900">{m.title}</p>
                       {m.description && <p className="text-xs text-slate-400 truncate">{m.description}</p>}
                     </div>
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full shrink-0" title="Anticipación con la que se crea la tarea y arrancan los recordatorios">
+                      ⏱ {m.notice_days ?? 5}d
+                    </span>
                     <span className={`text-xs font-medium px-2 py-1 rounded-full shrink-0 ${m.is_mandatory ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
                       {m.is_mandatory ? 'Obligatoria' : 'Opcional'}
                     </span>
