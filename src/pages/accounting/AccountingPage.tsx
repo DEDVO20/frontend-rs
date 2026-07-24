@@ -22,9 +22,10 @@ function fmtMoney(n: number) {
 }
 
 const PART_STATUS: Record<string, { label: string; cls: string }> = {
-  pending:   { label: 'Pendiente',   cls: 'bg-amber-100 text-amber-700' },
+  pending:   { label: 'Pendiente',      cls: 'bg-amber-100 text-amber-700' },
   review:    { label: 'Pend. revisión', cls: 'bg-red-100 text-red-700' },
-  validated: { label: 'Validada',    cls: 'bg-emerald-100 text-emerald-700' },
+  validated: { label: 'Conciliada',     cls: 'bg-blue-100 text-blue-700' },
+  closed:    { label: 'Cerrada',        cls: 'bg-emerald-100 text-emerald-700' },
 }
 
 // ── Registro manual de facturación + conciliación ────────────────────────────
@@ -36,23 +37,55 @@ function InvoicingModal({ item, onClose }: { item: any; onClose: () => void }) {
     finto_invoice:             inv.finto_invoice ?? '',
     finto_invoice_date:        inv.finto_invoice_date ?? '',
     finto_invoice_value:       inv.finto_invoice_value != null ? String(inv.finto_invoice_value) : '',
+    cash_receipt:              inv.cash_receipt ?? '',
+    cash_receipt_date:         inv.cash_receipt_date ?? '',
+    cash_receipt_value:        inv.cash_receipt_value != null ? String(inv.cash_receipt_value) : '',
+    cash_account:              inv.cash_account ?? '',
     third_party_invoice:       inv.third_party_invoice ?? '',
     third_party_invoice_date:  inv.third_party_invoice_date ?? '',
     third_party_invoice_value: inv.third_party_invoice_value != null ? String(inv.third_party_invoice_value) : '',
+    egress_voucher:            inv.egress_voucher ?? '',
+    egress_voucher_date:       inv.egress_voucher_date ?? '',
+    egress_voucher_value:      inv.egress_voucher_value != null ? String(inv.egress_voucher_value) : '',
     observations:              inv.observations ?? '',
   })
   const [result, setResult] = useState<{ status: string; reasons: string[] } | null>(null)
+  // Alertas de factura ya registrada — informativas, no bloquean el guardado
+  const [dupFinto, setDupFinto] = useState<string | null>(null)
+  const [dupThird, setDupThird] = useState<string | null>(null)
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  const num = (v: string) => v !== '' ? Number(v) : null
+  const receivable = (Number(form.finto_invoice_value) || 0) - (Number(form.cash_receipt_value) || 0)
+  const payable    = (Number(form.third_party_invoice_value) || 0) - (Number(form.egress_voucher_value) || 0)
+
+  const checkDuplicate = async (type: 'finto' | 'third', value: string) => {
+    const setter = type === 'finto' ? setDupFinto : setDupThird
+    if (!value.trim()) { setter(null); return }
+    try {
+      const { data } = await api.get('/api/participations/invoice-check', {
+        params: { type, number: value.trim(), exclude: item.id },
+      })
+      setter(data?.duplicate ? `Ya registrada en ${data.duplicate.purchase_order}` : null)
+    } catch { setter(null) }
+  }
 
   const saveMut = useMutation({
     mutationFn: async () => {
       const { data } = await api.patch(`/api/participations/monthly/${item.id}/invoicing`, {
         finto_invoice:             form.finto_invoice.trim() || null,
         finto_invoice_date:        form.finto_invoice_date || null,
-        finto_invoice_value:       form.finto_invoice_value !== '' ? Number(form.finto_invoice_value) : null,
+        finto_invoice_value:       num(form.finto_invoice_value),
+        cash_receipt:              form.cash_receipt.trim() || null,
+        cash_receipt_date:         form.cash_receipt_date || null,
+        cash_receipt_value:        num(form.cash_receipt_value),
+        cash_account:              form.cash_account.trim() || null,
         third_party_invoice:       form.third_party_invoice.trim() || null,
         third_party_invoice_date:  form.third_party_invoice_date || null,
-        third_party_invoice_value: form.third_party_invoice_value !== '' ? Number(form.third_party_invoice_value) : null,
+        third_party_invoice_value: num(form.third_party_invoice_value),
+        egress_voucher:            form.egress_voucher.trim() || null,
+        egress_voucher_date:       form.egress_voucher_date || null,
+        egress_voucher_value:      num(form.egress_voucher_value),
         observations:              form.observations.trim() || null,
       })
       return data
@@ -60,7 +93,12 @@ function InvoicingModal({ item, onClose }: { item: any; onClose: () => void }) {
     onSuccess: (d: any) => {
       setResult({ status: d.status, reasons: d.reasons ?? [] })
       qc.invalidateQueries({ queryKey: ['participations'] })
-      toast.success(d.status === 'validated' ? 'Conciliación correcta' : 'Guardado — quedó pendiente de revisión')
+      ;(d.warnings ?? []).forEach((w: string) => toast.warning(w))
+      toast.success(
+        d.status === 'closed'    ? 'Participación cerrada (recaudada y pagada)' :
+        d.status === 'validated' ? 'Conciliación correcta' :
+        'Guardado — quedó pendiente de revisión',
+      )
     },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
   })
@@ -99,29 +137,83 @@ function InvoicingModal({ item, onClose }: { item: any; onClose: () => void }) {
             </div>
           </div>
 
-          {/* Factura Finto */}
-          <div>
-            <p className="text-xs font-bold text-primary-600 uppercase tracking-wider mb-2">Factura de Finto</p>
-            <div className="grid grid-cols-3 gap-2">
-              <input value={form.finto_invoice} onChange={e => set('finto_invoice', e.target.value)} placeholder="N° factura"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <input type="date" value={form.finto_invoice_date} onChange={e => set('finto_invoice_date', e.target.value)}
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <input type="number" min={0} value={form.finto_invoice_value} onChange={e => set('finto_invoice_value', e.target.value)} placeholder="Valor antes IVA"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          {/* ── CxC Clientes: factura Finto → recibo de caja ── */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-slate-100">
+              <p className="text-xs font-bold text-slate-700 uppercase tracking-wider">CxC Clientes</p>
+              <span className={`text-xs font-semibold ${receivable > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                Saldo por cobrar: {fmtMoney(receivable)}
+              </span>
+            </div>
+            <div className="p-3 space-y-2">
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 mb-1">Factura de Finto</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={form.finto_invoice} onChange={e => set('finto_invoice', e.target.value)} onBlur={e => checkDuplicate('finto', e.target.value)} placeholder="N° factura"
+                    className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${dupFinto ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`} />
+                  <input type="date" value={form.finto_invoice_date} onChange={e => set('finto_invoice_date', e.target.value)}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <input type="number" min={0} value={form.finto_invoice_value} onChange={e => set('finto_invoice_value', e.target.value)} placeholder="Valor antes IVA"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+                {dupFinto && (
+                  <p className="text-[11px] text-amber-700 mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0" /> {dupFinto} — puedes continuar de todas formas
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 mb-1">Recibo de caja</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={form.cash_receipt} onChange={e => set('cash_receipt', e.target.value)} placeholder="N° recibo"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <input type="date" value={form.cash_receipt_date} onChange={e => set('cash_receipt_date', e.target.value)}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <input type="number" min={0} value={form.cash_receipt_value} onChange={e => set('cash_receipt_value', e.target.value)} placeholder="V. Recibo"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+                <input value={form.cash_account} onChange={e => set('cash_account', e.target.value)} placeholder="Caja / cuenta donde ingresó"
+                  className="w-full mt-2 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
             </div>
           </div>
 
-          {/* Factura tercero */}
-          <div>
-            <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Factura del tercero ({tercero})</p>
-            <div className="grid grid-cols-3 gap-2">
-              <input value={form.third_party_invoice} onChange={e => set('third_party_invoice', e.target.value)} placeholder="N° factura"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <input type="date" value={form.third_party_invoice_date} onChange={e => set('third_party_invoice_date', e.target.value)}
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <input type="number" min={0} value={form.third_party_invoice_value} onChange={e => set('third_party_invoice_value', e.target.value)} placeholder="Valor antes IVA"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          {/* ── CxP Terceros: factura tercero → comprobante de egreso ── */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-blue-50">
+              <p className="text-xs font-bold text-blue-800 uppercase tracking-wider">CxP Terceros ({tercero})</p>
+              <span className={`text-xs font-semibold ${payable > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                Saldo por pagar: {fmtMoney(payable)}
+              </span>
+            </div>
+            <div className="p-3 space-y-2">
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 mb-1">Factura del tercero</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={form.third_party_invoice} onChange={e => set('third_party_invoice', e.target.value)} onBlur={e => checkDuplicate('third', e.target.value)} placeholder="N° factura"
+                    className={`border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${dupThird ? 'border-amber-400 bg-amber-50' : 'border-slate-200'}`} />
+                  <input type="date" value={form.third_party_invoice_date} onChange={e => set('third_party_invoice_date', e.target.value)}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <input type="number" min={0} value={form.third_party_invoice_value} onChange={e => set('third_party_invoice_value', e.target.value)} placeholder="Valor antes IVA"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+                {dupThird && (
+                  <p className="text-[11px] text-amber-700 mt-1 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 shrink-0" /> {dupThird} — puedes continuar de todas formas
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 mb-1">Comprobante de egreso</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <input value={form.egress_voucher} onChange={e => set('egress_voucher', e.target.value)} placeholder="N° comprobante"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <input type="date" value={form.egress_voucher_date} onChange={e => set('egress_voucher_date', e.target.value)}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <input type="number" min={0} value={form.egress_voucher_value} onChange={e => set('egress_voucher_value', e.target.value)} placeholder="V. CE"
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -132,9 +224,12 @@ function InvoicingModal({ item, onClose }: { item: any; onClose: () => void }) {
           </div>
 
           {result && (
-            <div className={`rounded-lg p-3 text-sm ${result.status === 'validated' ? 'bg-emerald-50 border border-emerald-200' : 'bg-red-50 border border-red-200'}`}>
-              <p className={`font-semibold ${result.status === 'validated' ? 'text-emerald-700' : 'text-red-700'}`}>
-                {result.status === 'validated' ? '✓ Conciliación correcta' : '⚠ Pendiente de revisión'}
+            <div className={`rounded-lg p-3 text-sm ${result.status === 'review' ? 'bg-red-50 border border-red-200' : 'bg-emerald-50 border border-emerald-200'}`}>
+              <p className={`font-semibold ${result.status === 'review' ? 'text-red-700' : 'text-emerald-700'}`}>
+                {result.status === 'closed'    ? '✓ Cerrada — recaudada y pagada' :
+                 result.status === 'validated' ? '✓ Conciliación correcta — falta recaudar y/o pagar' :
+                 result.status === 'pending'   ? 'Sin registros aún' :
+                 '⚠ Pendiente de revisión'}
               </p>
               {result.reasons.map((r, i) => <p key={i} className="text-xs text-red-600 mt-0.5">• {r}</p>)}
             </div>
@@ -198,8 +293,8 @@ function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
           className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
           {MESES.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
         </select>
-        <div className="flex gap-1.5">
-          {([['', 'Todas'], ['pending', 'Pendientes'], ['review', 'Pend. revisión'], ['validated', 'Validadas']] as const).map(([k, l]) => (
+        <div className="flex flex-wrap gap-1.5">
+          {([['', 'Todas'], ['pending', 'Pendientes'], ['review', 'Pend. revisión'], ['validated', 'Conciliadas'], ['closed', 'Cerradas']] as const).map(([k, l]) => (
             <button key={k} onClick={() => { setStatusF(k); setPage(1) }}
               className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-colors ${statusF === k ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
               {l}
@@ -214,12 +309,13 @@ function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {/* Mini stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
           { label: 'Total', value: stats?.total ?? 0, cls: 'text-slate-900' },
-          { label: 'Pendientes', value: stats?.pending ?? 0, cls: 'text-amber-600' },
           { label: 'Pend. revisión', value: stats?.review ?? 0, cls: 'text-red-600' },
-          { label: 'Valor total', value: fmtMoney(stats?.total_value ?? 0), cls: 'text-primary-700' },
+          { label: 'Valor participaciones', value: fmtMoney(stats?.total_value ?? 0), cls: 'text-primary-700' },
+          { label: 'CxC Clientes', value: fmtMoney(stats?.receivable ?? 0), cls: 'text-slate-800' },
+          { label: 'CxP Terceros', value: fmtMoney(stats?.payable ?? 0), cls: 'text-blue-700' },
         ].map(k => (
           <div key={k.label} className="bg-white border border-slate-200 rounded-xl p-3">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{k.label}</p>
@@ -236,9 +332,15 @@ function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
+                <tr className="border-b border-slate-100">
+                  <th colSpan={7} className="bg-slate-50" />
+                  <th className="bg-slate-200 text-center px-3 py-1.5 text-[10px] font-bold text-slate-700 uppercase tracking-wider whitespace-nowrap">CxC Clientes</th>
+                  <th className="bg-blue-100 text-center px-3 py-1.5 text-[10px] font-bold text-blue-800 uppercase tracking-wider whitespace-nowrap">CxP Terceros</th>
+                  <th colSpan={2} className="bg-slate-50" />
+                </tr>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  {['Orden de compra', 'Cliente', 'Servicio', 'Tercero', 'Valor servicio', '%', 'Participación', 'Estado', ''].map(h => (
-                    <th key={h} className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  {['Orden de compra', 'Cliente', 'Servicio', 'Tercero', 'Valor servicio', '%', 'Participación', 'Por cobrar', 'Por pagar', 'Estado', ''].map((h, i) => (
+                    <th key={i} className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -255,6 +357,12 @@ function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
                       <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{fmtMoney(Number(r.service_value))}</td>
                       <td className="px-3 py-2.5 text-slate-500">{r.percentage}%</td>
                       <td className="px-3 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{fmtMoney(Number(r.participation_value))}</td>
+                      <td className={`px-3 py-2.5 whitespace-nowrap bg-slate-50/60 ${Number(r.receivable) > 0 ? 'text-amber-700 font-medium' : 'text-slate-400'}`}>
+                        {fmtMoney(Number(r.receivable ?? 0))}
+                      </td>
+                      <td className={`px-3 py-2.5 whitespace-nowrap bg-blue-50/60 ${Number(r.payable) > 0 ? 'text-amber-700 font-medium' : 'text-slate-400'}`}>
+                        {fmtMoney(Number(r.payable ?? 0))}
+                      </td>
                       <td className="px-3 py-2.5"><span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>{st.label}</span></td>
                       <td className="px-3 py-2.5 text-right">
                         <button onClick={() => setInvoicingItem(r)} className="text-xs font-medium text-primary-600 hover:underline whitespace-nowrap">
