@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
 import {
   Calculator, AlertTriangle, CalendarDays, CheckCircle2, Clock,
-  Building2, Plus, Pencil, Trash2, X, PlayCircle, ListChecks, Bell, Handshake,
+  Building2, Plus, Pencil, Trash2, X, PlayCircle, ListChecks, Bell, Handshake, Upload,
 } from 'lucide-react'
 
 type Tab = 'dashboard' | 'clients' | 'analysis' | 'participations' | 'master'
@@ -245,6 +245,145 @@ function InvoicingModal({ item, onClose }: { item: any; onClose: () => void }) {
   )
 }
 
+const RECON_OUTCOME: Record<string, { label: string; cls: string }> = {
+  matched:        { label: 'Emparejada',     cls: 'bg-emerald-100 text-emerald-700' },
+  value_mismatch: { label: 'Difiere valor',  cls: 'bg-amber-100 text-amber-700' },
+  ambiguous:      { label: 'Ambigua',        cls: 'bg-amber-100 text-amber-700' },
+  not_found:      { label: 'Sin factura',    cls: 'bg-slate-100 text-slate-500' },
+}
+
+function SiigoReconcileModal({ year, month, onClose }: { year: number; month: number; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [sales, setSales] = useState<File | null>(null)
+  const [receipts, setReceipts] = useState<File | null>(null)
+  const [report, setReport] = useState<any | null>(null)
+
+  const run = async (apply: boolean) => {
+    const fd = new FormData()
+    fd.append('file_sales', sales!)
+    fd.append('file_receipts', receipts!)
+    fd.append('year', String(year))
+    fd.append('month', String(month))
+    fd.append('apply', String(apply))
+    const { data } = await api.post('/api/participations/reconcile-siigo', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  }
+
+  const previewMut = useMutation({
+    mutationFn: () => run(false),
+    onSuccess: (d: any) => setReport(d),
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al conciliar'),
+  })
+
+  const applyMut = useMutation({
+    mutationFn: () => run(true),
+    onSuccess: (d: any) => {
+      toast.success(`${d.summary?.applied ?? 0} participación(es) actualizada(s) desde SIIGO`)
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      onClose()
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al aplicar'),
+  })
+
+  const s = report?.summary
+  const canRun = !!sales && !!receipts
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Conciliar con SIIGO — {MESES[month - 1]} {year}</h3>
+            <p className="text-xs text-slate-400">Sube los reportes del mes; rellena la factura de Finto y el recaudo del cliente (CxC).</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Ventas por vendedor (facturas Finto)</label>
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={e => { setSales(e.target.files?.[0] ?? null); setReport(null) }}
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Recibos de caja detallado por facturas</label>
+              <input type="file" accept=".xlsx,.xls,.csv" onChange={e => { setReceipts(e.target.files?.[0] ?? null); setReport(null) }}
+                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
+            </div>
+          </div>
+
+          {s && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  { label: 'Emparejadas', value: s.matched, cls: 'text-emerald-600' },
+                  { label: 'Difieren valor', value: s.value_mismatch, cls: 'text-amber-600' },
+                  { label: 'Ambiguas', value: s.ambiguous, cls: 'text-amber-600' },
+                  { label: 'Sin factura', value: s.not_found, cls: 'text-slate-500' },
+                ].map(k => (
+                  <div key={k.label} className="bg-slate-50 rounded-lg p-2 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">{k.label}</p>
+                    <p className={`text-lg font-bold ${k.cls}`}>{k.value}</p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400">Leídas {s.sales_rows} ventas y {s.receipt_rows} recibos del archivo.</p>
+
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-slate-50">
+                      <tr className="border-b border-slate-100">
+                        {['OC', 'Cliente', 'Factura Finto', 'Valor', 'Recibo', 'Recaudo', 'Resultado'].map(h => (
+                          <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {report.results.map((r: any) => {
+                        const o = RECON_OUTCOME[r.outcome] ?? RECON_OUTCOME.not_found
+                        return (
+                          <tr key={r.monthly_id} className="hover:bg-slate-50">
+                            <td className="px-3 py-2 font-mono text-[11px] text-slate-600 whitespace-nowrap">{r.purchase_order}</td>
+                            <td className="px-3 py-2 text-slate-700">{r.company}</td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.finto_invoice ?? '—'}</td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.finto_value != null ? fmtMoney(r.finto_value) : '—'}</td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.cash_receipt ?? '—'}</td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.cash_value != null ? fmtMoney(r.cash_value) : '—'}</td>
+                            <td className="px-3 py-2">
+                              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${o.cls}`}>{o.label}</span>
+                              {r.note && <p className="text-[10px] text-slate-400 mt-0.5">{r.note}</p>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <p className="text-[11px] text-amber-700">Al aplicar solo se escriben la factura de Finto y el recaudo (lado CxC). El lado del tercero (CxP) no se toca.</p>
+            </>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
+          <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+          <Button variant="secondary" disabled={!canRun} loading={previewMut.isPending} onClick={() => previewMut.mutate()}>
+            Previsualizar
+          </Button>
+          <Button disabled={!report || (s?.matched + s?.value_mismatch) === 0} loading={applyMut.isPending} onClick={() => applyMut.mutate()}>
+            Aplicar {s ? `(${s.matched + s.value_mismatch})` : ''}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
   const qc = useQueryClient()
   const now = new Date()
@@ -253,6 +392,7 @@ function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
   const [statusF, setStatusF] = useState('')
   const [page, setPage] = useState(1)
   const [invoicingItem, setInvoicingItem] = useState<any | null>(null)
+  const [showSiigo, setShowSiigo] = useState(false)
 
   const { data: stats } = useQuery({
     queryKey: ['participations', 'stats', year, month],
@@ -302,7 +442,12 @@ function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
           ))}
         </div>
         {isAdmin && (
-          <Button size="sm" variant="secondary" className="ml-auto" loading={generateMut.isPending} onClick={() => generateMut.mutate()}>
+          <Button size="sm" variant="secondary" className="ml-auto" onClick={() => setShowSiigo(true)}>
+            <Upload className="w-3.5 h-3.5" /> Conciliar con SIIGO
+          </Button>
+        )}
+        {isAdmin && (
+          <Button size="sm" variant="secondary" loading={generateMut.isPending} onClick={() => generateMut.mutate()}>
             Generar participaciones del mes
           </Button>
         )}
@@ -393,6 +538,7 @@ function ParticipationsTab({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       {invoicingItem && <InvoicingModal item={invoicingItem} onClose={() => setInvoicingItem(null)} />}
+      {showSiigo && <SiigoReconcileModal year={year} month={month} onClose={() => setShowSiigo(false)} />}
     </div>
   )
 }
