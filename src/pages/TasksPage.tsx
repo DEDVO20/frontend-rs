@@ -56,6 +56,26 @@ export function TasksPage() {
   })
   const services: any[] = servicesData ?? []
 
+  // Relaciones empresa↔servicio para condicionar los dos filtros entre sí
+  const { data: pairsData } = useQuery({
+    queryKey: ['company-service-pairs'],
+    queryFn: async () => { const { data } = await api.get('/api/company-services/pairs'); return data },
+    staleTime: 120_000,
+  })
+  const pairs: any[] = pairsData ?? []
+  const servicesByCompany = new Map<string, Set<string>>()
+  const companiesByService = new Map<string, Set<string>>()
+  for (const p of pairs) {
+    if (!servicesByCompany.has(p.company_id)) servicesByCompany.set(p.company_id, new Set())
+    servicesByCompany.get(p.company_id)!.add(p.service_id)
+    if (!companiesByService.has(p.service_id)) companiesByService.set(p.service_id, new Set())
+    companiesByService.get(p.service_id)!.add(p.company_id)
+  }
+  // Opciones condicionadas: al elegir un servicio, solo las empresas que lo
+  // tienen; al elegir una empresa, solo los servicios que tiene activos.
+  const companyOptions = companies.filter((c: any) => !serviceFilter || companiesByService.get(serviceFilter)?.has(c.id))
+  const serviceOptions = services.filter((s: any) => !companyFilter || servicesByCompany.get(companyFilter)?.has(s.id))
+
   // Tasks
   const { data, isLoading } = useQuery({
     queryKey: ['tasks', page, statusFilter, companyFilter, serviceFilter, ownerFilter],
@@ -223,16 +243,24 @@ export function TasksPage() {
             <SearchSelect
               label="Por empresa"
               value={companyFilter}
-              onChange={v => { setCompanyFilter(v); setPage(1) }}
+              onChange={v => {
+                setCompanyFilter(v); setPage(1)
+                // Si el servicio elegido no aplica a esta empresa, se limpia
+                if (v && serviceFilter && !servicesByCompany.get(v)?.has(serviceFilter)) setServiceFilter('')
+              }}
               placeholder="Todas las empresas"
-              options={companies.map((c: any) => ({ value: c.id, label: c.name ?? c.legal_name ?? '—', color: 'bg-primary-500' }))}
+              options={companyOptions.map((c: any) => ({ value: c.id, label: c.name ?? c.legal_name ?? '—', color: 'bg-primary-500' }))}
             />
             <SearchSelect
               label="Por servicio"
               value={serviceFilter}
-              onChange={v => { setServiceFilter(v); setPage(1) }}
+              onChange={v => {
+                setServiceFilter(v); setPage(1)
+                // Si la empresa elegida no tiene este servicio, se limpia
+                if (v && companyFilter && !companiesByService.get(v)?.has(companyFilter)) setCompanyFilter('')
+              }}
               placeholder="Todos los servicios"
-              options={services.map((s: any) => ({ value: s.id, label: s.name ?? '—' }))}
+              options={serviceOptions.map((s: any) => ({ value: s.id, label: s.name ?? '—' }))}
             />
           </div>
         </div>
