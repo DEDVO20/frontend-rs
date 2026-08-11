@@ -563,14 +563,18 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const [value, setValue] = useState<string>(row.service_value != null ? String(row.service_value) : '')
   const [hasThird, setHasThird] = useState<boolean>(row.has_third_party)
   const [thirdId, setThirdId] = useState<string>(row.third_party?.id ?? '')
+  const [ptype, setPtype] = useState<'percentage' | 'fixed'>(row.participation?.participation_type ?? 'percentage')
   const [pct, setPct] = useState<string>(row.participation?.percentage != null ? String(row.participation.percentage) : '')
+  const [fixedValue, setFixedValue] = useState<string>(row.participation?.fixed_value != null ? String(row.participation.fixed_value) : '')
   const [startDate, setStartDate] = useState<string>(row.participation?.start_date ?? '')
+  const [endDate, setEndDate] = useState<string>(row.participation?.end_date ?? '')
   const [active, setActive] = useState<boolean>(row.participation?.active ?? true)
 
   const selectedTercero = terceros.find((t: any) => t.id === thirdId)
   const valueNum = Number(value) || 0
   const pctNum = Number(pct) || 0
-  const preview = Math.round(valueNum * (pctNum / 100) * 100) / 100
+  const fixedNum = Number(fixedValue) || 0
+  const preview = ptype === 'fixed' ? fixedNum : Math.round(valueNum * (pctNum / 100) * 100) / 100
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -579,8 +583,11 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         service_value:      valueNum,
         has_third_party:    hasThird,
         third_party_id:     hasThird ? thirdId : null,
-        percentage:         hasThird ? pctNum : undefined,
+        participation_type: ptype,
+        percentage:         hasThird && ptype === 'percentage' ? pctNum : undefined,
+        fixed_value:        hasThird && ptype === 'fixed' ? fixedNum : undefined,
         start_date:         hasThird ? (startDate || undefined) : undefined,
+        end_date:           hasThird ? (endDate || null) : undefined,
         active,
       })
     },
@@ -588,7 +595,8 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
   })
 
-  const canSave = value !== '' && (!hasThird || (thirdId && pct !== '' && startDate))
+  const valueOk = ptype === 'fixed' ? fixedNum > 0 : pct !== ''
+  const canSave = value !== '' && (!hasThird || (thirdId && valueOk && startDate))
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4">
@@ -643,13 +651,39 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500" />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Porcentaje de participación (%)</label>
-            <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tipo de participación</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button type="button" onClick={() => setPtype('percentage')}
+                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${ptype === 'percentage' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Porcentaje (%)
+              </button>
+              <button type="button" onClick={() => setPtype('fixed')}
+                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${ptype === 'fixed' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Valor fijo
+              </button>
+            </div>
           </div>
+          {ptype === 'percentage' ? (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Porcentaje de participación (%)</label>
+              <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor fijo del tercero</label>
+              <input type="number" min={0} value={fixedValue} onChange={e => setFixedValue(e.target.value)} placeholder="0"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+          )}
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha de inicio</label>
             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha fin (vigencia · opcional)</label>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">

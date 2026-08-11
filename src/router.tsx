@@ -21,6 +21,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { RequestsPage } from '@/pages/RequestsPage'
 import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
+import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
       { path: 'my-company',   element: <MyCompanyPage /> },
       { path: 'collection',   element: <CollectionPage /> },
       { path: 'accounting',   element: <AccountingPage /> },
+      { path: 'participations', element: <ParticipationsPage /> },
       { path: 'onboarding',   element: <OnboardingPage /> },
       { path: 'tasks',        element: <TasksPage /> },
       { path: 'documents',    element: <DocumentsPage /> },
