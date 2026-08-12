@@ -858,6 +858,7 @@ function EditDebtorModal({ debtorId, onClose, onSaved }: {
       phone: debtor.phone ?? '',
       whatsapp: debtor.whatsapp ?? '',
       email: debtor.email ?? '',
+      email_contact_name: debtor.email_contact_name ?? '',
       city: debtor.city ?? '',
       status: debtor.status ?? 'pending',
     })
@@ -870,6 +871,7 @@ function EditDebtorModal({ debtorId, onClose, onSaved }: {
         phone: form.phone.trim() || undefined,
         whatsapp: form.whatsapp.trim() || undefined,
         email: form.email.trim() || undefined,
+        email_contact_name: form.email_contact_name.trim() || undefined,
         city: form.city.trim() || undefined,
         status: form.status || undefined,
       })
@@ -942,6 +944,10 @@ function EditDebtorModal({ debtorId, onClose, onSaved }: {
 
             <div className="grid sm:grid-cols-2 gap-4">
               {field('Email', 'email', 'email', 'correo@empresa.com')}
+              {field('Encargado del correo', 'email_contact_name', 'text', 'Nombre del responsable')}
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
               {field('Ciudad', 'city', 'text', 'Bogotá')}
             </div>
 

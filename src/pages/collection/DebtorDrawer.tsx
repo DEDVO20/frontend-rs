@@ -237,6 +237,7 @@ export function DebtorDrawer({ id, onClose }: Props) {
                 <InfoRow label="Teléfono" value={d.phone ?? '—'} />
                 <InfoRow label="Celular" value={d.whatsapp ?? d.phone ?? '—'} />
                 <InfoRow label="Email" value={d.email ?? '—'} />
+                <InfoRow label="Encargado del correo" value={d.email_contact_name ?? '—'} />
               </div>
 
               <div className="flex gap-2 pt-2">
