@@ -36,7 +36,6 @@ const STATUS_LABELS: Record<string, { label: string; color: any }> = {
   agreement:      { label: 'Acuerdo',        color: 'teal' },
   partially_paid: { label: 'Pago parcial',   color: 'orange' },
   paid:           { label: 'Pagado',         color: 'green' },
-  defaulted:      { label: 'En mora',        color: 'red' },
   uncontactable:  { label: 'No contactable', color: 'gray' },
 }
 
@@ -233,6 +232,7 @@ export function DebtorDrawer({ id, onClose }: Props) {
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                 <InfoRow label="Antigüedad" value={getTramo(maxTramo)} className={getTramoColor(maxTramo)} />
                 <InfoRow label="Ciudad" value={d.city ?? '—'} />
+                <InfoRow label="Socio" value={d.socio ?? '—'} />
                 <InfoRow label="Gestor" value={d.assigned_user?.full_name ?? 'Admin RS'} />
                 <InfoRow label="Teléfono" value={d.phone ?? '—'} />
                 <InfoRow label="Celular" value={d.whatsapp ?? d.phone ?? '—'} />

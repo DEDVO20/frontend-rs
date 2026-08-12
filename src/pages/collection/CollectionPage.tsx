@@ -23,7 +23,6 @@ const STATUS_LABELS: Record<string, { label: string; color: any }> = {
   agreement: { label: 'Acuerdo', color: 'teal' },
   partially_paid: { label: 'Pago parcial', color: 'orange' },
   paid: { label: 'Pagado', color: 'green' },
-  defaulted: { label: 'En mora', color: 'red' },
   uncontactable: { label: 'No contactable', color: 'gray' },
 }
 
@@ -832,7 +831,6 @@ const STATUS_OPTIONS = [
   { value: 'agreement', label: 'Acuerdo' },
   { value: 'partially_paid', label: 'Pago parcial' },
   { value: 'paid', label: 'Pagado' },
-  { value: 'defaulted', label: 'En mora' },
   { value: 'uncontactable', label: 'No contactable' },
 ]
 
@@ -1520,6 +1518,7 @@ export function CollectionPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [contactF, setContactF] = useState('')
+  const [socioF, setSocioF] = useState('')
   const [sortKey, setSortKey] = useState<'' | 'antiguedad' | 'mora' | 'saldo'>('')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(1)
@@ -1549,13 +1548,25 @@ export function CollectionPage() {
     staleTime: 60_000,
   })
 
+  const { data: socios } = useQuery({
+    queryKey: ['debtors-socios', companyId],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (companyId) params.set('company_id', companyId)
+      const { data } = await api.get(`/api/collection/debtors/socios?${params}`)
+      return data as string[]
+    },
+    staleTime: 300_000,
+  })
+
   const { data, isLoading } = useQuery({
-    queryKey: ['debtors', search, status, contactF, sortKey, sortDir, page, tab, companyId],
+    queryKey: ['debtors', search, status, contactF, socioF, sortKey, sortDir, page, tab, companyId],
     queryFn: async () => {
       const params = new URLSearchParams({ page: String(page), limit: '20' })
       if (search) params.set('search', search)
       if (companyId) params.set('company_id', companyId)
       if (contactF) params.set('contact', contactF)
+      if (socioF) params.set('socio', socioF)
       if (sortKey) { params.set('sort', sortKey); params.set('dir', sortDir) }
       if (tab === 'paid') params.set('status', 'paid')
       else if (tab === 'gestion') params.set('status', 'in_collection')
@@ -1710,6 +1721,13 @@ export function CollectionPage() {
                   <option value="phone">Con teléfono</option>
                   <option value="email">Con email</option>
                   <option value="none">Sin contacto</option>
+                </select>
+                <select
+                  value={socioF}
+                  onChange={e => { setSocioF(e.target.value); setPage(1) }}
+                  className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                  <option value="">Todos (Socio)</option>
+                  {(socios ?? []).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 {([
                   { key: 'antiguedad', label: 'Antigüedad' },
