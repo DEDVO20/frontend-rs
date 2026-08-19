@@ -19,7 +19,6 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 const STATUS_LABELS: Record<string, { label: string; color: any }> = {
   pending: { label: 'Pendiente', color: 'gray' },
   in_collection: { label: 'En gestión', color: 'blue' },
-  promised: { label: 'Prometido', color: 'yellow' },
   agreement: { label: 'Acuerdo', color: 'teal' },
   partially_paid: { label: 'Pago parcial', color: 'orange' },
   paid: { label: 'Pagado', color: 'green' },
@@ -564,7 +563,7 @@ function TemplateModal({ editing, onClose, onSaved }: {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
           <div className="grid sm:grid-cols-2 gap-4">
             {/* Nombre */}
             <div className="sm:col-span-2">
@@ -827,7 +826,6 @@ function PlantillasPanel() {
 const STATUS_OPTIONS = [
   { value: 'pending', label: 'Pendiente' },
   { value: 'in_collection', label: 'En gestión' },
-  { value: 'promised', label: 'Prometido' },
   { value: 'agreement', label: 'Acuerdo' },
   { value: 'partially_paid', label: 'Pago parcial' },
   { value: 'paid', label: 'Pagado' },
@@ -921,7 +919,7 @@ function EditDebtorModal({ debtorId, onClose, onSaved }: {
         {isLoading || !form ? (
           <div className="py-16 flex justify-center"><PageLoader /></div>
         ) : (
-          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
 
             <div className="grid sm:grid-cols-2 gap-4">
               {field('Nombre completo', 'debtor_name', 'text', 'Nombre del deudor')}
@@ -1322,7 +1320,7 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: (import
         <StepBar steps={steps} step={step} />
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6">
 
           {/* ── SIIGO ── */}
           {mode === 'siigo' && (
@@ -1538,11 +1536,13 @@ export function CollectionPage() {
   const companyList: any[] = companies?.data ?? []
 
   const { data: stats } = useQuery({
-    queryKey: ['collection-stats', companyId],
+    queryKey: ['collection-stats', companyId, socioF],
     queryFn: async () => {
       const params = new URLSearchParams()
       if (companyId) params.set('company_id', companyId)
-      const { data } = await api.get(`/api/collection/stats${companyId ? `?${params}` : ''}`)
+      if (socioF) params.set('socio', socioF)
+      const qs = params.toString()
+      const { data } = await api.get(`/api/collection/stats${qs ? `?${qs}` : ''}`)
       return data
     },
     staleTime: 60_000,

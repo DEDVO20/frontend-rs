@@ -5,7 +5,11 @@ import {
   X, Eye, Download, User, Calendar, Building2, Tag, AlertCircle, FileText,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { toast } from 'sonner'
+
+// Estados finales: una vez la solicitud queda en uno de ellos, su estado se bloquea.
+const TERMINAL_STATUSES = ['resolved', 'closed', 'cancelled']
 
 interface Props {
   id: string
@@ -34,6 +38,7 @@ function fmtDate(d: string) {
 
 export function RequestDrawer({ id, companies, onClose }: Props) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const { user } = useAuthStore()
   const isInternal = ['admin', 'rs_admin', 'rs_staff'].includes(user?.role ?? '')
   const isAdminOrRsAdmin = ['admin', 'rs_admin'].includes(user?.role ?? '')
@@ -70,6 +75,24 @@ export function RequestDrawer({ id, companies, onClose }: Props) {
       toast.error(e.response?.data?.error ?? 'Error al actualizar')
     },
   })
+
+  const isLocked = TERMINAL_STATUSES.includes(request?.status)
+
+  // Todo cambio de estado pide confirmación; los estados finales avisan que es irreversible.
+  const requestStatusChange = (newStatus: string) => {
+    if (!newStatus || newStatus === request?.status) return
+    const label = STATUS_MAP[newStatus]?.label ?? newStatus
+    const targetIsTerminal = TERMINAL_STATUSES.includes(newStatus)
+    confirm({
+      title: `¿Cambiar el estado a "${label}"?`,
+      description: targetIsTerminal
+        ? 'Es un estado final: una vez aplicado, no podrás volver a cambiar el estado de la solicitud.'
+        : undefined,
+      type: targetIsTerminal ? 'warning' : 'info',
+      confirmLabel: 'Cambiar estado',
+      onConfirm: () => updateMut.mutate({ status: newStatus }),
+    })
+  }
 
   const companyName = (companyId: string) => companies.find(c => c.id === companyId)?.name ?? '—'
 
@@ -125,10 +148,10 @@ export function RequestDrawer({ id, companies, onClose }: Props) {
                 {/* Status selector or static label */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Estado</label>
-                  {isInternal ? (
+                  {isInternal && !isLocked ? (
                     <select
                       value={request?.status}
-                      onChange={e => updateMut.mutate({ status: e.target.value })}
+                      onChange={e => requestStatusChange(e.target.value)}
                       disabled={updateMut.isPending}
                       className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     >
@@ -142,6 +165,9 @@ export function RequestDrawer({ id, companies, onClose }: Props) {
                         label={STATUS_MAP[request?.status]?.label ?? request?.status}
                         color={STATUS_MAP[request?.status]?.color ?? 'gray'}
                       />
+                      {isInternal && isLocked && (
+                        <p className="text-[11px] text-slate-400 mt-1.5">Estado final · no editable</p>
+                      )}
                     </div>
                   )}
                 </div>

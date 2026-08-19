@@ -32,7 +32,6 @@ const RESULT_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, { label: string; color: any }> = {
   pending:        { label: 'Pendiente',      color: 'gray' },
   in_collection:  { label: 'En gestión',     color: 'blue' },
-  promised:       { label: 'Prometido',      color: 'yellow' },
   agreement:      { label: 'Acuerdo',        color: 'teal' },
   partially_paid: { label: 'Pago parcial',   color: 'orange' },
   paid:           { label: 'Pagado',         color: 'green' },

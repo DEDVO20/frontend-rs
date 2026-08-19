@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import {
-  Building2, ArrowLeft, CheckCircle2, Loader2, ChevronLeft,
+  CheckCircle2, Loader2, ChevronLeft, X,
   FileText, Shield, ClipboardList, Users, Calculator, CreditCard, ShoppingBag,
   FileCheck2, IdCard, AlertCircle, ChevronDown, ChevronUp, Paperclip,
 } from 'lucide-react'
+import { FintoLogo } from '@/components/ui/FintoLogo'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -243,16 +244,17 @@ export function RegisterCompanyPage() {
   // ── Success screen ───────────────────────────────────────────────────────────
   if (mutation.isSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-primary-950 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-md w-full text-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle2 className="w-9 h-9 text-green-500" />
+      <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4 md:p-8">
+        <div className="relative w-full max-w-md overflow-hidden rounded-[2rem] shadow-2xl shadow-navy-900/25
+                        bg-gradient-to-br from-navy-900 via-brand-800 to-brand-600 p-10 text-center">
+          <div className="w-16 h-16 rounded-full bg-cream-100/15 flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 className="w-9 h-9 text-cream-100" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">¡Solicitud enviada!</h2>
-          <p className="text-slate-500 mb-8">
+          <h2 className="font-display text-2xl font-bold text-cream-100 mb-2">¡Solicitud enviada!</h2>
+          <p className="text-cream-100/70 mb-8 leading-relaxed">
             Nuestro equipo revisará su solicitud y le contactará en menos de 24 horas hábiles.
           </p>
-          <Link to="/" className="inline-flex items-center justify-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700 transition-colors w-full">
+          <Link to="/" className="inline-flex w-full items-center justify-center gap-2 bg-cream-100 text-navy-900 px-6 py-3.5 rounded-full font-display font-bold hover:bg-cream-50 transition-colors">
             Volver al inicio
           </Link>
         </div>
@@ -260,58 +262,57 @@ export function RegisterCompanyPage() {
     )
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-primary-950 flex flex-col">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 max-w-4xl mx-auto w-full">
-        <Link to="/" className="flex items-center gap-2 text-white/70 hover:text-white transition-colors text-sm">
-          <ArrowLeft className="w-4 h-4" /> Volver al inicio
-        </Link>
-        <div className="flex items-center gap-2 text-white font-bold text-lg">
-          <Building2 className="w-5 h-5 text-primary-400" />RS Hubs
-        </div>
-      </nav>
+  const STEP_TITLES = ['Empieza hoy', 'Seleccione sus servicios', 'Políticas y autorizaciones', 'Documentos de vinculación', 'Revise y confirme']
+  const STEP_SUBS = [
+    'Ingrese la información básica de su empresa y del representante legal.',
+    'Escoja uno o más módulos según las necesidades de su empresa.',
+    'Lea cada política y confirme su aceptación. Queda registrada con fecha y hora.',
+    'Suba los documentos requeridos en PDF o imagen. Máx. 10 MB por archivo.',
+    'Verifique que toda la información sea correcta antes de enviar.',
+  ]
 
-      <div className="flex-1 flex items-start justify-center p-6 pb-12">
-        <div className="w-full max-w-2xl">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <p className="text-primary-300 text-sm font-semibold mb-1">Paso {step + 1} de {STEPS.length}</p>
-            <h1 className="text-2xl font-bold text-white">
-              {['Datos de su empresa', 'Seleccione sus servicios', 'Políticas y autorizaciones', 'Documentos de vinculación', 'Revise y confirme'][step]}
+  return (
+    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4 md:p-8">
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] shadow-2xl shadow-navy-900/25
+                      bg-gradient-to-br from-navy-900 via-brand-800 to-brand-600">
+        {/* Cerrar */}
+        <Link to="/" aria-label="Cerrar"
+          className="absolute top-5 right-5 z-10 text-brand-200 hover:text-cream-100 transition-colors">
+          <X className="w-6 h-6" />
+        </Link>
+
+        <div className="p-6 md:p-10">
+          {/* Header: logo + título */}
+          <div className="relative mb-6">
+            <FintoLogo variant="white" height={26} className="absolute left-0 top-0" />
+            <h1 className="font-display text-2xl md:text-3xl font-bold text-cream-100 text-center pt-1">
+              {STEP_TITLES[step]}
             </h1>
-            <p className="text-slate-400 text-sm mt-1">
-              {[
-                'Ingrese la información básica de su empresa y del representante legal.',
-                'Escoja uno o más módulos según las necesidades de su empresa.',
-                'Lea cada política y confirme su aceptación. Queda registrada con fecha y hora.',
-                'Suba los documentos requeridos en PDF o imagen. Máx. 10 MB por archivo.',
-                'Verifique que toda la información sea correcta antes de enviar.',
-              ][step]}
-            </p>
           </div>
 
-          {/* Progress */}
-          <div className="flex items-center justify-center gap-1 mb-6">
+          {/* Indicador de pasos */}
+          <div className="flex items-center justify-center gap-2 mb-6">
             {STEPS.map((_, i) => (
-              <div key={i} className="flex items-center gap-1">
-                <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all ${
-                  i < step ? 'bg-primary-500 text-white' :
-                  i === step ? 'bg-primary-600 text-white ring-2 ring-primary-300 ring-offset-1 ring-offset-transparent' :
-                  'bg-white/10 text-slate-500'
+              <div key={i} className="flex items-center gap-2">
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold font-display transition-all ${
+                  i < step ? 'bg-brand-400 text-cream-100' :
+                  i === step ? 'bg-brand-500 text-cream-100 ring-2 ring-cream-100/50' :
+                  'bg-white/10 text-cream-100/40'
                 }`}>
                   {i < step ? '✓' : i + 1}
                 </div>
-                {i < STEPS.length - 1 && <div className={`w-6 h-px ${i < step ? 'bg-primary-500' : 'bg-white/20'}`} />}
+                {i < STEPS.length - 1 && <div className={`w-5 h-px ${i < step ? 'bg-brand-400' : 'bg-white/20'}`} />}
               </div>
             ))}
           </div>
 
+          <p className="text-center text-sm text-cream-100/60 mb-8 max-w-lg mx-auto">{STEP_SUBS[step]}</p>
+
           <form onSubmit={handleSubmit}>
             {/* ── STEP 1: Empresa ─────────────────────────────────────────── */}
             {step === 0 && (
-              <div className="space-y-5">
-                <Section title="Información de la empresa">
+              <div className="space-y-7">
+                <Section title="Regístrate">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label="Razón social *" className="sm:col-span-2">
                       <Input placeholder="Nombre S.A.S." value={company.razon_social} onChange={setC('razon_social')} required />
@@ -337,8 +338,11 @@ export function RegisterCompanyPage() {
                     <Field label="Dirección" className="sm:col-span-2">
                       <Input placeholder="Calle 100 # 15-20" value={company.direccion} onChange={setC('direccion')} />
                     </Field>
-                    <Field label="Teléfono">
-                      <Input placeholder="+57 601…" value={company.telefono} onChange={setC('telefono')} />
+                    <Field label="Correo electrónico *" className="sm:col-span-2">
+                      <Input placeholder="empresa@correo.com" type="email" value={rep.email} onChange={setR('email')} required />
+                    </Field>
+                    <Field label="Teléfono *">
+                      <Input placeholder="+57 300 000 0000" value={company.telefono} onChange={setC('telefono')} />
                     </Field>
                     <Field label="Sitio web">
                       <Input placeholder="https://…" value={company.sitio_web} onChange={setC('sitio_web')} />
@@ -357,10 +361,7 @@ export function RegisterCompanyPage() {
                     <Field label="Cargo">
                       <Input placeholder="Gerente General" value={rep.cargo} onChange={setR('cargo')} />
                     </Field>
-                    <Field label="Correo electrónico *">
-                      <Input placeholder="Será su usuario de acceso" type="email" value={rep.email} onChange={setR('email')} required />
-                    </Field>
-                    <Field label="Teléfono móvil *">
+                    <Field label="Teléfono móvil *" className="sm:col-span-2">
                       <Input placeholder="+57 300 000 0000" value={rep.telefono} onChange={setR('telefono')} required />
                     </Field>
                   </div>
@@ -379,29 +380,29 @@ export function RegisterCompanyPage() {
                       key={svc.id}
                       type="button"
                       onClick={() => toggleService(svc.id)}
-                      className={`text-left p-4 rounded-xl border-2 transition-all ${
+                      className={`text-left p-4 rounded-xl ring-1 transition-all ${
                         selected
-                          ? 'border-primary-500 bg-primary-50 shadow-md shadow-primary-200'
-                          : 'border-slate-200 bg-white hover:border-primary-200'
+                          ? 'ring-brand-300 bg-brand-500/30'
+                          : 'ring-white/10 bg-white/5 hover:bg-white/10'
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${selected ? 'bg-primary-100' : 'bg-slate-100'}`}>
-                          <Icon className={`w-5 h-5 ${selected ? 'text-primary-600' : 'text-slate-400'}`} />
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${selected ? 'bg-brand-400/40' : 'bg-white/10'}`}>
+                          <Icon className="w-5 h-5 text-cream-100" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
-                            <p className={`font-semibold text-sm ${selected ? 'text-primary-700' : 'text-slate-800'}`}>{svc.name}</p>
-                            {selected && <CheckCircle2 className="w-4 h-4 text-primary-500 shrink-0" />}
+                            <p className="font-semibold text-sm text-cream-100">{svc.name}</p>
+                            {selected && <CheckCircle2 className="w-4 h-4 text-cream-100 shrink-0" />}
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{svc.description ?? ''}</p>
+                          <p className="text-xs text-cream-100/55 mt-0.5 leading-relaxed">{svc.description ?? ''}</p>
                         </div>
                       </div>
                     </button>
                   )
                 })}
                 {!step2Valid && (
-                  <p className="sm:col-span-2 text-xs text-amber-600 flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-lg">
+                  <p className="sm:col-span-2 text-xs text-gold-300 flex items-center gap-1.5 bg-white/5 px-3 py-2 rounded-lg">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" /> Seleccione al menos un servicio para continuar.
                   </p>
                 )}
@@ -414,37 +415,37 @@ export function RegisterCompanyPage() {
                 {policies.map(policy => {
                   const Icon = policy.icon
                   return (
-                    <div key={policy.id} className={`rounded-xl border-2 bg-white overflow-hidden transition-all ${policy.accepted ? 'border-primary-300' : 'border-slate-200'}`}>
+                    <div key={policy.id} className={`rounded-xl ring-1 bg-white/5 overflow-hidden transition-all ${policy.accepted ? 'ring-brand-300' : 'ring-white/10'}`}>
                       <div className="flex items-center gap-3 p-4">
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${policy.accepted ? 'bg-primary-100' : 'bg-slate-100'}`}>
-                          <Icon className={`w-5 h-5 ${policy.accepted ? 'text-primary-600' : 'text-slate-400'}`} />
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${policy.accepted ? 'bg-brand-400/40' : 'bg-white/10'}`}>
+                          <Icon className="w-5 h-5 text-cream-100" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-slate-800">{policy.label}</p>
-                          <p className="text-xs text-slate-400">{policy.version} · Activa</p>
+                          <p className="font-semibold text-sm text-cream-100">{policy.label}</p>
+                          <p className="text-xs text-cream-100/50">{policy.version} · Activa</p>
                         </div>
                         <button
                           type="button"
                           onClick={() => togglePolicy(policy.id, 'expanded')}
-                          className="text-slate-400 hover:text-primary-600 transition-colors p-1"
+                          className="text-cream-100/50 hover:text-cream-100 transition-colors p-1"
                         >
                           {policy.expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
                       </div>
                       {policy.expanded && (
-                        <div className="px-4 pb-3 border-t border-slate-100 pt-3">
-                          <p className="text-xs text-slate-600 leading-relaxed">{policy.body}</p>
+                        <div className="px-4 pb-3 border-t border-white/10 pt-3">
+                          <p className="text-xs text-cream-100/70 leading-relaxed">{policy.body}</p>
                         </div>
                       )}
                       <div className="px-4 pb-4">
-                        <label className="flex items-center gap-2.5 cursor-pointer group">
+                        <label className="flex items-center gap-2.5 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={policy.accepted}
                             onChange={() => togglePolicy(policy.id, 'accepted')}
-                            className="w-4 h-4 rounded border-slate-300 text-primary-600 accent-primary-600 cursor-pointer"
+                            className="w-4 h-4 rounded accent-brand-500 cursor-pointer"
                           />
-                          <span className={`text-sm font-medium ${policy.accepted ? 'text-primary-700' : 'text-slate-600'}`}>
+                          <span className={`text-sm font-medium ${policy.accepted ? 'text-cream-100' : 'text-cream-100/70'}`}>
                             He leído y acepto {policy.label}
                           </span>
                         </label>
@@ -459,7 +460,7 @@ export function RegisterCompanyPage() {
             {step === 3 && (
               <div className="space-y-4">
                 <DocUpload
-                  icon={<FileText className="w-5 h-5 text-slate-500" />}
+                  icon={<FileText className="w-5 h-5 text-cream-100" />}
                   label="RUT de la empresa"
                   required
                   file={files.rut}
@@ -468,7 +469,7 @@ export function RegisterCompanyPage() {
                   uploadLabel="Subir RUT"
                 />
                 <DocUpload
-                  icon={<IdCard className="w-5 h-5 text-slate-500" />}
+                  icon={<IdCard className="w-5 h-5 text-cream-100" />}
                   label="Cédula del representante"
                   required
                   file={files.cedula}
@@ -477,7 +478,7 @@ export function RegisterCompanyPage() {
                   uploadLabel="Subir cédula (ambas caras)"
                 />
                 <DocUpload
-                  icon={<Shield className="w-5 h-5 text-slate-500" />}
+                  icon={<Shield className="w-5 h-5 text-cream-100" />}
                   label="Formulario SARLAFT"
                   required
                   file={files.sarlaft}
@@ -485,10 +486,10 @@ export function RegisterCompanyPage() {
                   hint="PDF o imagen · Máx. 10 MB"
                   uploadLabel="Subir formulario SARLAFT firmado"
                   extra={
-                    <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-1">
+                    <p className="text-xs text-cream-100/60 flex items-center gap-1.5 mt-1">
                       <Paperclip className="w-3.5 h-3.5 shrink-0" />
                       Descargue, diligencie y firme el formulario SARLAFT antes de subirlo.{' '}
-                      <a href="#" className="text-primary-600 font-medium hover:underline">Descargar formulario →</a>
+                      <a href="#" className="text-brand-200 font-medium hover:underline">Descargar formulario →</a>
                     </p>
                   }
                 />
@@ -522,18 +523,18 @@ export function RegisterCompanyPage() {
 
                 <ReviewSection title="✅ Políticas aceptadas">
                   {policies.map(p => (
-                    <Row key={p.id} label={p.label} value={`✓ ${p.version}`} valueClass="text-green-600 font-semibold" />
+                    <Row key={p.id} label={p.label} value={`✓ ${p.version}`} valueClass="text-emerald-300 font-semibold" />
                   ))}
                 </ReviewSection>
 
                 <ReviewSection title="📁 Documentos cargados">
-                  {files.rut    && <Row label="RUT"            value={`✓ ${files.rut.name}`}    valueClass="text-green-600" />}
-                  {files.cedula && <Row label="Cédula rep. legal" value={`✓ ${files.cedula.name}`} valueClass="text-green-600" />}
-                  {files.sarlaft && <Row label="SARLAFT"        value={`✓ ${files.sarlaft.name}`} valueClass="text-green-600" />}
+                  {files.rut    && <Row label="RUT"            value={`✓ ${files.rut.name}`}    valueClass="text-emerald-300" />}
+                  {files.cedula && <Row label="Cédula rep. legal" value={`✓ ${files.cedula.name}`} valueClass="text-emerald-300" />}
+                  {files.sarlaft && <Row label="SARLAFT"        value={`✓ ${files.sarlaft.name}`} valueClass="text-emerald-300" />}
                 </ReviewSection>
 
                 {mutation.isError && (
-                  <div className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg flex items-start gap-2">
+                  <div className="text-sm text-red-200 bg-red-500/20 ring-1 ring-red-400/30 px-4 py-3 rounded-lg flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                     <p>
                       {(mutation.error as any)?.response?.data?.error
@@ -546,12 +547,12 @@ export function RegisterCompanyPage() {
             )}
 
             {/* ── Nav buttons ─────────────────────────────────────────────── */}
-            <div className="flex gap-3 mt-6">
+            <div className="flex gap-3 mt-8 justify-center">
               {step > 0 && (
                 <button
                   type="button"
                   onClick={() => setStep(s => s - 1)}
-                  className="flex items-center gap-1.5 px-5 py-3 rounded-xl border border-white/20 text-white font-semibold hover:bg-white/10 transition-colors"
+                  className="flex items-center gap-1.5 px-6 py-3.5 rounded-full border border-cream-100/30 text-cream-100 font-display font-bold hover:bg-white/10 transition-colors"
                 >
                   <ChevronLeft className="w-4 h-4" /> Volver
                 </button>
@@ -559,22 +560,22 @@ export function RegisterCompanyPage() {
               <button
                 type="submit"
                 disabled={!canNext || mutation.isPending}
-                className="flex-1 inline-flex items-center justify-center gap-2 bg-primary-600 text-white py-3 rounded-xl font-semibold hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-primary-800/30"
+                className="min-w-[200px] inline-flex items-center justify-center gap-2 bg-navy-950 text-cream-100 py-3.5 px-8 rounded-full font-display font-bold hover:bg-navy-900 ring-1 ring-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {mutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Enviando solicitud…</>
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</>
                 ) : step < 4 ? (
-                  <>Continuar → {STEPS[step + 1]}</>
+                  'Continuar'
                 ) : (
-                  <>🚀 Enviar solicitud</>
+                  'Enviar solicitud'
                 )}
               </button>
             </div>
           </form>
 
-          <p className="text-center text-slate-500 text-sm mt-6">
+          <p className="text-center text-sm text-cream-100/60 mt-6">
             ¿Ya tiene cuenta?{' '}
-            <Link to="/login" className="text-primary-400 hover:text-primary-300 font-medium">Inicie sesión</Link>
+            <Link to="/login" className="text-brand-200 hover:text-cream-100 font-medium">Inicie sesión</Link>
           </p>
         </div>
       </div>
@@ -582,22 +583,22 @@ export function RegisterCompanyPage() {
   )
 }
 
-// ── Helper components ──────────────────────────────────────────────────────────
+// ── Helper components (estética Finto sobre tarjeta azul) ────────────────────────
 
-const inputCls = 'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white text-slate-900 placeholder-slate-400'
+const inputCls = 'w-full px-4 py-3 rounded-xl bg-white/10 text-cream-100 placeholder:text-cream-100/40 ring-1 ring-white/15 focus:outline-none focus:ring-2 focus:ring-brand-300 transition text-sm'
 
 function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={inputCls} />
 }
 
 function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement> & { children: React.ReactNode }) {
-  return <select {...props} className={inputCls}>{children}</select>
+  return <select {...props} className={`${inputCls} appearance-none bg-[position:right_0.75rem_center] bg-no-repeat [&>option]:text-navy-900`}>{children}</select>
 }
 
 function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`space-y-1.5 ${className ?? ''}`}>
-      <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">{label}</label>
+    <div className={`space-y-2 ${className ?? ''}`}>
+      <label className="block text-[11px] font-bold text-brand-200 uppercase tracking-wider">{label}</label>
       {children}
     </div>
   )
@@ -605,22 +606,20 @@ function Field({ label, children, className }: { label: string; children: React.
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-        <p className="text-sm font-bold text-slate-700">{title}</p>
-      </div>
-      <div className="p-5">{children}</div>
+    <div>
+      <h3 className="font-display font-bold text-cream-100 text-lg mb-4">{title}</h3>
+      {children}
     </div>
   )
 }
 
 function ReviewSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-        <p className="text-sm font-bold text-slate-700">{title}</p>
+    <div className="bg-white/5 ring-1 ring-white/10 rounded-2xl overflow-hidden">
+      <div className="px-5 py-3 bg-white/5 border-b border-white/10">
+        <p className="text-sm font-bold text-cream-100">{title}</p>
       </div>
-      <div className="divide-y divide-slate-50">{children}</div>
+      <div className="divide-y divide-white/5">{children}</div>
     </div>
   )
 }
@@ -628,8 +627,8 @@ function ReviewSection({ title, children }: { title: string; children: React.Rea
 function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="flex items-start justify-between gap-4 px-5 py-2.5">
-      <span className="text-xs text-slate-400 shrink-0 pt-0.5">{label}</span>
-      <span className={`text-sm font-medium text-right ${valueClass ?? 'text-slate-800'}`}>{value || '—'}</span>
+      <span className="text-xs text-cream-100/50 shrink-0 pt-0.5">{label}</span>
+      <span className={`text-sm font-medium text-right ${valueClass ?? 'text-cream-100'}`}>{value || '—'}</span>
     </div>
   )
 }
@@ -648,19 +647,19 @@ function DocUpload({
 }) {
   const ref = useRef<HTMLInputElement>(null)
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+    <div className="bg-white/5 ring-1 ring-white/10 rounded-2xl p-5 space-y-3">
       <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">{icon}</div>
+        <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0">{icon}</div>
         <div>
-          <p className="font-semibold text-sm text-slate-800">
-            {label} {required && <span className="text-red-400 text-xs">Requerido</span>}
+          <p className="font-semibold text-sm text-cream-100">
+            {label} {required && <span className="text-gold-300 text-xs">Requerido</span>}
           </p>
           {file ? (
-            <p className="text-xs text-green-600 font-medium mt-0.5 flex items-center gap-1">
+            <p className="text-xs text-emerald-300 font-medium mt-0.5 flex items-center gap-1">
               <CheckCircle2 className="w-3.5 h-3.5" /> {file.name}
             </p>
           ) : (
-            <p className="text-xs text-slate-400">Sin archivos seleccionados</p>
+            <p className="text-xs text-cream-100/45">Sin archivos seleccionados</p>
           )}
         </div>
       </div>
@@ -668,11 +667,11 @@ function DocUpload({
       <button
         type="button"
         onClick={() => ref.current?.click()}
-        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-200 hover:border-primary-300 text-slate-500 hover:text-primary-600 text-sm py-3 rounded-xl transition-colors"
+        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-white/20 hover:border-brand-300 text-cream-100/70 hover:text-cream-100 text-sm py-3 rounded-xl transition-colors"
       >
         <FileCheck2 className="w-4 h-4" />
         {uploadLabel}
-        <span className="text-xs text-slate-400">· {hint}</span>
+        <span className="text-xs text-cream-100/45">· {hint}</span>
       </button>
       <input
         ref={ref}

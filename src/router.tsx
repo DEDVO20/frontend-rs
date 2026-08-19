@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { PortalLayout } from '@/components/layout/PortalLayout'
 import { LandingPage } from '@/pages/LandingPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
@@ -11,14 +12,17 @@ import { ClientDashboard } from '@/pages/client/ClientDashboard'
 import { MyCompanyPage } from '@/pages/client/MyCompanyPage'
 import { CollectionPage } from '@/pages/collection/CollectionPage'
 import { TasksPage } from '@/pages/TasksPage'
+import { ClientTasksPage } from '@/pages/client/ClientTasksPage'
 import { AuditPage } from '@/pages/AuditPage'
 import { OnboardingPage } from '@/pages/onboarding/OnboardingPage'
 import { RegisterCompanyPage } from '@/pages/onboarding/RegisterCompanyPage'
 import { DocumentsPage } from '@/pages/DocumentsPage'
+import { ClientDocumentsPage } from '@/pages/client/ClientDocumentsPage'
 import { CompaniesPage } from '@/pages/CompaniesPage'
 import { ProfilesPage } from '@/pages/ProfilesPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { RequestsPage } from '@/pages/RequestsPage'
+import { ClientRequestsPage } from '@/pages/client/ClientRequestsPage'
 import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
 import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
@@ -33,11 +37,32 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+/** Clientes usan el layout del portal (estética Finto); el personal interno, el back-office. */
+function RoleLayout() {
+  const role = useAuthStore(s => s.user?.role ?? '')
+  return INTERNAL_ROLES.includes(role) ? <AppLayout /> : <PortalLayout />
+}
+
 function SmartDashboard() {
   const role = useAuthStore(s => s.user?.role ?? '')
   // El contador aterriza directo en su dashboard contable
   if (role === 'contador') return <Navigate to="/app/accounting" replace />
   return INTERNAL_ROLES.includes(role) ? <DashboardPage /> : <ClientDashboard />
+}
+
+function SmartTasks() {
+  const role = useAuthStore(s => s.user?.role ?? '')
+  return INTERNAL_ROLES.includes(role) ? <TasksPage /> : <ClientTasksPage />
+}
+
+function SmartDocuments() {
+  const role = useAuthStore(s => s.user?.role ?? '')
+  return INTERNAL_ROLES.includes(role) ? <DocumentsPage /> : <ClientDocumentsPage />
+}
+
+function SmartRequests() {
+  const role = useAuthStore(s => s.user?.role ?? '')
+  return INTERNAL_ROLES.includes(role) ? <RequestsPage /> : <ClientRequestsPage />
 }
 
 export const router = createBrowserRouter([
@@ -49,7 +74,7 @@ export const router = createBrowserRouter([
   { path: '/reset-password',             element: <ResetPasswordPage /> },
   {
     path: '/app',
-    element: <RequireAuth><AppLayout /></RequireAuth>,
+    element: <RequireAuth><RoleLayout /></RequireAuth>,
     children: [
       { index: true,          element: <Navigate to="/app/dashboard" replace /> },
       { path: 'dashboard',    element: <SmartDashboard /> },
@@ -58,10 +83,10 @@ export const router = createBrowserRouter([
       { path: 'accounting',   element: <AccountingPage /> },
       { path: 'participations', element: <ParticipationsPage /> },
       { path: 'onboarding',   element: <OnboardingPage /> },
-      { path: 'tasks',        element: <TasksPage /> },
-      { path: 'documents',    element: <DocumentsPage /> },
+      { path: 'tasks',        element: <SmartTasks /> },
+      { path: 'documents',    element: <SmartDocuments /> },
       { path: 'companies',    element: <CompaniesPage /> },
-      { path: 'requests',     element: <RequestsPage /> },
+      { path: 'requests',     element: <SmartRequests /> },
       { path: 'dashboards-bi', element: <DashboardsBIPage /> },
       { path: 'task-templates', element: <TaskTemplatesPage /> },
       { path: 'profiles',     element: <ProfilesPage /> },

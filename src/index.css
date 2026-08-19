@@ -1,19 +1,64 @@
 @import "tailwindcss";
 
+/* Modo oscuro manual: la variante `dark:` responde a [data-theme="dark"] en <html>
+   (no solo a la preferencia del sistema), para poder alternarlo con el toggle. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
-  --color-primary-50:  #f0fdfa;
-  --color-primary-100: #ccfbf1;
-  --color-primary-200: #99f6e4;
-  --color-primary-300: #5eead4;
-  --color-primary-400: #2dd4bf;
-  --color-primary-500: #14b8a6;
-  --color-primary-600: #0d9488;
-  --color-primary-700: #0f766e;
-  --color-primary-800: #115e59;
-  --color-primary-900: #134e4a;
-  --color-primary-950: #042f2e;
+  /* ===== Finto — paleta de marca =====
+     #FFF7E4 crema · #DBC59C arena · #BC984A oro · #3D6BC1 azul · #1A2545 azul profundo */
+
+  /* Azul de marca (interacción: botones, enlaces, nav activo) */
+  --color-brand-50:  #eef3fb;
+  --color-brand-100: #d9e3f6;
+  --color-brand-200: #b7cbeb;
+  --color-brand-300: #8aaadd;
+  --color-brand-400: #5c86d0;
+  --color-brand-500: #3d6bc1;
+  --color-brand-600: #315aa8;
+  --color-brand-700: #294b8c;
+  --color-brand-800: #243f73;
+  --color-brand-900: #1f345d;
+
+  /* Alias `primary` → azul de marca. La UI usa clases `primary-*`
+     (botones, rings, acentos); se mapean al mismo azul de marca. */
+  --color-primary-50:  #eef3fb;
+  --color-primary-100: #d9e3f6;
+  --color-primary-200: #b7cbeb;
+  --color-primary-300: #8aaadd;
+  --color-primary-400: #5c86d0;
+  --color-primary-500: #3d6bc1;
+  --color-primary-600: #315aa8;
+  --color-primary-700: #294b8c;
+  --color-primary-800: #243f73;
+  --color-primary-900: #1f345d;
+
+  /* Azul profundo (estructura: sidebar, títulos, modo oscuro) */
+  --color-navy-700: #22315a;
+  --color-navy-800: #1f2a4d;
+  --color-navy-900: #1a2545;
+  --color-navy-950: #121a33;
+
+  /* Oro / bronce (acento: pestaña activa, gráficas, destacados) */
+  --color-gold-300: #e3cf9f;
+  --color-gold-400: #cdaf6a;
+  --color-gold-500: #bc984a;
+  --color-gold-600: #a07f3a;
+  --color-gold-700: #82662e;
+
+  /* Arena (secundario: pestañas, bordes suaves, chips) */
+  --color-sand-100: #f4ead2;
+  --color-sand-200: #ead9b4;
+  --color-sand-300: #dbc59c;
+  --color-sand-400: #cbae78;
+
+  /* Crema (lienzo del portal, fondo de tarjetas) */
+  --color-cream-50:  #fffdf7;
+  --color-cream-100: #fff7e4;
+  --color-cream-200: #fbefd4;
 
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Poppins', 'Inter', system-ui, sans-serif;
 }
 
 @layer base {
@@ -25,4 +70,9 @@
   }
 
   #root { @apply min-h-screen; }
+}
+
+/* Utilidad para titulares con la tipografía display de Finto */
+@layer utilities {
+  .font-display { font-family: var(--font-display); }
 }

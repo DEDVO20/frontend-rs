@@ -511,7 +511,7 @@ const TASK_STATUS: Record<string, { label: string; cls: string }> = {
   overdue:     { label: 'Vencida',     cls: 'bg-red-100 text-red-700' },
 }
 
-function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => void; companyName: (t: any) => string }) {
+export function TaskDrawer({ id, onClose, companyName }: { id: string; onClose: () => void; companyName: (t: any) => string }) {
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const confirm = useConfirm()

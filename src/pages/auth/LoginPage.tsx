@@ -3,9 +3,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate, Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { Loader2, X } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
-import { Input } from '@/components/ui/Input'
-import { Button } from '@/components/ui/Button'
+import { FintoLogo } from '@/components/ui/FintoLogo'
+import mockupHero from '@/assets/finto/images/mockup-hero.webp'
 
 const schema = z.object({
   email: z.string().email('Email inválido'),
@@ -13,24 +14,6 @@ const schema = z.object({
 })
 
 type Form = z.infer<typeof schema>
-
-const FEATURES = [
-  {
-    emoji: '📊',
-    title: 'Dashboard en tiempo real',
-    desc: 'KPIs, facturación, cartera y tesorería actualizados al instante.',
-  },
-  {
-    emoji: '🔒',
-    title: 'Acceso seguro por roles',
-    desc: 'Cada usuario ve únicamente la información que le corresponde.',
-  },
-  {
-    emoji: '📁',
-    title: 'Documentos y reportes',
-    desc: 'Descargue facturas, nóminas e informes desde cualquier dispositivo.',
-  },
-]
 
 export function LoginPage() {
   const { login } = useAuthStore()
@@ -50,134 +33,103 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-primary-950 flex items-center justify-center p-4">
-      {/* Grid decorativo */}
-      <div
-        className="fixed inset-0 opacity-[0.06] pointer-events-none"
-        style={{ backgroundImage: 'linear-gradient(#14b8a6 1px,transparent 1px),linear-gradient(90deg,#14b8a6 1px,transparent 1px)', backgroundSize: '48px 48px' }}
-      />
+    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4 md:p-8">
+      <div className="relative w-full max-w-5xl overflow-hidden rounded-[2rem] shadow-2xl shadow-navy-900/25
+                      bg-gradient-to-br from-navy-900 via-brand-800 to-brand-600">
+        {/* Cerrar */}
+        <Link to="/" aria-label="Cerrar"
+          className="absolute top-5 right-5 z-10 text-brand-200 hover:text-cream-100 transition-colors">
+          <X className="w-6 h-6" />
+        </Link>
 
-      <div className="relative w-full max-w-5xl flex flex-col lg:flex-row gap-0 rounded-3xl overflow-hidden shadow-2xl shadow-black/50">
+        <div className="flex flex-col lg:flex-row">
 
-        {/* ── Panel izquierdo ── */}
-        <div className="hidden lg:flex flex-col w-[52%] bg-slate-900/80 backdrop-blur border-r border-white/5 p-10 xl:p-14">
-          {/* Logo */}
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-base">F</span>
-            </div>
-            <div>
-              <p className="font-semibold text-white text-sm leading-tight">Finto</p>
-              <p className="text-xs text-slate-400 leading-tight">Gestión empresarial</p>
-            </div>
-          </div>
+          {/* ── Panel izquierdo (marca) ── */}
+          <div className="lg:w-[52%] p-8 md:p-12 flex flex-col">
+            <FintoLogo variant="white" height={34} className="mb-8 self-start" />
 
-          {/* Headline */}
-          <div className="mb-10">
-            <h2 className="text-4xl xl:text-5xl font-bold text-white leading-tight mb-4">
-              Bienvenido<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-teal-300">
-                a su portal
-              </span>
+            <h2 className="font-display text-3xl md:text-4xl xl:text-5xl font-bold text-cream-100 leading-[1.1] mb-6">
+              Bienvenido a<br />tu portal
             </h2>
-            <p className="text-slate-400 leading-relaxed text-sm">
-              Acceda a toda la información financiera y administrativa de su empresa
-              en un solo lugar, seguro y en tiempo real.
+
+            <img src={mockupHero} alt="Portal Finto en un portátil"
+              className="hidden lg:block w-full max-w-sm mx-auto drop-shadow-2xl mb-6" />
+
+            <p className="text-cream-100/70 text-sm leading-relaxed max-w-sm mx-auto text-center">
+              Toda la información financiera de tu empresa, organizada en un solo lugar.
             </p>
           </div>
 
-          {/* Features */}
-          <div className="space-y-5 mb-12">
-            {FEATURES.map(f => (
-              <div key={f.title} className="flex items-start gap-4">
-                <span className="text-2xl shrink-0">{f.emoji}</span>
-                <div>
-                  <p className="text-sm font-semibold text-white mb-0.5">{f.title}</p>
-                  <p className="text-xs text-slate-400 leading-relaxed">{f.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* ── Panel derecho (formulario) ── */}
+          <div className="lg:w-[48%] p-8 md:p-12 lg:border-l border-white/10 flex flex-col justify-center">
+            <h1 className="font-display text-2xl md:text-3xl font-bold text-cream-100 mb-8">
+              Iniciar sesión
+            </h1>
 
-          {/* Testimonial */}
-          <div className="mt-auto bg-white/5 border border-white/10 rounded-2xl p-5">
-            <p className="text-sm text-slate-300 italic leading-relaxed mb-4">
-              "Finto transformó la manera en que gestionamos nuestra contabilidad.
-              Tenemos visibilidad total y nunca más perdemos una fecha tributaria."
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-primary-700 flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-primary-200">JR</span>
-              </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div>
-                <p className="text-sm font-semibold text-white leading-tight">Jorge Rodríguez</p>
-                <p className="text-xs text-slate-400 leading-tight">Constructora Bolívar S.A.S</p>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-brand-200 mb-2">
+                  Correo electrónico
+                </label>
+                <input
+                  type="email"
+                  placeholder="empresa@correo.com"
+                  autoComplete="email"
+                  className="w-full px-4 py-3 rounded-xl bg-white/10 text-cream-100 placeholder:text-cream-100/40
+                             ring-1 ring-white/15 focus:outline-none focus:ring-2 focus:ring-brand-300 transition"
+                  {...register('email')}
+                />
+                {errors.email && <p className="text-xs text-red-300 mt-1.5">{errors.email.message}</p>}
               </div>
-            </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-brand-200 mb-2">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  placeholder="••••••••••••"
+                  autoComplete="current-password"
+                  className="w-full px-4 py-3 rounded-xl bg-white/10 text-cream-100 placeholder:text-cream-100/40
+                             ring-1 ring-white/15 focus:outline-none focus:ring-2 focus:ring-brand-300 transition"
+                  {...register('password')}
+                />
+                {errors.password && <p className="text-xs text-red-300 mt-1.5">{errors.password.message}</p>}
+              </div>
+
+              <div className="space-y-3 pt-1">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-full font-display font-bold text-base
+                             bg-navy-950 text-cream-100 hover:bg-navy-900 ring-1 ring-white/10
+                             disabled:opacity-60 transition-colors"
+                >
+                  {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Ingresar
+                </button>
+
+                <Link
+                  to="/register"
+                  className="w-full flex items-center justify-center py-3.5 rounded-full font-display font-bold text-base
+                             bg-brand-500 text-cream-100 hover:bg-brand-400 transition-colors"
+                >
+                  Registrarme
+                </Link>
+              </div>
+
+              <div className="text-center">
+                <Link to="/forgot-password" className="text-xs text-cream-100/50 hover:text-cream-100/80 transition-colors">
+                  ¿Olvidó su contraseña?
+                </Link>
+              </div>
+            </form>
+
+            <p className="text-center text-sm text-cream-100/60 mt-6 leading-relaxed">
+              ¿Aún no tiene cuenta?<br />
+              <span className="text-cream-100/80">Regístrate y obtén grandes beneficios.</span>
+            </p>
           </div>
-        </div>
-
-        {/* ── Panel derecho (formulario) ── */}
-        <div className="flex-1 bg-white flex flex-col justify-center p-8 xl:p-12">
-          {/* Logo mobile */}
-          <div className="flex lg:hidden items-center gap-3 mb-8">
-            <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm">F</span>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-900 text-sm leading-tight">Finto</p>
-              <p className="text-xs text-slate-400 leading-tight">Gestión empresarial</p>
-            </div>
-          </div>
-
-          <h2 className="text-2xl font-bold text-slate-900 mb-1">Iniciar sesión</h2>
-          <p className="text-sm text-slate-400 mb-8">Ingrese a su portal empresarial</p>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <Input
-              label="Correo electrónico"
-              type="email"
-              placeholder="empresa@correo.com"
-              error={errors.email?.message}
-              {...register('email')}
-            />
-            <Input
-              label="Contraseña"
-              type="password"
-              placeholder="••••••••"
-              error={errors.password?.message}
-              {...register('password')}
-            />
-
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer">
-                <input type="checkbox" className="rounded border-slate-300" />
-                Recordarme
-              </label>
-              <Link to="/forgot-password" className="text-xs text-primary-600 hover:underline">
-                ¿Olvidó su contraseña?
-              </Link>
-            </div>
-
-            <Button type="submit" className="w-full" size="lg" loading={isSubmitting}>
-              Ingresar al Portal →
-            </Button>
-          </form>
-
-          {/* Registro */}
-          <div className="mt-6 pt-6 border-t border-slate-100 text-center">
-            <p className="text-sm text-slate-500 mb-2">¿Aún no tiene cuenta?</p>
-            <Link
-              to="/register"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-primary-600 hover:text-primary-700 transition-colors"
-            >
-              Registrar mi empresa →
-            </Link>
-          </div>
-
-          <p className="text-center text-slate-300 text-xs mt-8">
-            © {new Date().getFullYear()} Finto · Todos los derechos reservados
-          </p>
         </div>
       </div>
     </div>

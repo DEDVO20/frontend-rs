@@ -51,7 +51,7 @@ const TYPE_FOLDERS = [
 
 // ── Upload modal ───────────────────────────────────────────────────────────────
 
-function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+export function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { user } = useAuthStore()
   const isInternal = ['admin', 'rs_admin', 'rs_staff'].includes(user?.role ?? '')
   const [title, setTitle]         = useState('')

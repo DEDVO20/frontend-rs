@@ -1,6 +1,15 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, ChevronRight, Menu, X, Phone } from 'lucide-react'
+import { ArrowRight, Menu, X, Search, Settings2, FileText, BarChart3, User } from 'lucide-react'
 import { useState } from 'react'
+import { FintoLogo } from '@/components/ui/FintoLogo'
+import { FintoIcon, type FintoIconName } from '@/components/ui/FintoIcon'
+
+import mockupHero from '@/assets/finto/images/mockup-hero.webp'
+import mockupPortal from '@/assets/finto/images/mockup-portal.webp'
+import imgContabilidad from '@/assets/finto/images/CONTABILIDAD E IMPUESTOS.webp'
+import imgController from '@/assets/finto/images/CONTROLLER FINANCIERO Y TESORERIA.webp'
+import imgFacturacion from '@/assets/finto/images/FACTURACION Y RECAUDO.webp'
+import imgPersonal from '@/assets/finto/images/GESTION DE PERSONAL Y COMPRAS.webp'
 
 const NAV_LINKS = [
   { label: 'Servicios', href: '#servicios' },
@@ -10,431 +19,283 @@ const NAV_LINKS = [
 ]
 
 const SERVICES = [
-  {
-    num: '01',
-    emoji: '📊',
-    title: 'Contabilidad e impuestos',
-    desc: 'Gestión contable integral bajo NIIF y normativa colombiana vigente. Información financiera precisa y oportuna para la toma de decisiones.',
-    items: [
-      'Registro y causación de movimientos',
-      'Estados financieros mensuales',
-      'Conciliaciones bancarias',
-      'Declaraciones tributarias (IVA, Renta, ICA)',
-      'Libros oficiales y auxiliares',
-    ],
-  },
-  {
-    num: '02',
-    emoji: '🏦',
-    title: 'Controller financiero y Tesorería',
-    desc: 'Control del flujo de caja, pagos y recaudos con visibilidad en tiempo real. Optimizamos la liquidez de su empresa.',
-    items: [
-      'Planeación financiera',
-      'Flujo de caja proyectado',
-      'Gestión bancaria',
-      'Reportes financieros',
-      'Reportes y Dashboard en línea',
-    ],
-  },
-  {
-    num: '03',
-    emoji: '🧾',
-    title: 'Facturación y recaudo',
-    desc: 'Emisión y gestión de factura electrónica conforme a los requisitos de la DIAN. Procesos ágiles y sin errores.',
-    items: [
-      'Facturación masiva y programada',
-      'Notas crédito y débito',
-      'Gestión de cobro preventivo y activo',
-      'Ageing de cartera (antigüedad)',
-      'Reportes y Dashboard en línea',
-    ],
-  },
-  {
-    num: '05',
-    emoji: '👥',
-    title: 'Gestión de Personal y compras',
-    desc: 'Nómina, seguridad social y bienestar laboral. Cumplimos con toda la normativa laboral colombiana de manera eficiente.',
-    items: [
-      'Vinculaciones y desvinculaciones',
-      'Evaluaciones de desempeño',
-      'Contratos, novedades y certificados',
-      'Compras de oficina y suministros',
-      'Reportes y dashboard en línea',
-    ],
-  },
+  { img: imgContabilidad, title: 'Contabilidad e impuestos' },
+  { img: imgController, title: 'Controller Financiero y Tesorería' },
+  { img: imgFacturacion, title: 'Facturación y recaudo' },
+  { img: imgPersonal, title: 'Gestión de Personal y compras' },
 ]
 
-const PROCESS_STEPS = [
-  {
-    num: '01',
-    title: 'Diagnóstico inicial',
-    desc: 'Analizamos el estado actual de su empresa, sus necesidades específicas y definimos el alcance del servicio.',
-  },
-  {
-    num: '02',
-    title: 'Configuración del portal',
-    desc: 'Creamos su portal personalizado con acceso seguro para todos los usuarios autorizados de su organización.',
-  },
-  {
-    num: '03',
-    title: 'Operación continua',
-    desc: 'Nuestros equipos especializados gestionan cada área con reportes y entregables definidos mes a mes.',
-  },
-  {
-    num: '04',
-    title: 'Reporte y seguimiento',
-    desc: 'Usted consulta su información en tiempo real desde el dashboard y recibe informes ejecutivos periódicos.',
-  },
+const PROCESS = [
+  { icon: Search,     title: 'Diagnóstico',    desc: 'Analizamos el estado actual de su empresa y definimos el alcance.' },
+  { icon: Settings2,  title: 'Configuración',  desc: 'Personalizamos su portal con acceso seguro para su equipo.' },
+  { icon: FileText,   title: 'Operación',      desc: 'Gestionamos cada área con entregables definidos mes a mes.' },
+  { icon: BarChart3,  title: 'Seguimiento',    desc: 'Consulta su información en tiempo real desde el dashboard.' },
 ]
 
-const PLATFORM_FEATURES = [
-  { emoji: '⚡', title: 'Información actualizada al instante', desc: 'Los datos de su empresa se reflejan en el portal en tiempo real. Sin esperas, sin versiones desactualizadas.' },
-  { emoji: '🛡️', title: 'Seguridad de nivel bancario', desc: 'Cifrado SSL, autenticación de dos factores y copias de seguridad automáticas diarias.' },
-  { emoji: '📱', title: 'Acceso desde cualquier dispositivo', desc: 'Portal responsivo optimizado para computador, tableta y móvil. Su información siempre disponible.' },
-  { emoji: '🔗', title: 'Integración con su ERP', desc: 'Conectamos con los principales sistemas contables y ERP del mercado colombiano sin fricciones.' },
-  { emoji: '📋', title: 'Reportes personalizados', desc: 'Genere informes a la medida de su empresa: por período, área, proyecto o centro de costos.' },
-  { emoji: '🎯', title: 'Soporte dedicado', desc: 'Un equipo especializado asignado a su empresa, con tiempos de respuesta garantizados por SLA.' },
+const PORTAL_FEATURES: { icon: FintoIconName; title: string; desc: string }[] = [
+  { icon: 'analytics',  title: 'Dashboard en tiempo real', desc: 'Indicadores clave actualizados al instante: flujo de caja, cartera, nómina y más.' },
+  { icon: 'security-lock', title: 'Acceso seguro por roles', desc: 'Administre los permisos de su equipo. Cada usuario ve solo lo que le corresponde.' },
+  { icon: 'download',   title: 'Descarga de documentos', desc: 'Facturas, comprobantes, informes y certificados disponibles en cualquier momento.' },
+]
+
+const PLATFORM: { icon: FintoIconName; title: string; desc: string }[] = [
+  { icon: 'download',      title: 'Información actualizada al instante', desc: 'Los datos de su empresa se reflejan en el portal en tiempo real. Sin esperas, sin versiones desactualizadas.' },
+  { icon: 'security-lock', title: 'Seguridad de nivel bancario', desc: 'Cifrado SSL, autenticación de dos factores y copias de seguridad automáticas diarias.' },
+  { icon: 'devices',       title: 'Acceso desde cualquier dispositivo', desc: 'Portal responsivo optimizado para computador, tableta y móvil. Su información siempre disponible.' },
+  { icon: 'bank-gear',     title: 'Integración con su ERP', desc: 'Conectamos con los principales sistemas contables y ERP del mercado colombiano sin fricciones.' },
+  { icon: 'analytics',     title: 'Reportes personalizados', desc: 'Genere informes a la medida de su empresa: por período, área, proyecto o centro de costos.' },
+  { icon: 'support',       title: 'Soporte dedicado', desc: 'Un equipo especializado asignado a su empresa, con tiempos de respuesta garantizados por SLA.' },
+]
+
+const STATS = [
+  { value: '+10', label: 'Empresas\nactivas' },
+  { value: '+14', label: 'Meses en\nel mercado' },
+  { value: '99%', label: 'Satisfacción\nclientes' },
 ]
 
 export function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  // Giro 3D del mockup según el lado donde esté el mouse (0 = de frente)
+  const [heroTilt, setHeroTilt] = useState(0)
+  const TILT = 18 // grados de giro a cada lado
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-cream-50 font-sans text-navy-900">
 
-      {/* ── Navbar ─────────────────────────────────────────────────────────── */}
-      <header className="fixed top-0 inset-x-0 z-50 bg-white/90 backdrop-blur border-b border-slate-100">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
-              <span className="text-white font-bold text-sm">F</span>
-            </div>
-            <div>
-              <p className="font-semibold text-slate-900 text-sm leading-tight">Finto</p>
-              <p className="text-xs text-slate-400 leading-tight">Gestión Empresarial</p>
-            </div>
-          </div>
+      {/* ── Navbar ─────────────────────────────────────────────── */}
+      <header className="fixed top-0 inset-x-0 z-50 bg-cream-50/90 backdrop-blur border-b border-sand-300/40">
+        <div className="max-w-6xl mx-auto px-5 md:px-6 h-16 flex items-center justify-between">
+          <FintoLogo variant="navy" height={26} />
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-7">
             {NAV_LINKS.map(l => (
-              <a key={l.label} href={l.href}
-                className="text-sm text-slate-600 hover:text-primary-600 transition-colors">
+              <a key={l.label} href={l.href} className="text-sm font-medium text-navy-900/70 hover:text-brand-600 transition-colors">
                 {l.label}
               </a>
             ))}
           </nav>
 
-          <div className="hidden md:flex items-center gap-3">
-            <Link to="/register"
-              className="text-sm text-slate-600 hover:text-primary-600 transition-colors font-medium">
+          <div className="hidden md:flex items-center gap-2">
+            <Link to="/register" className="text-sm font-medium text-navy-900/70 hover:text-brand-600 px-3 py-2 transition-colors">
               Registrarse
             </Link>
-            <Link to="/login"
-              className="text-sm bg-primary-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-primary-700 transition-colors">
-              Acceder al Portal
+            <Link to="/login" className="inline-flex items-center gap-2 text-sm font-semibold bg-navy-900 text-cream-100 pl-3 pr-4 py-2 rounded-full hover:bg-navy-800 transition-colors">
+              <User className="w-4 h-4" /> Acceder al Portal
             </Link>
           </div>
 
-          {/* Mobile toggle */}
-          <button className="md:hidden text-slate-600 p-1" onClick={() => setMobileOpen(o => !o)}>
+          <button className="md:hidden text-navy-900 p-1" onClick={() => setMobileOpen(o => !o)}>
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
 
-        {/* Mobile menu */}
         {mobileOpen && (
-          <div className="md:hidden bg-white border-t border-slate-100 px-6 py-4 space-y-3">
+          <div className="md:hidden bg-cream-50 border-t border-sand-300/40 px-6 py-4 space-y-3">
             {NAV_LINKS.map(l => (
-              <a key={l.label} href={l.href} onClick={() => setMobileOpen(false)}
-                className="block text-sm text-slate-600 hover:text-primary-600">
+              <a key={l.label} href={l.href} onClick={() => setMobileOpen(false)} className="block text-sm font-medium text-navy-900/70">
                 {l.label}
               </a>
             ))}
-            <div className="pt-2 flex flex-col gap-2 border-t border-slate-100">
-              <Link to="/register" onClick={() => setMobileOpen(false)}
-                className="block text-sm font-medium text-slate-600">
-                Registrarse
-              </Link>
-              <Link to="/login" onClick={() => setMobileOpen(false)}
-                className="block text-sm font-semibold text-primary-600">
-                Acceder al Portal →
-              </Link>
+            <div className="pt-2 flex flex-col gap-2 border-t border-sand-300/40">
+              <Link to="/register" onClick={() => setMobileOpen(false)} className="text-sm font-medium text-navy-900/70">Registrarse</Link>
+              <Link to="/login" onClick={() => setMobileOpen(false)} className="text-sm font-semibold text-brand-600">Acceder al Portal →</Link>
             </div>
           </div>
         )}
       </header>
 
-      {/* ── Hero ───────────────────────────────────────────────────────────── */}
-      <section className="pt-32 pb-20 bg-gradient-to-br from-slate-900 via-slate-800 to-primary-950 relative overflow-hidden">
-        {/* Grid decorativo */}
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: 'linear-gradient(#14b8a6 1px,transparent 1px),linear-gradient(90deg,#14b8a6 1px,transparent 1px)', backgroundSize: '48px 48px' }} />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-primary-500/20 rounded-full blur-3xl" />
+      {/* ── Hero ───────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden pt-16 bg-gradient-to-br from-navy-950 via-navy-900 to-brand-600">
+        <div className="absolute inset-0 opacity-[0.07] pointer-events-none"
+          style={{ backgroundImage: 'linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px)', backgroundSize: '52px 52px' }} />
 
-        <div className="max-w-6xl mx-auto px-6 relative">
-          <div className="text-center max-w-3xl mx-auto mb-14">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-400 bg-primary-400/10 border border-primary-400/20 rounded-full px-3 py-1 mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse" />
-              Gestión empresarial profesional
-            </span>
+        <div className="relative max-w-6xl mx-auto px-5 md:px-6 py-16 md:py-24 grid lg:grid-cols-2 gap-12 items-center">
+          {/* Imagen — mockup del portal: de frente sin mouse, gira hacia el lado del cursor */}
+          <div
+            className="order-2 lg:order-1 flex justify-center [perspective:1400px]"
+            onMouseMove={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              setHeroTilt(e.clientX - r.left < r.width / 2 ? -TILT : TILT)
+            }}
+            onMouseLeave={() => setHeroTilt(0)}
+          >
+            <img
+              src={mockupHero}
+              alt="Portal Finto en un portátil"
+              style={{ transform: `rotateY(${heroTilt}deg)` }}
+              className="w-full max-w-md drop-shadow-2xl will-change-transform transition-transform duration-500 ease-out"
+            />
+          </div>
 
-            <h1 className="text-5xl md:text-6xl font-bold text-white leading-tight tracking-tight mb-4">
-              Su negocio, organizado{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-teal-300">
-                con precisión.
-              </span>
+          {/* Texto */}
+          <div className="order-1 lg:order-2 text-center lg:text-left">
+            <h1 className="font-display text-4xl md:text-5xl xl:text-6xl font-bold text-cream-100 leading-[1.08] mb-6">
+              La estructura detrás<br />del crecimiento.
             </h1>
-
-            <p className="text-lg text-slate-400 leading-relaxed mb-10">
-              Soluciones integrales de back office para empresas que exigen excelencia. Contabilidad,
-              finanzas, tesorería, facturación, cartera y gestión de personal, todo en una sola plataforma.
+            <p className="text-cream-100/70 text-base md:text-lg leading-relaxed mb-8 max-w-lg mx-auto lg:mx-0">
+              Centralizamos las operaciones del back office en un solo lugar, brindándole mayor
+              control, eficiencia y visibilidad sobre su operación.
             </p>
-
-            <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center lg:justify-start">
               <Link to="/login"
-                className="inline-flex items-center justify-center gap-2 border border-white/20 text-white px-6 py-3 rounded-xl font-semibold hover:bg-white/10 transition-colors backdrop-blur">
+                className="inline-flex items-center justify-center gap-2 font-display font-semibold text-cream-100 border border-cream-100/30 bg-white/5 px-6 py-3 rounded-full hover:bg-white/10 transition-colors">
                 Acceder al Portal
-                <ArrowRight className="w-4 h-4" />
               </Link>
               <Link to="/register"
-                className="inline-flex items-center justify-center gap-2 bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700 transition-colors shadow-lg shadow-primary-600/30">
-                Empieza ahora
-                <ArrowRight className="w-4 h-4" />
+                className="inline-flex items-center justify-center gap-2 font-display font-semibold bg-navy-950 text-cream-100 px-6 py-3 rounded-full ring-1 ring-white/10 hover:bg-navy-900 transition-colors">
+                Solicitar una propuesta <ArrowRight className="w-4 h-4" />
               </Link>
-              <a href="#servicios"
-                className="inline-flex items-center justify-center gap-2 text-slate-300 px-6 py-3 rounded-xl font-semibold hover:text-white transition-colors">
-                Ver Servicios
-                <ChevronRight className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="flex flex-wrap justify-center gap-6 mb-12">
-            {[
-              { value: '+5', label: 'Empresas activas' },
-              { value: '14+', label: 'Meses en el mercado' },
-              { value: '99%', label: 'Satisfacción clientes' },
-            ].map(s => (
-              <div key={s.label} className="text-center px-6">
-                <p className="text-3xl font-bold text-primary-400">{s.value}</p>
-                <p className="text-xs text-slate-400 mt-1">{s.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Dashboard mockup */}
-          <div className="relative max-w-4xl mx-auto">
-            <div className="bg-slate-800/80 backdrop-blur border border-slate-700/60 rounded-2xl shadow-2xl shadow-black/40 overflow-hidden">
-              {/* Window chrome */}
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/60 bg-slate-900/60">
-                <div className="w-3 h-3 rounded-full bg-red-500/70" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/70" />
-                <div className="w-3 h-3 rounded-full bg-green-500/70" />
-                <div className="flex-1 mx-4 bg-slate-700/60 rounded-md h-6 flex items-center px-3">
-                  <span className="text-xs text-slate-400">DASHBOARD CLIENTE</span>
-                </div>
-                <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> En vivo
-                </span>
-              </div>
-
-              <div className="flex flex-col md:flex-row">
-                {/* KPIs grid */}
-                <div className="flex-1 p-5 grid grid-cols-3 gap-3">
-                  {[
-                    { label: 'Facturación', val: '$84.2M', change: '↑ 12.4%' },
-                    { label: 'Cartera', val: '$21.7M', change: '↑ 8.1%' },
-                    { label: 'Tesorería', val: '97.3%', change: '↑ 3.2%' },
-                  ].map(k => (
-                    <div key={k.label} className="bg-slate-700/40 rounded-xl p-3">
-                      <p className="text-[10px] text-slate-400 mb-1">{k.label}</p>
-                      <p className="text-sm font-bold text-white">{k.val}</p>
-                      <p className="text-[10px] text-emerald-400 mt-0.5">{k.change}</p>
-                    </div>
-                  ))}
-                  <div className="bg-slate-700/40 rounded-xl p-3">
-                    <p className="text-[10px] text-slate-400 mb-1">Personal</p>
-                    <p className="text-sm font-bold text-white">48</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Activos</p>
-                  </div>
-                  <div className="bg-slate-700/40 rounded-xl p-3">
-                    <p className="text-[10px] text-slate-400 mb-1">Facturas del mes</p>
-                    <p className="text-sm font-bold text-white">142</p>
-                    <p className="text-[10px] text-emerald-400 mt-0.5">Al día</p>
-                  </div>
-                  <div className="bg-slate-700/40 rounded-xl p-3">
-                    <p className="text-[10px] text-slate-400 mb-1">Nómina procesada</p>
-                    <p className="text-sm font-bold text-white">Jun 2025</p>
-                    <p className="text-[10px] text-emerald-400 mt-0.5">✓</p>
-                  </div>
-                </div>
-
-                {/* Right panel */}
-                <div className="w-full md:w-44 bg-slate-900/60 border-t md:border-t-0 md:border-l border-slate-700/40 p-4 flex flex-col gap-3 shrink-0">
-                  <div className="bg-primary-600/20 border border-primary-500/30 rounded-xl p-3">
-                    <p className="text-[10px] text-slate-400">Saldo disponible</p>
-                    <p className="text-base font-bold text-white mt-1">$12.4M</p>
-                    <p className="text-[10px] text-emerald-400 mt-1">↑ COP +2.1% este mes</p>
-                  </div>
-                  <div className="bg-slate-700/30 rounded-xl p-3">
-                    <p className="text-[10px] text-slate-400">Próximo cierre</p>
-                    <p className="text-sm font-bold text-white mt-1">30 Jun</p>
-                    <p className="text-[10px] text-amber-400 mt-1">● 4 días restantes</p>
-                  </div>
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
-                    <p className="text-[10px] text-slate-400">Obligaciones fiscales</p>
-                    <p className="text-sm font-bold text-white mt-1">2 pend.</p>
-                    <p className="text-[10px] text-red-400 mt-1">Revisar</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Servicios ──────────────────────────────────────────────────────── */}
-      <section id="servicios" className="py-24">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-sm font-semibold text-primary-600 uppercase tracking-wider mb-3">Lo que ofrecemos</p>
-            <h2 className="text-4xl font-bold text-slate-900 mb-4">Servicios especializados</h2>
-            <p className="text-slate-500 leading-relaxed">
+      {/* ── Stats ──────────────────────────────────────────────── */}
+      <section className="bg-cream-100">
+        <div className="max-w-6xl mx-auto px-5 md:px-6 py-12 md:py-16 flex flex-col md:flex-row items-center gap-10 md:gap-16">
+          <p className="text-lg md:text-xl font-semibold text-navy-900 max-w-xs text-center md:text-left leading-snug">
+            De principio a fin, organizamos los procesos que impulsan su empresa.
+          </p>
+          <div className="flex-1 grid grid-cols-3 gap-6">
+            {STATS.map(s => (
+              <div key={s.label} className="text-center md:text-left">
+                <p className="font-display text-4xl md:text-5xl font-bold text-brand-500 leading-none">{s.value}</p>
+                <p className="text-sm font-semibold text-navy-900 mt-2 whitespace-pre-line leading-tight">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Servicios ──────────────────────────────────────────── */}
+      <section id="servicios" className="bg-cream-50 py-20 md:py-24">
+        <div className="max-w-6xl mx-auto px-5 md:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <p className="text-xs font-bold text-brand-600 uppercase tracking-[0.2em] mb-3">Lo que ofrecemos</p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-brand-600 mb-4">Servicios Especializados</h2>
+            <p className="text-navy-900/60 leading-relaxed">
               Cubrimos todas las áreas administrativas y financieras de su empresa con equipos expertos
               y tecnología de punta.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
             {SERVICES.map(s => (
-              <div key={s.num}
-                className="group p-7 rounded-2xl border border-slate-200 hover:border-primary-300 hover:shadow-lg hover:shadow-primary-50 transition-all bg-white">
-                <div className="flex items-start gap-4 mb-4">
-                  <span className="text-3xl">{s.emoji}</span>
-                  <div>
-                    <p className="text-xs font-bold text-primary-600 mb-0.5">{s.num}</p>
-                    <h3 className="font-semibold text-slate-900 text-lg">{s.title}</h3>
+              <div key={s.title} className="group relative rounded-2xl overflow-hidden aspect-[3/4] shadow-lg shadow-navy-900/10 ring-1 ring-navy-900/5">
+                <img src={s.img} alt={s.title}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/20 to-transparent" />
+                <div className="absolute bottom-0 inset-x-0 p-4">
+                  <div className="w-9 h-9 rounded-lg bg-gold-500/90 flex items-center justify-center mb-2">
+                    <FintoIcon name="briefcase" variant="white" size={18} />
                   </div>
+                  <p className="font-display font-bold text-cream-100 text-sm leading-tight">{s.title}</p>
                 </div>
-                <p className="text-sm text-slate-500 leading-relaxed mb-4">{s.desc}</p>
-                <ul className="space-y-1.5">
-                  {s.items.map(item => (
-                    <li key={item} className="flex items-center gap-2 text-sm text-slate-600">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary-400 shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Proceso ────────────────────────────────────────────────────────── */}
-      <section id="proceso" className="py-24 bg-slate-50">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-sm font-semibold text-primary-600 uppercase tracking-wider mb-3">Proceso</p>
-            <h2 className="text-4xl font-bold text-slate-900 mb-4">Así trabajamos con usted</h2>
-            <p className="text-slate-500 leading-relaxed">
-              Un proceso transparente y estructurado desde el primer día.
-            </p>
+      {/* ── Proceso ────────────────────────────────────────────── */}
+      <section id="proceso" className="relative py-20 md:py-24 bg-gradient-to-br from-navy-900 to-brand-700">
+        <div className="max-w-6xl mx-auto px-5 md:px-6">
+          <div className="mb-8">
+            <p className="text-xs font-bold text-gold-400 uppercase tracking-[0.2em] mb-3">Proceso</p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-cream-100 mb-3">Así trabajamos con usted</h2>
+            <p className="text-cream-100/60 leading-relaxed">Un proceso transparente y estructurado desde el primer día.</p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {PROCESS_STEPS.map(({ num, title, desc }) => (
-              <div key={num} className="bg-white rounded-2xl border border-slate-200 p-6">
-                <div className="text-5xl font-black text-primary-100 mb-3 leading-none">{num}</div>
-                <h3 className="font-semibold text-slate-900 mb-2">{title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
-              </div>
-            ))}
+          {/* Móvil / tablet: lista de pasos */}
+          <div className="lg:hidden grid sm:grid-cols-2 gap-5">
+            {PROCESS.map((step, i) => {
+              const Icon = step.icon
+              return (
+                <div key={step.title} className="rounded-2xl bg-white/5 ring-1 ring-white/10 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-11 h-11 rounded-full border-2 border-gold-400/60 flex items-center justify-center shrink-0">
+                      <Icon className="w-5 h-5 text-cream-100" />
+                    </div>
+                    <span className="font-display text-4xl font-bold text-white/15 leading-none">{i + 1}</span>
+                  </div>
+                  <h3 className="font-display font-bold text-cream-100 mb-1.5">{step.title}</h3>
+                  <p className="text-sm text-cream-100/60 leading-relaxed">{step.desc}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop: diagrama circular con efecto lupa al pasar el mouse */}
+          <div className="hidden lg:block">
+            <div className="relative mx-auto mt-8 w-full max-w-[500px] aspect-square">
+              {/* Anillo punteado */}
+              <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full text-cream-100/30">
+                <circle cx="50" cy="50" r="47" fill="none" stroke="currentColor"
+                  strokeWidth="0.4" strokeDasharray="0.1 3.4" strokeLinecap="round" />
+              </svg>
+
+              {PROCESS.map((step, i) => {
+                const Icon = step.icon
+                const pos = [
+                  { left: '50%', top: '3%' },   // arriba
+                  { left: '97%', top: '50%' },  // derecha
+                  { left: '50%', top: '97%' },  // abajo
+                  { left: '3%',  top: '50%' },  // izquierda
+                ][i]!
+                return (
+                  <div key={step.title}
+                    className="absolute z-10 hover:z-30 -translate-x-1/2 -translate-y-1/2"
+                    style={{ left: pos.left, top: pos.top }}>
+                    <div className="group relative flex flex-col items-center cursor-pointer">
+                      {/* Nodo (efecto lupa: crece al hacer hover) */}
+                      <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-gold-400/60
+                                      bg-navy-900/70 backdrop-blur transition-all duration-300 origin-center
+                                      group-hover:scale-[1.6] group-hover:border-gold-400
+                                      group-hover:bg-gradient-to-br group-hover:from-brand-500 group-hover:to-navy-900
+                                      group-hover:shadow-2xl group-hover:shadow-brand-500/50">
+                        <Icon className="h-8 w-8 text-cream-100 transition-transform duration-300 group-hover:scale-[0.55]" />
+                      </div>
+                      {/* Texto revelado */}
+                      <div className="pointer-events-none absolute top-[calc(100%+0.75rem)] w-52 text-center
+                                      translate-y-1 opacity-0 transition-all duration-300
+                                      group-hover:translate-y-0 group-hover:opacity-100">
+                        <p className="font-display font-bold text-cream-100 text-sm">{i + 1}. {step.title}</p>
+                        <p className="mt-1 text-xs text-cream-100/75 leading-snug">{step.desc}</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ── Portal cliente ─────────────────────────────────────────────────── */}
-      <section className="py-24">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="bg-gradient-to-br from-slate-900 to-primary-950 rounded-3xl p-8 md:p-14 flex flex-col lg:flex-row gap-12 items-center">
-
-            {/* Login mockup */}
-            <div className="w-full lg:w-72 shrink-0">
-              <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-                <div className="bg-slate-900 px-5 py-4 flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
-                    <span className="text-white font-bold text-xs">F</span>
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white text-xs leading-tight">Finto</p>
-                    <p className="text-[10px] text-slate-400 leading-tight">Gestión Empresarial</p>
-                  </div>
-                </div>
-                <div className="px-5 py-5">
-                  <p className="text-sm font-semibold text-slate-900 mb-1">Bienvenido de vuelta</p>
-                  <p className="text-xs text-slate-400 mb-4">Ingrese a su portal empresarial</p>
-                  <div className="space-y-3 mb-4">
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">Correo electrónico</p>
-                      <div className="h-8 bg-slate-100 rounded-lg px-3 flex items-center">
-                        <span className="text-xs text-slate-400">empresa@correo.com</span>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 mb-1">Contraseña</p>
-                      <div className="h-8 bg-slate-100 rounded-lg px-3 flex items-center">
-                        <span className="text-xs text-slate-400">••••••••</span>
-                      </div>
-                    </div>
-                  </div>
-                  <Link to="/login"
-                    className="block w-full text-center text-xs font-semibold bg-primary-600 text-white py-2 rounded-lg hover:bg-primary-700 transition-colors">
-                    Ingresar al Portal →
-                  </Link>
-                  <p className="text-center text-[10px] text-slate-400 mt-3">
-                    ¿No tiene cuenta?{' '}
-                    <Link to="/register" className="text-primary-600 font-medium">Solicite acceso</Link>
-                  </p>
-                </div>
-
-                {/* Mini nav */}
-                <div className="border-t border-slate-100 px-5 pb-4">
-                  {['Dashboard general', 'Mis facturas', 'Estado de nómina', 'Cartera y cobros'].map((item, i) => (
-                    <div key={item}
-                      className={`flex items-center gap-2 py-2 text-xs ${i === 0 ? 'text-primary-600 font-medium' : 'text-slate-400'}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${i === 0 ? 'bg-primary-500' : 'bg-slate-200'}`} />
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </div>
+      {/* ── Portal del cliente ─────────────────────────────────── */}
+      <section className="bg-navy-900 py-20 md:py-24">
+        <div className="max-w-6xl mx-auto px-5 md:px-6">
+          <div className="rounded-3xl bg-cream-100 p-8 md:p-12 flex flex-col lg:flex-row gap-10 lg:gap-14 items-center">
+            {/* Teléfono */}
+            <div className="w-full lg:w-72 shrink-0 flex justify-center">
+              <img src={mockupPortal} alt="Portal Finto en el móvil"
+                className="w-full max-w-[250px] drop-shadow-2xl" />
             </div>
 
-            {/* Text */}
-            <div className="flex-1 text-center lg:text-left">
-              <p className="text-sm font-semibold text-primary-400 uppercase tracking-wider mb-4">Portal del cliente</p>
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-6 leading-tight">
+            {/* Texto */}
+            <div className="flex-1">
+              <p className="text-xs font-bold text-brand-600 uppercase tracking-[0.2em] mb-3">Portal del cliente</p>
+              <h2 className="font-display text-3xl md:text-4xl font-bold text-navy-900 mb-4 leading-tight">
                 Todo su negocio<br />en un solo lugar
               </h2>
-              <p className="text-slate-400 mb-8 leading-relaxed">
-                Acceda a su información financiera y administrativa desde cualquier dispositivo,
-                en tiempo real y con total seguridad.
+              <p className="text-brand-600 font-medium mb-8 leading-relaxed max-w-md">
+                Consulte indicadores, descargue documentos y haga seguimiento desde cualquier dispositivo.
               </p>
-
               <div className="grid sm:grid-cols-3 gap-4">
-                {[
-                  { emoji: '📈', title: 'Dashboard en tiempo real', desc: 'Indicadores clave actualizados al instante: flujo de caja, cartera, nómina y más.' },
-                  { emoji: '🔒', title: 'Acceso seguro por roles', desc: 'Administre los permisos de su equipo. Cada usuario ve solo lo que le corresponde.' },
-                  { emoji: '📥', title: 'Descarga de documentos', desc: 'Facturas, comprobantes, informes y certificados disponibles en cualquier momento.' },
-                ].map(f => (
-                  <div key={f.title} className="bg-white/10 backdrop-blur border border-white/10 rounded-xl p-4 text-left">
-                    <span className="text-2xl">{f.emoji}</span>
-                    <p className="text-sm font-semibold text-white mt-2 mb-1">{f.title}</p>
-                    <p className="text-xs text-slate-400 leading-relaxed">{f.desc}</p>
+                {PORTAL_FEATURES.map(f => (
+                  <div key={f.title} className="rounded-xl bg-sand-200/60 p-4">
+                    <FintoIcon name={f.icon} variant="navy" size={34} className="mb-3" />
+                    <p className="font-display font-bold text-brand-600 text-sm mb-1.5 leading-tight">{f.title}</p>
+                    <p className="text-xs text-navy-900/60 leading-relaxed">{f.desc}</p>
                   </div>
                 ))}
               </div>
@@ -443,101 +304,91 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ── Plataforma ─────────────────────────────────────────────────────── */}
-      <section id="plataforma" className="py-24 bg-slate-50">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-14">
-            <p className="text-sm font-semibold text-primary-600 uppercase tracking-wider mb-3">Plataforma</p>
-            <h2 className="text-4xl font-bold text-slate-900 mb-4">Tecnología al<br />servicio de su empresa</h2>
-            <p className="text-slate-500 leading-relaxed">
-              Nuestra plataforma está diseñada para empresas que no pueden permitirse errores
-              ni retrasos en su información.
+      {/* ── Plataforma ─────────────────────────────────────────── */}
+      <section id="plataforma" className="bg-cream-100 py-20 md:py-24">
+        <div className="max-w-6xl mx-auto px-5 md:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <p className="text-xs font-bold text-brand-600 uppercase tracking-[0.2em] mb-3">Plataforma</p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-brand-600 mb-4">Tecnología al servicio<br />de su empresa</h2>
+            <p className="text-navy-900/60 leading-relaxed">
+              Tecnología diseñada para facilitar la gestión empresarial con información en tiempo real,
+              seguridad, integración y soporte.
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {PLATFORM_FEATURES.map(f => (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
+            {PLATFORM.map(f => (
               <div key={f.title}
-                className="bg-white p-6 rounded-2xl border border-slate-200 hover:border-primary-200 hover:shadow-md transition-all">
-                <span className="text-3xl">{f.emoji}</span>
-                <h3 className="font-semibold text-slate-900 mt-3 mb-2">{f.title}</h3>
-                <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
+                className="group rounded-2xl p-6 text-center bg-sand-200/70 hover:bg-brand-500 transition-colors duration-300 cursor-default">
+                <div className="relative w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                  <FintoIcon name={f.icon} variant="navy" size={40} className="transition-opacity duration-300 group-hover:opacity-0" />
+                  <FintoIcon name={f.icon} variant="white" size={40} className="absolute opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                </div>
+                <h3 className="font-display font-bold mb-2 text-brand-600 group-hover:text-cream-100 transition-colors duration-300">{f.title}</h3>
+                <p className="text-sm leading-relaxed text-navy-900/55 group-hover:text-cream-100/85 transition-colors duration-300">{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── CTA ────────────────────────────────────────────────────────────── */}
-      <section id="contacto" className="py-24 bg-primary-600">
+      {/* ── CTA ────────────────────────────────────────────────── */}
+      <section id="contacto" className="relative overflow-hidden py-20 md:py-28 bg-gradient-to-br from-navy-900 to-brand-700">
         <div className="max-w-3xl mx-auto px-6 text-center">
-          <p className="text-sm font-semibold text-primary-200 uppercase tracking-wider mb-4">Comience hoy</p>
-          <h2 className="text-4xl font-bold text-white mb-4">
-            ¿Listo para ordenar<br />el back office de su empresa?
+          <p className="text-xs font-bold text-cream-100 uppercase tracking-[0.2em] mb-4">Comience hoy</p>
+          <h2 className="font-display text-3xl md:text-5xl font-bold text-gold-500 mb-5 leading-tight">
+            ¿Listo para hacer<br />crecer su empresa?
           </h2>
-          <p className="text-primary-100 mb-10 text-lg leading-relaxed">
-            Contáctenos y en menos de 48 horas tendrá una propuesta<br className="hidden sm:block" />
-            personalizada para su negocio.
+          <p className="text-cream-100/70 mb-10 text-base md:text-lg leading-relaxed">
+            Contáctenos y en menos de 48 horas tendrá una propuesta personalizada para su negocio.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/register"
-              className="inline-flex items-center justify-center gap-2 bg-white text-primary-700 px-8 py-3.5 rounded-xl font-semibold hover:bg-primary-50 transition-colors shadow-lg">
-              Registrar mi empresa →
+              className="inline-flex items-center justify-center gap-2 font-display font-semibold border border-cream-100/40 text-cream-100 px-8 py-3.5 rounded-full hover:bg-white/10 transition-colors">
+              Solicitar una propuesta
             </Link>
-            <a href="tel:+57"
-              className="inline-flex items-center justify-center gap-2 border border-white/30 text-white px-8 py-3.5 rounded-xl font-semibold hover:bg-white/10 transition-colors">
-              <Phone className="w-4 h-4" /> Llamar ahora
+            <a href="#contacto"
+              className="inline-flex items-center justify-center gap-2 font-display font-semibold bg-cream-100 text-navy-900 px-8 py-3.5 rounded-full hover:bg-cream-50 transition-colors">
+              Hablar con un asesor
             </a>
           </div>
         </div>
       </section>
 
-      {/* ── Footer ─────────────────────────────────────────────────────────── */}
-      <footer className="bg-slate-900 text-slate-400 py-14">
+      {/* ── Footer ─────────────────────────────────────────────── */}
+      <footer className="bg-navy-950 text-cream-100/60 py-14">
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between gap-10 mb-10">
-            {/* Brand */}
             <div className="max-w-xs">
-              <div className="flex items-center gap-2.5 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center shrink-0">
-                  <span className="text-white font-bold text-xs">F</span>
-                </div>
-                <div>
-                  <p className="font-semibold text-white text-sm leading-tight">Finto</p>
-                  <p className="text-[10px] text-slate-400 leading-tight">Gestión Empresarial</p>
-                </div>
-              </div>
+              <FintoLogo variant="white" height={26} className="mb-4" />
               <p className="text-sm leading-relaxed">
-                Soluciones integrales de back office para empresas colombianas.
-                Confianza, precisión y tecnología al servicio de su crecimiento.
+                Soluciones integrales de back office para empresas colombianas. Confianza, precisión
+                y tecnología al servicio de su crecimiento.
               </p>
             </div>
-
-            {/* Links */}
             <div className="grid grid-cols-3 gap-8 text-sm">
               <div>
-                <p className="text-white font-medium mb-3">Servicios</p>
+                <p className="text-cream-100 font-semibold mb-3">Servicios</p>
                 {['Contabilidad', 'Tesorería', 'Facturación', 'Cartera', 'Gestión de Personal'].map(l => (
-                  <p key={l} className="mb-2 hover:text-white cursor-pointer transition-colors">{l}</p>
+                  <p key={l} className="mb-2 hover:text-cream-100 cursor-pointer transition-colors">{l}</p>
                 ))}
               </div>
               <div>
-                <p className="text-white font-medium mb-3">Portal</p>
+                <p className="text-cream-100 font-semibold mb-3">Portal</p>
                 {['Acceder', 'Solicitar acceso', 'Soporte técnico', 'Manual de usuario'].map(l => (
-                  <p key={l} className="mb-2 hover:text-white cursor-pointer transition-colors">{l}</p>
+                  <p key={l} className="mb-2 hover:text-cream-100 cursor-pointer transition-colors">{l}</p>
                 ))}
               </div>
               <div>
-                <p className="text-white font-medium mb-3">Empresa</p>
+                <p className="text-cream-100 font-semibold mb-3">Empresa</p>
                 {['Nosotros', 'Equipo', 'Contacto', 'Política de privacidad'].map(l => (
-                  <p key={l} className="mb-2 hover:text-white cursor-pointer transition-colors">{l}</p>
+                  <p key={l} className="mb-2 hover:text-cream-100 cursor-pointer transition-colors">{l}</p>
                 ))}
               </div>
             </div>
           </div>
-
-          <div className="border-t border-slate-800 pt-6 flex flex-col md:flex-row justify-between items-center gap-2 text-xs">
-            <p>© 2025 Finto. Todos los derechos reservados.</p>
+          <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-2 text-xs">
+            <p>© {new Date().getFullYear()} Finto. Todos los derechos reservados.</p>
             <p>Bogotá, Colombia · finto@finto.la</p>
           </div>
         </div>

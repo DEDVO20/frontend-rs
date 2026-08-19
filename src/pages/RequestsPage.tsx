@@ -5,7 +5,11 @@ import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { PageLoader } from '@/components/ui/Spinner'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { toast } from 'sonner'
+
+// Estados finales: una vez la solicitud queda en uno de ellos, su estado se bloquea.
+const TERMINAL_STATUSES = ['resolved', 'closed', 'cancelled']
 import {
   Plus, Search, Eye, Trash2, X, Paperclip, FileText,
 } from 'lucide-react'
@@ -68,6 +72,8 @@ export function RequestsPage() {
   const inProgressCount = allRequests.filter(r => r.status === 'in_progress').length
   const resolvedCount   = allRequests.filter(r => r.status === 'resolved' || r.status === 'closed').length
 
+  const confirm = useConfirm()
+
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       await api.patch(`/api/requests/${id}`, { status })
@@ -75,6 +81,22 @@ export function RequestsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['requests'] }); toast.success('Estado actualizado') },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error'),
   })
+
+  // Todo cambio de estado pide confirmación; los estados finales avisan que es irreversible.
+  const requestStatusChange = (id: string, current: string, newStatus: string) => {
+    if (!newStatus || newStatus === current) return
+    const label = STATUS_MAP[newStatus]?.label ?? newStatus
+    const targetIsTerminal = TERMINAL_STATUSES.includes(newStatus)
+    confirm({
+      title: `¿Cambiar el estado a "${label}"?`,
+      description: targetIsTerminal
+        ? 'Es un estado final: una vez aplicado, no podrás volver a cambiar el estado de la solicitud.'
+        : undefined,
+      type: targetIsTerminal ? 'warning' : 'info',
+      confirmLabel: 'Cambiar estado',
+      onConfirm: () => updateStatus.mutate({ id, status: newStatus }),
+    })
+  }
 
   const companyName = (id: string) => companies.find(c => c.id === id)?.name ?? '—'
 
@@ -201,15 +223,22 @@ export function RequestsPage() {
                           {r.operational_request_types?.name ?? '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <select
-                            value={r.status}
-                            onChange={e => updateStatus.mutate({ id: r.id, status: e.target.value })}
-                            className="text-xs font-medium border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                          >
-                            {Object.entries(STATUS_MAP).map(([k, v]) => (
-                              <option key={k} value={k}>{v.label}</option>
-                            ))}
-                          </select>
+                          {TERMINAL_STATUSES.includes(r.status) ? (
+                            <Badge
+                              label={STATUS_MAP[r.status]?.label ?? r.status}
+                              color={STATUS_MAP[r.status]?.color ?? 'gray'}
+                            />
+                          ) : (
+                            <select
+                              value={r.status}
+                              onChange={e => requestStatusChange(r.id, r.status, e.target.value)}
+                              className="text-xs font-medium border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                            >
+                              {Object.entries(STATUS_MAP).map(([k, v]) => (
+                                <option key={k} value={k}>{v.label}</option>
+                              ))}
+                            </select>
+                          )}
                         </td>
                         <td className="px-4 py-3">
                           <Badge label={pr.label} color={pr.color} />
