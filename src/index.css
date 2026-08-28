@@ -72,7 +72,59 @@
   #root { @apply min-h-screen; }
 }
 
+/* ===== Barras de desplazamiento (horizontal y vertical) ===== */
+@layer base {
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;   /* thumb · track */
+  }
+
+  /* WebKit / Chromium — thumb tipo "píldora" con padding transparente */
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;              /* slate-300 */
+    border-radius: 9999px;
+    border: 3px solid transparent;          /* deja aire alrededor → se ve delgada */
+    background-clip: content-box;
+    transition: background-color .15s ease;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;              /* slate-400 */
+  }
+  ::-webkit-scrollbar-thumb:active {
+    background-color: #3d6bc1;              /* azul de marca al arrastrar */
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Modo oscuro */
+  [data-theme="dark"] * {
+    scrollbar-color: #3a4763 transparent;
+  }
+  [data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background-color: #3a4763;
+  }
+  [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background-color: #4b5b7e;
+  }
+  [data-theme="dark"] ::-webkit-scrollbar-thumb:active {
+    background-color: #5c86d0;
+  }
+}
+
 /* Utilidad para titulares con la tipografía display de Finto */
 @layer utilities {
   .font-display { font-family: var(--font-display); }
+
+  /* Scrollbar más delgada para contenedores internos (tablas, modales) */
+  .scrollbar-slim::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scrollbar-slim::-webkit-scrollbar-thumb { border-width: 2px; }
 }

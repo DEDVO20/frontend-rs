@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useRef, type ReactNode, type DragEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
@@ -64,12 +64,17 @@ function DateFilter({ value, onChange }: { value: DateSel; onChange: (v: DateSel
             {/* Rango de fechas */}
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Rango de fechas</p>
-              <div className="flex items-center gap-1.5">
-                <input type="date" value={from} max={to || undefined} onChange={e => onChange({ year: '', month: '', from: e.target.value, to })}
-                  className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full" />
-                <span className="text-xs text-slate-400">–</span>
-                <input type="date" value={to} min={from || undefined} onChange={e => onChange({ year: '', month: '', from, to: e.target.value })}
-                  className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500 w-full" />
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 w-10 shrink-0">Desde</span>
+                  <input type="date" value={from} max={to || undefined} onChange={e => onChange({ year: '', month: '', from: e.target.value, to })}
+                    className="flex-1 min-w-0 text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-400 w-10 shrink-0">Hasta</span>
+                  <input type="date" value={to} min={from || undefined} onChange={e => onChange({ year: '', month: '', from, to: e.target.value })}
+                    className="flex-1 min-w-0 text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </label>
               </div>
             </div>
 
@@ -111,83 +116,94 @@ const STATUS_FILTERS: [string, string][] = [
   ['closed', 'Cerradas'],
 ]
 
-const RECON_OUTCOME: Record<string, { label: string; cls: string }> = {
-  created:        { label: 'Participación',  cls: 'bg-emerald-100 text-emerald-700' },
-  updated:        { label: 'Actualizada',    cls: 'bg-emerald-100 text-emerald-700' },
-  value_mismatch: { label: 'Difiere valor',  cls: 'bg-amber-100 text-amber-700' },
-  ambiguous:      { label: 'Ambigua',        cls: 'bg-amber-100 text-amber-700' },
-  no_config:      { label: 'Sin config',     cls: 'bg-slate-100 text-slate-500' },
-}
-
-function SiigoReconcileModal({ onClose }: { onClose: () => void }) {
+function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
-  const [sales, setSales] = useState<File | null>(null)
-  const [receipts, setReceipts] = useState<File | null>(null)
+  const [file, setFile] = useState<File | null>(null)
   const [report, setReport] = useState<any | null>(null)
+  const [dragging, setDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const ACCEPT = ['.xlsx', '.xls', '.csv']
+  const pickFile = (f: File | null | undefined) => {
+    if (!f) return
+    const ok = ACCEPT.some(ext => f.name.toLowerCase().endsWith(ext))
+    if (!ok) { toast.error('Formato no válido. Usa un archivo .xlsx, .xls o .csv'); return }
+    setFile(f)
+    setReport(null)
+  }
+  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    setDragging(false)
+    pickFile(e.dataTransfer.files?.[0])
+  }
 
   const run = async (apply: boolean) => {
     const fd = new FormData()
-    fd.append('file_sales', sales!)
-    fd.append('file_receipts', receipts!)
+    fd.append('file', file!)
     fd.append('apply', String(apply))
-    const { data } = await api.post('/api/participations/process-siigo', fd, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const { data } = await api.post('/api/participations/import-consolidado', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     return data
   }
-
   const previewMut = useMutation({
     mutationFn: () => run(false),
     onSuccess: (d: any) => setReport(d),
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al procesar'),
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al leer'),
   })
-
   const applyMut = useMutation({
     mutationFn: () => run(true),
     onSuccess: (d: any) => {
       const s = d.summary ?? {}
-      toast.success(`${s.created ?? 0} creada(s), ${s.updated ?? 0} actualizada(s) desde SIIGO`)
+      toast.success(`${s.created ?? 0} creada(s), ${s.updated ?? 0} actualizada(s)${s.attached ? `, ${s.attached} en OC del mes` : ''} desde el informe`)
       qc.invalidateQueries({ queryKey: ['participations'] })
       onClose()
     },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al aplicar'),
   })
-
   const s = report?.summary
-  const canRun = !!sales && !!receipts
+  const OUT: Record<string, { label: string; cls: string }> = {
+    matched:       { label: 'Con participación', cls: 'bg-emerald-100 text-emerald-700' },
+    ambiguous:     { label: 'Ambigua',           cls: 'bg-amber-100 text-amber-700' },
+    multi_tercero: { label: 'Varios terceros',   cls: 'bg-amber-100 text-amber-700' },
+    no_config:     { label: 'Sin config',        cls: 'bg-slate-100 text-slate-500' },
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Importar ventas y recaudo (SIIGO)</h3>
-            <p className="text-xs text-slate-400">Cada factura que cruza con una participación configurada crea su participación; el recibo determina el recaudo y lo disponible para el tercero.</p>
+            <h3 className="text-base font-bold text-slate-900">Importar informe consolidado</h3>
+            <p className="text-xs text-slate-400">Un solo archivo con ventas, recaudo y pagos al tercero ya cruzados. Cada factura que cruza con una participación configurada se crea o actualiza con los valores del informe. Reemplaza subir los reportes por separado.</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
         </div>
-
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Ventas por vendedor (facturas Finto)</label>
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={e => { setSales(e.target.files?.[0] ?? null); setReport(null) }}
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Recibos de caja detallado por facturas</label>
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={e => { setReceipts(e.target.files?.[0] ?? null); setReport(null) }}
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
-            </div>
+        <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-4">
+          <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
+            onChange={e => { pickFile(e.target.files?.[0]); e.target.value = '' }} />
+          <div
+            onClick={() => inputRef.current?.click()}
+            onDragOver={e => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={e => { e.preventDefault(); setDragging(false) }}
+            onDrop={onDrop}
+            className={`flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed px-6 py-8 text-center cursor-pointer transition-colors ${
+              dragging ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 bg-slate-50'
+            }`}
+          >
+            <Upload className={`w-6 h-6 ${dragging ? 'text-emerald-500' : 'text-slate-400'}`} />
+            {file ? (
+              <p className="text-sm font-medium text-slate-700">{file.name}</p>
+            ) : (
+              <p className="text-sm text-slate-500"><span className="font-semibold text-slate-700">Arrastra el archivo aquí</span> o haz clic para elegirlo</p>
+            )}
+            <p className="text-[11px] text-slate-400">.xlsx, .xls o .csv</p>
           </div>
-
           {s && (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
+                  { label: 'Facturas', value: s.invoices, cls: 'text-slate-700' },
                   { label: 'Con participación', value: s.matched, cls: 'text-emerald-600' },
-                  { label: 'Difieren valor', value: s.value_mismatch, cls: 'text-amber-600' },
                   { label: 'Ambiguas', value: s.ambiguous, cls: 'text-amber-600' },
                   { label: 'Sin config', value: s.no_config, cls: 'text-slate-500' },
                 ].map(k => (
@@ -198,145 +214,36 @@ function SiigoReconcileModal({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
               <p className="text-[11px] text-slate-400">
-                Leídas {s.sales_rows} ventas y {s.receipt_rows} recibos.
-                {(s.invalid_sales > 0 || s.dup_receipts > 0) && (
-                  <span className="text-amber-600"> · {s.invalid_sales} venta(s) inválida(s), {s.dup_receipts} recibo(s) duplicado(s) ignorados.</span>
+                Leídas {s.lines} líneas del informe.
+                {s.multi_tercero > 0 && (
+                  <span className="text-amber-600"> · {s.multi_tercero} factura(s) con varios terceros: se escribe el primero (el modelo admite un tercero por factura).</span>
                 )}
               </p>
 
               <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                <div className="overflow-x-auto max-h-72 overflow-y-auto scrollbar-slim">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-slate-50">
                       <tr className="border-b border-slate-100">
-                        {['Factura', 'Cliente', 'Participación', 'Recaudado', 'Disponible', 'Resultado'].map(h => (
+                        {['Factura', 'Cliente', 'Tercero', 'Participación', 'Recaudado', 'Pagado', 'Resultado'].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {report.results.filter((r: any) => r.outcome !== 'no_config').map((r: any, i: number) => {
-                        const o = RECON_OUTCOME[r.outcome] ?? RECON_OUTCOME.no_config
+                        const o = OUT[r.outcome] ?? OUT.no_config
                         return (
                           <tr key={i} className="hover:bg-slate-50">
-                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.finto_invoice}</td>
-                            <td className="px-3 py-2 text-slate-700">{r.company}</td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.fv}</td>
+                            <td className="px-3 py-2 text-slate-700">{r.client}</td>
+                            <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.tercero}</td>
                             <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.participation_value != null ? fmtMoney(r.participation_value) : '—'}</td>
                             <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.collected != null ? fmtMoney(r.collected) : '—'}</td>
-                            <td className="px-3 py-2 text-emerald-700 whitespace-nowrap">{r.available != null ? fmtMoney(r.available) : '—'}</td>
-                            <td className="px-3 py-2">
-                              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${o.cls}`}>{o.label}</span>
-                              {r.note && <p className="text-[10px] text-slate-400 mt-0.5">{r.note}</p>}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <p className="text-[11px] text-amber-700">Crea/actualiza el lado del cliente (factura + recaudo). El lado del tercero (factura y pago) se hará en las siguientes etapas.</p>
-            </>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
-          <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-          <Button variant="secondary" disabled={!canRun} loading={previewMut.isPending} onClick={() => previewMut.mutate()}>
-            Previsualizar
-          </Button>
-          <Button disabled={!report || (s?.matched ?? 0) === 0} loading={applyMut.isPending} onClick={() => applyMut.mutate()}>
-            Aplicar {s ? `(${s.matched})` : ''}
-          </Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function EgresosImportModal({ onClose }: { onClose: () => void }) {
-  const qc = useQueryClient()
-  const [file, setFile] = useState<File | null>(null)
-  const [report, setReport] = useState<any | null>(null)
-
-  const run = async (apply: boolean) => {
-    const fd = new FormData()
-    fd.append('file', file!)
-    fd.append('apply', String(apply))
-    const { data } = await api.post('/api/participations/import-egresos', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-    return data
-  }
-  const previewMut = useMutation({
-    mutationFn: () => run(false),
-    onSuccess: (d: any) => setReport(d),
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al leer'),
-  })
-  const applyMut = useMutation({
-    mutationFn: () => run(true),
-    onSuccess: (d: any) => { toast.success(`${d.summary?.applied ?? 0} tercero(s) conciliado(s) y pagado(s)`); qc.invalidateQueries({ queryKey: ['participations'] }); onClose() },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al aplicar'),
-  })
-  const s = report?.summary
-  const OUT: Record<string, { label: string; cls: string }> = {
-    matched:        { label: 'Conciliado',    cls: 'bg-emerald-100 text-emerald-700' },
-    value_mismatch: { label: 'Difiere valor', cls: 'bg-amber-100 text-amber-700' },
-    ambiguous:      { label: 'Ambiguo',       cls: 'bg-amber-100 text-amber-700' },
-    not_found:      { label: 'Sin tercero',   cls: 'bg-slate-100 text-slate-500' },
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">Importar facturas y pagos de terceros (SIIGO)</h3>
-            <p className="text-xs text-slate-400">Reporte "Movimiento por cuenta contable" (RP). Registra la factura de compra (de la descripción) y el pago, cruzando por NIT del tercero + valor. Genera la Orden de Pago y cierra el ciclo.</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <input type="file" accept=".xlsx,.xls,.csv" onChange={e => { setFile(e.target.files?.[0] ?? null); setReport(null) }}
-            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
-          {s && (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  { label: 'Líneas', value: s.rows, cls: 'text-slate-700' },
-                  { label: 'Conciliados', value: s.matched, cls: 'text-emerald-600' },
-                  { label: 'Difieren valor', value: s.value_mismatch, cls: 'text-amber-600' },
-                  { label: 'Sin tercero', value: s.not_found, cls: 'text-slate-500' },
-                ].map(k => (
-                  <div key={k.label} className="bg-slate-50 rounded-lg p-2 text-center">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">{k.label}</p>
-                    <p className={`text-lg font-bold ${k.cls}`}>{k.value}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto max-h-72 overflow-y-auto">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-slate-50">
-                      <tr className="border-b border-slate-100">
-                        {['RP', 'Factura compra', 'Valor', 'Tercero', 'OC', 'Resultado'].map(h => (
-                          <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {report.results.map((r: any, i: number) => {
-                        const o = OUT[r.outcome] ?? OUT.not_found
-                        return (
-                          <tr key={i} className="hover:bg-slate-50">
-                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.rp}</td>
-                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.invoice}</td>
-                            <td className="px-3 py-2 text-slate-700 whitespace-nowrap">{fmtMoney(r.value)}</td>
-                            <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.tercero ?? `NIT ${r.nit ?? '—'}`}</td>
-                            <td className="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">{r.purchase_order ?? '—'}</td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.paid != null ? fmtMoney(r.paid) : '—'}</td>
                             <td className="px-3 py-2">
                               <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${o.cls}`}>{o.label}</span>
                               {r.note && <p className="text-[10px] text-amber-600 mt-0.5">{r.note}</p>}
-                              {r.payment_order && <p className="text-[10px] text-violet-600 mt-0.5">OP {r.payment_order}</p>}
                             </td>
                           </tr>
                         )
@@ -345,6 +252,7 @@ function EgresosImportModal({ onClose }: { onClose: () => void }) {
                   </table>
                 </div>
               </div>
+              <p className="text-[11px] text-amber-700">Al aplicar, cada factura del informe se crea o <b>reemplaza</b> (recaudo, disponible y pagos) manteniendo su OC. Las facturas anteriores que no estén en el informe no se tocan.</p>
             </>
           )}
         </div>
@@ -352,7 +260,7 @@ function EgresosImportModal({ onClose }: { onClose: () => void }) {
           <Button variant="secondary" onClick={onClose}>Cerrar</Button>
           <Button variant="secondary" disabled={!file} loading={previewMut.isPending} onClick={() => previewMut.mutate()}>Previsualizar</Button>
           <Button disabled={!report || (s?.matched ?? 0) === 0} loading={applyMut.isPending} onClick={() => applyMut.mutate()}>
-            Conciliar y pagar {s ? `(${s.matched})` : ''}
+            Aplicar {s ? `(${s.matched})` : ''}
           </Button>
         </div>
       </div>
@@ -366,6 +274,20 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
   const inv = Number(item.finto_invoice_value ?? 0)
   const collected = Number(item.collected ?? 0)
   const pct = inv > 0 ? Math.round(collected / inv * 100) : 0
+
+  // Una etapa se marca "hecha" por su dato propio o porque el estado ya avanzó
+  // más allá de ella. El informe consolidado va venta → recaudo → pago sin
+  // registrar la factura de compra/OP (etapa 4), así que sin esto una
+  // participación pagada mostraría etapas previas como incompletas.
+  const RANK: Record<string, number> = {
+    pending_invoice: 1, invoiced: 2, partial_collection: 2,
+    available: 3, payment_in_process: 4, paid: 5, closed: 5,
+  }
+  const rank = RANK[item.status] ?? 2
+  const saleDone      = rank >= 2 || !!item.finto_invoice
+  const collectDone   = rank >= 3 || (inv > 0 && collected + 0.01 >= inv)
+  const purchaseDone  = rank >= 4 || !!item.third_party_invoice || !!item.payment_order
+  const paymentDone   = rank >= 5 || !!item.egress_voucher
 
   const Field = ({ label, value, mono }: { label: string; value: any; mono?: boolean }) => (
     <div className="flex justify-between gap-4 py-1">
@@ -399,7 +321,7 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
+        <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-3">
           <Stage n={1} title="Generación · OC" done>
             <Field label="Orden de compra" value={item.purchase_order} mono />
             <Field label="Periodo" value={item.period ?? '—'} />
@@ -407,25 +329,25 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
             <Field label="Participación causada" value={fmtMoney(Number(item.participation_value ?? 0))} />
           </Stage>
 
-          <Stage n={2} title="Venta (factura Finto)" done={!!item.finto_invoice}>
+          <Stage n={2} title="Venta (factura Finto)" done={saleDone}>
             <Field label="Factura de venta" value={item.finto_invoice ?? 'Pendiente'} />
             <Field label="Fecha" value={item.finto_invoice_date ?? '—'} />
             <Field label="Valor factura" value={fmtMoney(inv)} />
           </Stage>
 
-          <Stage n={3} title="Recaudo del cliente (CxC)" done={collected > 0 && collected + 0.01 >= inv}>
+          <Stage n={3} title="Recaudo del cliente (CxC)" done={collectDone}>
             <Field label="Recibos de caja" value={item.cash_receipts ?? '—'} />
             <Field label="Recaudado" value={`${fmtMoney(collected)}${inv > 0 ? ` · ${pct}%` : ''}`} />
             <Field label="Disponible para el tercero" value={fmtMoney(Number(item.available_for_payment ?? 0))} />
           </Stage>
 
-          <Stage n={4} title="Factura de compra + Orden de Pago" done={!!item.third_party_invoice}>
-            <Field label="Factura del tercero" value={item.third_party_invoice ?? 'Pendiente'} />
+          <Stage n={4} title="Factura de compra + Orden de Pago" done={purchaseDone}>
+            <Field label="Factura del tercero" value={item.third_party_invoice ?? (purchaseDone ? 'No registrada (pago directo)' : 'Pendiente')} />
             <Field label="Valor" value={item.third_party_invoice_value != null ? fmtMoney(Number(item.third_party_invoice_value)) : '—'} />
             <Field label="Orden de pago" value={item.payment_order ?? '—'} mono />
           </Stage>
 
-          <Stage n={5} title="Pago al tercero (egreso)" done={!!item.egress_voucher}>
+          <Stage n={5} title="Pago al tercero (egreso)" done={paymentDone}>
             <Field label="Comprobante de egreso" value={item.egress_voucher ?? 'Pendiente'} />
             <Field label="Fecha" value={item.egress_voucher_date ?? '—'} />
             <Field label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
@@ -502,7 +424,7 @@ function ThirdPartyPaymentModal({ item, onClose }: { item: any; onClose: () => v
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-5">
           <div className="grid grid-cols-3 gap-3 text-center">
             <div className="bg-slate-50 rounded-lg p-2">
               <p className="text-[10px] font-bold text-slate-400 uppercase">Causado</p>
@@ -567,6 +489,83 @@ function ThirdPartyPaymentModal({ item, onClose }: { item: any; onClose: () => v
   )
 }
 
+function BalanceDetailModal({ kind, row, onClose }: { kind: 'cxc' | 'cxp'; row: any; onClose: () => void }) {
+  const isCxc = kind === 'cxc'
+  const items: any[] = row.items ?? []
+  const headers = isCxc
+    ? ['OC', 'Periodo', 'Factura', 'Facturado', 'Recaudado', 'Saldo']
+    : ['OC', 'Periodo', 'Cliente', 'Factura', 'Causado', 'Disponible', 'Pagado', 'Por pagar']
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">
+              {isCxc ? `Nos deben — ${row.client}` : `Debemos — ${row.third_party}`}
+            </h3>
+            <p className="text-xs text-slate-400">
+              {isCxc
+                ? `Saldo por cobrar ${fmtMoney(row.outstanding)} · facturado ${fmtMoney(row.invoiced)} − recaudado ${fmtMoney(row.collected)}`
+                : `Por pagar ${fmtMoney(row.owed)} · ${row.nit ? `NIT ${row.nit} · ` : ''}pagado ${fmtMoney(row.paid)}`}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-3">
+          <p className="text-[11px] text-slate-500">
+            {isCxc
+              ? 'Nos deben porque estas facturas emitidas aún no se recaudan por completo. Saldo = Facturado − Recaudado.'
+              : 'Debemos porque estas participaciones ya están recaudadas (disponibles) y aún no se pagan al tercero. Por pagar = Disponible − Pagado.'}
+          </p>
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            <div className="overflow-x-auto max-h-96 overflow-y-auto scrollbar-slim">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-slate-50">
+                  <tr className="border-b border-slate-100">
+                    {headers.map(h => (
+                      <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {items.map((it: any, i: number) => (
+                    <tr key={i} className="hover:bg-slate-50">
+                      <td className="px-3 py-2 font-mono text-[11px] text-slate-500 whitespace-nowrap">{it.purchase_order}</td>
+                      <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{it.period}</td>
+                      {isCxc ? (
+                        <>
+                          <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{it.finto_invoice ?? '—'}</td>
+                          <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{fmtMoney(it.invoiced)}</td>
+                          <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{fmtMoney(it.collected)}</td>
+                          <td className={`px-3 py-2 font-semibold whitespace-nowrap ${it.outstanding > 0 ? 'text-blue-700' : 'text-slate-400'}`}>{fmtMoney(it.outstanding)}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-3 py-2 text-slate-600">{it.client}</td>
+                          <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{it.finto_invoice ?? '—'}</td>
+                          <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{fmtMoney(it.participation_value)}</td>
+                          <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{fmtMoney(it.available)}</td>
+                          <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{fmtMoney(it.paid)}</td>
+                          <td className={`px-3 py-2 font-semibold whitespace-nowrap ${it.owed > 0 ? 'text-red-600' : 'text-slate-400'}`}>{fmtMoney(it.owed)}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end px-6 py-4 border-t border-slate-100 shrink-0">
+          <Button variant="secondary" onClick={onClose}>Cerrar</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BalancesPanel({ period, year, from, to }: { period: string; year: string; from: string; to: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ['participations', 'balances', period, year, from, to],
@@ -581,6 +580,8 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
     },
   })
 
+  const [detail, setDetail] = useState<{ kind: 'cxc' | 'cxp'; row: any } | null>(null)
+
   if (isLoading) return <div className="py-10"><PageLoader /></div>
   const s = data?.summary ?? {}
   const receivable: any[] = data?.receivable ?? []
@@ -589,8 +590,9 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
   return (
     <div className="space-y-4">
       {/* Tarjetas de saldo */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {[
+          { label: 'Participación causada', value: fmtMoney(s.participation_total ?? 0), cls: 'text-slate-900', sub: `${s.count ?? 0} OC · total causado` },
           { label: 'Nos deben (clientes)', value: fmtMoney(s.receivable_total ?? 0), cls: 'text-blue-700', sub: 'CxC · facturado sin recaudar' },
           { label: 'Debemos (terceros)', value: fmtMoney(s.payable_total ?? 0), cls: 'text-red-600', sub: 'CxP · disponible sin pagar' },
           { label: 'Disponible para pago', value: fmtMoney(s.available_total ?? 0), cls: 'text-emerald-700', sub: 'recaudado a favor del tercero' },
@@ -611,7 +613,7 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
             <h3 className="text-sm font-bold text-slate-900">Lo que nos deben — clientes</h3>
             <span className="text-xs font-semibold text-blue-700">{fmtMoney(s.receivable_total ?? 0)}</span>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-slim">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
@@ -622,7 +624,7 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {receivable.map((r: any, i: number) => (
-                  <tr key={i} className="hover:bg-slate-50">
+                  <tr key={i} className="hover:bg-blue-50 cursor-pointer" onClick={() => setDetail({ kind: 'cxc', row: r })} title="Ver detalle">
                     <td className="px-3 py-2 text-slate-700">{r.client}</td>
                     <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{fmtMoney(r.invoiced)}</td>
                     <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{fmtMoney(r.collected)}</td>
@@ -641,7 +643,7 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
             <h3 className="text-sm font-bold text-slate-900">Lo que debemos — terceros</h3>
             <span className="text-xs font-semibold text-red-600">{fmtMoney(s.payable_total ?? 0)}</span>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto scrollbar-slim">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
@@ -652,7 +654,7 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {payable.map((r: any, i: number) => (
-                  <tr key={i} className="hover:bg-slate-50">
+                  <tr key={i} className="hover:bg-red-50 cursor-pointer" onClick={() => setDetail({ kind: 'cxp', row: r })} title="Ver detalle">
                     <td className="px-3 py-2 text-slate-700">{r.third_party}</td>
                     <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.nit || '—'}</td>
                     <td className="px-3 py-2 font-semibold text-red-600 whitespace-nowrap">{fmtMoney(r.owed)}</td>
@@ -665,6 +667,8 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
           </div>
         </div>
       </div>
+
+      {detail && <BalanceDetailModal kind={detail.kind} row={detail.row} onClose={() => setDetail(null)} />}
     </div>
   )
 }
@@ -682,8 +686,7 @@ export function ParticipationsPage() {
   const [fromF, setFromF] = useState('')
   const [toF, setToF] = useState('')
   const [page, setPage] = useState(1)
-  const [showSiigo, setShowSiigo] = useState(false)
-  const [showEgresos, setShowEgresos] = useState(false)
+  const [showConsolidado, setShowConsolidado] = useState(false)
   const [payItem, setPayItem] = useState<any | null>(null)
   const [detailItem, setDetailItem] = useState<any | null>(null)
   const [downloading, setDownloading] = useState(false)
@@ -762,7 +765,7 @@ export function ParticipationsPage() {
     <div className="flex flex-col h-full overflow-hidden">
       <TopBar title="Participaciones" subtitle="Participación de terceros en la facturación" />
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto scrollbar-slim p-4 md:p-6 space-y-4">
         {/* Vista: Resumen (panel) / Detalle (lista) */}
         <div className="flex gap-1 border-b border-slate-200">
           {([['panel', 'Resumen'], ['list', 'Detalle']] as const).map(([k, l]) => (
@@ -812,13 +815,8 @@ export function ParticipationsPage() {
             </Button>
           )}
           {isAdmin && (
-            <Button size="sm" variant="secondary" onClick={() => setShowSiigo(true)}>
-              <Upload className="w-3.5 h-3.5" /> Ventas y recaudo
-            </Button>
-          )}
-          {isAdmin && (
-            <Button size="sm" variant="secondary" onClick={() => setShowEgresos(true)}>
-              <Upload className="w-3.5 h-3.5" /> Facturas y pagos de terceros
+            <Button size="sm" onClick={() => setShowConsolidado(true)} title="Un solo archivo: ventas + recaudo + pagos ya cruzados">
+              <Upload className="w-3.5 h-3.5" /> Importar informe
             </Button>
           )}
         </div>
@@ -847,7 +845,7 @@ export function ParticipationsPage() {
           {isLoading ? (
             <div className="py-10"><PageLoader /></div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto scrollbar-slim">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
@@ -894,7 +892,7 @@ export function ParticipationsPage() {
               </table>
               {!rows.length && (
                 <p className="px-4 py-12 text-center text-slate-400 text-sm">
-                  No hay participaciones por factura. {isAdmin && 'Usa "Ventas y recaudo" para crearlas desde las facturas.'}
+                  No hay participaciones por factura. {isAdmin && 'Usa "Importar informe" para crearlas desde el informe consolidado.'}
                 </p>
               )}
             </div>
@@ -912,8 +910,7 @@ export function ParticipationsPage() {
         </>)}
       </div>
 
-      {showSiigo && <SiigoReconcileModal onClose={() => setShowSiigo(false)} />}
-      {showEgresos && <EgresosImportModal onClose={() => setShowEgresos(false)} />}
+      {showConsolidado && <ConsolidatedImportModal onClose={() => setShowConsolidado(false)} />}
       {payItem && <ThirdPartyPaymentModal item={payItem} onClose={() => setPayItem(null)} />}
       {detailItem && <ParticipationDetailModal item={detailItem} onClose={() => setDetailItem(null)} />}
     </div>

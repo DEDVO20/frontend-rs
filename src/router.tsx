@@ -20,6 +20,7 @@ import { DocumentsPage } from '@/pages/DocumentsPage'
 import { ClientDocumentsPage } from '@/pages/client/ClientDocumentsPage'
 import { CompaniesPage } from '@/pages/CompaniesPage'
 import { ProfilesPage } from '@/pages/ProfilesPage'
+import { RolesPage } from '@/pages/RolesPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { RequestsPage } from '@/pages/RequestsPage'
 import { ClientRequestsPage } from '@/pages/client/ClientRequestsPage'
@@ -90,6 +91,7 @@ export const router = createBrowserRouter([
       { path: 'dashboards-bi', element: <DashboardsBIPage /> },
       { path: 'task-templates', element: <TaskTemplatesPage /> },
       { path: 'profiles',     element: <ProfilesPage /> },
+      { path: 'roles',        element: <RolesPage /> },
       { path: 'audit',        element: <AuditPage /> },
       { path: 'settings',     element: <SettingsPage /> },
       { path: '*',            element: <NotFoundPage /> },

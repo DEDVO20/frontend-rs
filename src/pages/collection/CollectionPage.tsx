@@ -207,6 +207,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
         channel,
         message_template: message,
         ...(channel === 'whatsapp' && isZavuTpl && { zavu_template_id: selectedTpl.zavu_id }),
+        ...(channel === 'email' && selectedTpl?.image_url && { image_url: selectedTpl.image_url }),
         debtor_ids: targets.map(d => d.id),
         company_id: companyId,
       })
@@ -392,6 +393,10 @@ function MasivoPanel({ companyId }: { companyId: string }) {
                 <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
                   {renderPreview(message, firstTarget)}
                 </p>
+                {channel === 'email' && selectedTpl?.image_url && (
+                  <img src={selectedTpl.image_url} alt="Imagen adjunta"
+                    className="mt-2 max-h-40 rounded-lg border border-slate-200 object-contain" />
+                )}
               </div>
             ) : (
               <p className="text-xs text-slate-400 italic">
@@ -485,7 +490,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
 
 // ── Template modal ─────────────────────────────────────────────────────────────
 
-const EMPTY_FORM = { name: '', channel: 'whatsapp', tramo_min: '', content: '', active: true, company_id: '' }
+const EMPTY_FORM = { name: '', channel: 'whatsapp', tramo_min: '', content: '', active: true, company_id: '', image_url: '' }
 const VARS = ['{{nombre}}', '{{saldo}}', '{{empresa}}', '{{dias_mora}}', '{{asesor}}', '{{facturas}}']
 
 function TemplateModal({ editing, onClose, onSaved }: {
@@ -495,10 +500,30 @@ function TemplateModal({ editing, onClose, onSaved }: {
 }) {
   const [form, setForm] = useState(() =>
     editing
-      ? { name: editing.name ?? '', channel: editing.channel ?? 'whatsapp', tramo_min: editing.tramo != null ? String(editing.tramo) : '', content: editing.body ?? editing.content ?? '', active: editing.is_active !== false, company_id: editing.company_id ?? '' }
+      ? { name: editing.name ?? '', channel: editing.channel ?? 'whatsapp', tramo_min: editing.tramo != null ? String(editing.tramo) : '', content: editing.body ?? editing.content ?? '', active: editing.is_active !== false, company_id: editing.company_id ?? '', image_url: editing.image_url ?? '' }
       : EMPTY_FORM
   )
   const [saving, setSaving] = useState(false)
+  const [uploadingImg, setUploadingImg] = useState(false)
+  const imgInputRef = useRef<HTMLInputElement>(null)
+
+  const uploadImage = async (file: File) => {
+    if (!file.type.startsWith('image/')) { toast.error('Selecciona una imagen (JPG, PNG, WEBP o GIF)'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('La imagen supera el límite de 5 MB'); return }
+    setUploadingImg(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      if (form.company_id) fd.append('company_id', form.company_id)
+      const { data } = await api.post('/api/collection/templates/upload-image', fd)
+      setForm(f => ({ ...f, image_url: data.url }))
+      toast.success('Imagen cargada')
+    } catch (e: any) {
+      toast.error(e.response?.data?.error ?? 'Error al subir la imagen')
+    } finally {
+      setUploadingImg(false)
+    }
+  }
 
   const { data: companiesData } = useQuery({
     queryKey: ['companies-list'],
@@ -527,6 +552,8 @@ function TemplateModal({ editing, onClose, onSaved }: {
         body: form.content.trim(),
         tramo: tramoNum,
         is_active: form.active,
+        // Imagen adjunta (solo se envía en el canal email)
+        image_url: form.image_url || null,
         // Sin empresa = plantilla global; con empresa = personalizada
         company_id: form.company_id || null,
         is_global: !form.company_id,
@@ -667,6 +694,44 @@ function TemplateModal({ editing, onClose, onSaved }: {
             <p className="text-xs text-slate-400 text-right mt-1">{form.content.length} caracteres</p>
           </div>
 
+          {/* Imagen adjunta (solo email) */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-600">Imagen adjunta</label>
+              <span className="text-[10px] text-slate-400">Solo se envía por email · máx. 5 MB</span>
+            </div>
+            {form.image_url ? (
+              <div className="relative inline-block">
+                <img src={form.image_url} alt="Imagen de la plantilla"
+                  className="max-h-40 rounded-lg border border-slate-200 object-contain" />
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, image_url: '' }))}
+                  className="absolute -top-2 -right-2 bg-white border border-slate-200 rounded-full p-1 shadow-sm text-slate-400 hover:text-red-500"
+                  title="Quitar imagen">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button type="button"
+                onClick={() => imgInputRef.current?.click()}
+                disabled={uploadingImg}
+                className="w-full border-2 border-dashed border-slate-300 rounded-xl py-6 text-center hover:border-primary-400 hover:bg-primary-50/40 transition-colors disabled:opacity-60">
+                <div className="text-2xl mb-1">🖼️</div>
+                <p className="text-xs font-medium text-slate-600">
+                  {uploadingImg ? 'Subiendo…' : 'Haz clic para subir una imagen'}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, WEBP o GIF</p>
+              </button>
+            )}
+            <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.target.value = '' }} />
+            {form.channel !== 'email' && form.image_url && (
+              <p className="text-[11px] text-amber-600 mt-1.5">
+                ⚠️ La imagen solo se envía cuando el canal es Email. Este canal ({form.channel}) enviará solo el texto.
+              </p>
+            )}
+          </div>
+
           {/* Activa */}
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={form.active}
@@ -754,6 +819,9 @@ function PlantillasPanel() {
                         <span className="font-medium text-slate-900">{t.name}</span>
                         {isZavu && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">Zavu</span>
+                        )}
+                        {t.image_url && (
+                          <span className="text-[10px]" title="Incluye imagen">🖼️</span>
                         )}
                       </div>
                       {isZavu && t.variables?.length > 0 && (
