@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
-import { X, Upload, Download, CheckCircle2, CalendarPlus, Filter, ChevronDown, Calendar } from 'lucide-react'
+import { X, Upload, Download, CheckCircle2, CalendarPlus, Filter, ChevronDown, Calendar, SlidersHorizontal } from 'lucide-react'
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
@@ -95,28 +95,25 @@ function fmtMoney(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n ?? 0)
 }
 
-// Estados del modelo por factura
+// Estados de la relación (spec §15)
 const INV_STATUS: Record<string, { label: string; cls: string }> = {
-  pending_invoice:    { label: 'Pendiente de factura', cls: 'bg-slate-100 text-slate-500' },
-  invoiced:           { label: 'Facturada',           cls: 'bg-slate-100 text-slate-600' },
-  partial_collection: { label: 'Recaudo parcial',     cls: 'bg-amber-100 text-amber-700' },
-  available:          { label: 'Disponible para pago', cls: 'bg-blue-100 text-blue-700' },
-  payment_in_process: { label: 'Pago en proceso',     cls: 'bg-violet-100 text-violet-700' },
-  paid:               { label: 'Pagada',              cls: 'bg-emerald-100 text-emerald-700' },
-  closed:             { label: 'Cerrada',             cls: 'bg-emerald-100 text-emerald-700' },
+  pending_invoice:       { label: 'Pendiente de factura',     cls: 'bg-slate-100 text-slate-500' },
+  pending_third_invoice: { label: 'Pendiente factura tercero', cls: 'bg-amber-100 text-amber-700' },
+  value_difference:      { label: 'Diferencia de valor',      cls: 'bg-rose-100 text-rose-700' },
+  pending_payment:       { label: 'Pendiente de pago',        cls: 'bg-blue-100 text-blue-700' },
+  complete:              { label: 'Completa',                 cls: 'bg-emerald-100 text-emerald-700' },
 }
 
 const STATUS_FILTERS: [string, string][] = [
   ['', 'Todas'],
-  ['pending_invoice', 'Pendientes'],
-  ['invoiced', 'Facturadas'],
-  ['partial_collection', 'Recaudo parcial'],
-  ['available', 'Disponible para pago'],
-  ['paid', 'Pagadas'],
-  ['closed', 'Cerradas'],
+  ['pending_invoice', 'Pendiente de factura'],
+  ['pending_third_invoice', 'Pendiente factura tercero'],
+  ['value_difference', 'Diferencia de valor'],
+  ['pending_payment', 'Pendiente de pago'],
+  ['complete', 'Completas'],
 ]
 
-function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
+function MovimientoImportModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
   const [file, setFile] = useState<File | null>(null)
   const [report, setReport] = useState<any | null>(null)
@@ -141,7 +138,7 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
     const fd = new FormData()
     fd.append('file', file!)
     fd.append('apply', String(apply))
-    const { data } = await api.post('/api/participations/import-consolidado', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    const { data } = await api.post('/api/participations/import-movimiento', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
     return data
   }
   const previewMut = useMutation({
@@ -153,7 +150,12 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
     mutationFn: () => run(true),
     onSuccess: (d: any) => {
       const s = d.summary ?? {}
-      toast.success(`${s.created ?? 0} creada(s), ${s.updated ?? 0} actualizada(s)${s.attached ? `, ${s.attached} en OC del mes` : ''} desde el informe`)
+      const extra = [
+        s.recaudo_updated ? `${s.recaudo_updated} con recaudo` : '',
+        s.third_invoice_matched ? `${s.third_invoice_matched} factura tercero` : '',
+        s.paid_matched ? `${s.paid_matched} pagada(s)` : '',
+      ].filter(Boolean).join(', ')
+      toast.success(`${s.created ?? 0} creada(s), ${s.updated ?? 0} actualizada(s)${extra ? ` · ${extra}` : ''} desde el movimiento contable`)
       qc.invalidateQueries({ queryKey: ['participations'] })
       onClose()
     },
@@ -161,11 +163,12 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
   })
   const s = report?.summary
   const OUT: Record<string, { label: string; cls: string }> = {
-    matched:       { label: 'Con participación', cls: 'bg-emerald-100 text-emerald-700' },
-    ambiguous:     { label: 'Ambigua',           cls: 'bg-amber-100 text-amber-700' },
-    multi_tercero: { label: 'Varios terceros',   cls: 'bg-amber-100 text-amber-700' },
-    no_config:     { label: 'Sin config',        cls: 'bg-slate-100 text-slate-500' },
+    matched:   { label: 'Con participación', cls: 'bg-emerald-100 text-emerald-700' },
+    ambiguous: { label: 'Ambigua',           cls: 'bg-amber-100 text-amber-700' },
+    no_amount: { label: 'Sin monto',         cls: 'bg-amber-100 text-amber-700' },
+    no_config: { label: 'Sin config',        cls: 'bg-slate-100 text-slate-500' },
   }
+  const canApply = !!report && ((s?.matched ?? 0) > 0 || (s?.collections ?? 0) > 0 || (s?.third_invoices ?? 0) > 0 || (s?.payments ?? 0) > 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -173,8 +176,8 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
       <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div>
-            <h3 className="text-base font-bold text-slate-900">Importar informe consolidado</h3>
-            <p className="text-xs text-slate-400">Un solo archivo con ventas, recaudo y pagos al tercero ya cruzados. Cada factura que cruza con una participación configurada se crea o actualiza con los valores del informe. Reemplaza subir los reportes por separado.</p>
+            <h3 className="text-base font-bold text-slate-900">Importar movimiento contable</h3>
+            <p className="text-xs text-slate-400">Reporte "Movimiento por cuenta contable" — la fuente única del ciclo. Cada fila se clasifica por cuenta: <b>ventas</b> (41 → participación), <b>recaudo</b> (13050501), <b>factura del tercero</b> (2335) y <b>pago</b> (banco). Crea participaciones para los clientes con tercero configurado.</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
         </div>
@@ -202,7 +205,7 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { label: 'Facturas', value: s.invoices, cls: 'text-slate-700' },
+                  { label: 'Ventas', value: s.sales, cls: 'text-slate-700' },
                   { label: 'Con participación', value: s.matched, cls: 'text-emerald-600' },
                   { label: 'Ambiguas', value: s.ambiguous, cls: 'text-amber-600' },
                   { label: 'Sin config', value: s.no_config, cls: 'text-slate-500' },
@@ -214,10 +217,7 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
               <p className="text-[11px] text-slate-400">
-                Leídas {s.lines} líneas del informe.
-                {s.multi_tercero > 0 && (
-                  <span className="text-amber-600"> · {s.multi_tercero} factura(s) con varios terceros: se escribe el primero (el modelo admite un tercero por factura).</span>
-                )}
+                En el informe: recaudos (RC) <b className="text-slate-600">{s.collections ?? 0}</b> · notas crédito (NC) <b className="text-slate-600">{s.credit_notes ?? 0}</b> · facturas del tercero (FC) <b className="text-slate-600">{s.third_invoices ?? 0}</b> · pagos (RP) <b className="text-slate-600">{s.payments ?? 0}</b>. Se aplican los que cruzan con un cliente/tercero configurado.
               </p>
 
               <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -225,7 +225,7 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-slate-50">
                       <tr className="border-b border-slate-100">
-                        {['Factura', 'Cliente', 'Tercero', 'Participación', 'Recaudado', 'Pagado', 'Resultado'].map(h => (
+                        {['Factura', 'Cliente', 'Tercero', 'Tipo', 'Neto', 'Participación', 'Recaudado', 'Resultado'].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -233,14 +233,23 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
                     <tbody className="divide-y divide-slate-50">
                       {report.results.filter((r: any) => r.outcome !== 'no_config').map((r: any, i: number) => {
                         const o = OUT[r.outcome] ?? OUT.no_config
+                        const hasNote = (r.credit_note ?? 0) > 0 || (r.debit_note ?? 0) > 0
                         return (
                           <tr key={i} className="hover:bg-slate-50">
                             <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.fv}</td>
                             <td className="px-3 py-2 text-slate-700">{r.client}</td>
-                            <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.tercero}</td>
-                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.participation_value != null ? fmtMoney(r.participation_value) : '—'}</td>
-                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.collected != null ? fmtMoney(r.collected) : '—'}</td>
-                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.paid != null ? fmtMoney(r.paid) : '—'}</td>
+                            <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{r.tercero ?? '—'}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">
+                              {r.contract === 'mandato'
+                                ? <span className="text-[11px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">Mandato</span>
+                                : <span className="text-[11px] text-slate-400">Servicio</span>}
+                            </td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                              {r.net != null ? fmtMoney(r.net) : '—'}
+                              {hasNote && <span className="text-[10px] text-amber-600"> {(r.credit_note ?? 0) > 0 && `−${fmtMoney(r.credit_note)}`}{(r.debit_note ?? 0) > 0 && ` +${fmtMoney(r.debit_note)}`}</span>}
+                            </td>
+                            <td className="px-3 py-2 text-slate-700 font-medium whitespace-nowrap">{r.participation_value != null ? fmtMoney(r.participation_value) : '—'}</td>
+                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.collected ? fmtMoney(r.collected) : '—'}</td>
                             <td className="px-3 py-2">
                               <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${o.cls}`}>{o.label}</span>
                               {r.note && <p className="text-[10px] text-amber-600 mt-0.5">{r.note}</p>}
@@ -252,14 +261,37 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
                   </table>
                 </div>
               </div>
-              <p className="text-[11px] text-amber-700">Al aplicar, cada factura del informe se crea o <b>reemplaza</b> (recaudo, disponible y pagos) manteniendo su OC. Las facturas anteriores que no estén en el informe no se tocan.</p>
+              {([...(report.creditNotes ?? []).map((n: any) => ({ ...n, kind: 'NC' })), ...(report.debitNotes ?? []).map((n: any) => ({ ...n, kind: 'ND' }))]).length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
+                  <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider mb-1.5">Notas crédito / débito</p>
+                  <p className="text-[11px] text-amber-700 mb-2">Las que traen el FV en la descripción <b>ajustan el neto</b> (NC resta, ND suma); las demás solo se informan para revisión manual.</p>
+                  <div className="overflow-x-auto max-h-40 overflow-y-auto scrollbar-slim">
+                    <table className="w-full text-sm">
+                      <tbody className="divide-y divide-amber-100">
+                        {[...(report.creditNotes ?? []).map((n: any) => ({ ...n, kind: 'NC' })), ...(report.debitNotes ?? []).map((n: any) => ({ ...n, kind: 'ND' }))].map((n: any, i: number) => (
+                          <tr key={i}>
+                            <td className="py-1 pr-2 whitespace-nowrap"><span className={`text-[10px] font-bold ${n.kind === 'NC' ? 'text-rose-600' : 'text-blue-600'}`}>{n.kind}</span></td>
+                            <td className="py-1 pr-3 text-slate-600 whitespace-nowrap">{n.comprobante}</td>
+                            <td className="py-1 pr-3 text-slate-700">{n.client}</td>
+                            <td className="py-1 pr-3 whitespace-nowrap">{n.fv
+                              ? <span className="text-emerald-700">{n.fv} · aplicada</span>
+                              : <span className="text-slate-400">sin FV · revisar</span>}</td>
+                            <td className="py-1 text-slate-700 font-medium whitespace-nowrap text-right">{fmtMoney(n.amount)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              <p className="text-[11px] text-amber-700">Al aplicar: se crean/actualizan las participaciones sobre el <b>valor neto</b> (venta − NC + ND); el <b>recaudo (RC)</b> libera el disponible, la <b>factura del tercero (FC)</b> genera la Orden de Pago y el <b>pago (RP)</b> registra el egreso.</p>
             </>
           )}
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
           <Button variant="secondary" onClick={onClose}>Cerrar</Button>
           <Button variant="secondary" disabled={!file} loading={previewMut.isPending} onClick={() => previewMut.mutate()}>Previsualizar</Button>
-          <Button disabled={!report || (s?.matched ?? 0) === 0} loading={applyMut.isPending} onClick={() => applyMut.mutate()}>
+          <Button disabled={!canApply} loading={applyMut.isPending} onClick={() => applyMut.mutate()}>
             Aplicar {s ? `(${s.matched})` : ''}
           </Button>
         </div>
@@ -268,25 +300,78 @@ function ConsolidatedImportModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function AccountSettingsModal({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['participation-accounts'],
+    queryFn: async () => { const { data } = await api.get('/api/participations/settings/accounts'); return data },
+  })
+  const [form, setForm] = useState<Record<string, string> | null>(null)
+  const f = form ?? data ?? null
+
+  const FIELDS: [string, string, string][] = [
+    ['income_account',        'Ventas (facturación)',      'Base de la participación. Ej. 41'],
+    ['mandate_account',       'Mandato (porción tercero)', 'Ej. 28150601'],
+    ['receivable_account',    'Cartera (recaudo y NC)',    'Ej. 13050501'],
+    ['third_invoice_account', 'Factura del tercero',       'Ej. 2335'],
+    ['payment_account',       'Pago al tercero (banco)',   'Varios con "|". Ej. 1120|1110'],
+  ]
+
+  const saveMut = useMutation({
+    mutationFn: async () => { const { data } = await api.put('/api/participations/settings/accounts', f); return data },
+    onSuccess: () => { toast.success('Cuentas actualizadas'); qc.invalidateQueries({ queryKey: ['participation-accounts'] }); onClose() },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
+  })
+  const set = (k: string, v: string) => setForm({ ...(f ?? {}), [k]: v })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">Cuentas contables del import</h3>
+            <p className="text-xs text-slate-400">Prefijos de cuenta que el import "Movimiento por cuenta contable" usa para cada etapa. Solo dígitos; varios prefijos separados por "|".</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-3">
+          {isLoading || !f ? (
+            <p className="text-sm text-slate-400 py-8 text-center">Cargando…</p>
+          ) : FIELDS.map(([k, label, hint]) => (
+            <div key={k}>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</label>
+              <input value={f[k] ?? ''} onChange={e => set(k, e.target.value)} placeholder={hint}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <p className="text-[10px] text-slate-400 mt-0.5">{hint}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button disabled={!f} loading={saveMut.isPending} onClick={() => saveMut.mutate()}>Guardar</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () => void }) {
-  const st = INV_STATUS[item.status] ?? INV_STATUS.invoiced
+  const st = INV_STATUS[item.status] ?? INV_STATUS.pending_third_invoice
   const p = item.participation ?? {}
   const inv = Number(item.finto_invoice_value ?? 0)
   const collected = Number(item.collected ?? 0)
-  const pct = inv > 0 ? Math.round(collected / inv * 100) : 0
+  const pct = inv > 0 ? Math.min(100, Math.round(collected / inv * 100)) : 0
 
-  // Una etapa se marca "hecha" por su dato propio o porque el estado ya avanzó
-  // más allá de ella. El informe consolidado va venta → recaudo → pago sin
-  // registrar la factura de compra/OP (etapa 4), así que sin esto una
-  // participación pagada mostraría etapas previas como incompletas.
+  // Cada etapa se marca "hecha" por su dato propio o por el estado alcanzado.
   const RANK: Record<string, number> = {
-    pending_invoice: 1, invoiced: 2, partial_collection: 2,
-    available: 3, payment_in_process: 4, paid: 5, closed: 5,
+    pending_invoice: 1, pending_third_invoice: 2,
+    value_difference: 3, pending_payment: 4, complete: 5,
   }
   const rank = RANK[item.status] ?? 2
   const saleDone      = rank >= 2 || !!item.finto_invoice
-  const collectDone   = rank >= 3 || (inv > 0 && collected + 0.01 >= inv)
-  const purchaseDone  = rank >= 4 || !!item.third_party_invoice || !!item.payment_order
+  const collectDone   = inv > 0 && collected + 0.01 >= inv
+  const purchaseDone  = rank >= 3 || !!item.third_party_invoice || !!item.payment_order
   const paymentDone   = rank >= 5 || !!item.egress_voucher
 
   const Field = ({ label, value, mono }: { label: string; value: any; mono?: boolean }) => (
@@ -356,133 +441,6 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
 
         <div className="flex justify-end px-6 py-4 border-t border-slate-100 shrink-0">
           <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ThirdPartyPaymentModal({ item, onClose }: { item: any; onClose: () => void }) {
-  const qc = useQueryClient()
-  const causado = Number(item.participation_value ?? 0)
-  const available = Number(item.available_for_payment ?? 0)
-
-  const [tpInv, setTpInv] = useState(item.third_party_invoice ?? '')
-  const [tpDate, setTpDate] = useState(item.third_party_invoice_date ?? '')
-  const [tpValue, setTpValue] = useState(item.third_party_invoice_value != null ? String(item.third_party_invoice_value) : String(causado || ''))
-  const [ce, setCe] = useState(item.egress_voucher ?? '')
-  const [ceDate, setCeDate] = useState(item.egress_voucher_date ?? '')
-  const [ceValue, setCeValue] = useState(item.egress_voucher_value != null ? String(item.egress_voucher_value) : String(available || ''))
-  const [op, setOp] = useState<string | null>(item.payment_order ?? null)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
-
-  const tpMut = useMutation({
-    mutationFn: async () => {
-      const { data } = await api.patch(`/api/participations/invoices/${item.id}/third-party`, {
-        third_party_invoice: tpInv.trim(),
-        third_party_invoice_date: tpDate || null,
-        third_party_invoice_value: Number(tpValue) || 0,
-      })
-      return data
-    },
-    onSuccess: (d: any) => {
-      qc.invalidateQueries({ queryKey: ['participations'] })
-      ;(d.warnings ?? []).forEach((w: string) => toast.warning(w))
-      if (d.ok) { setOp(d.payment_order); setMsg({ ok: true, text: `Conciliada. Orden de Pago ${d.payment_order} generada.` }) }
-      else setMsg({ ok: false, text: (d.reasons ?? []).join(' · ') || 'Pendiente de revisión' })
-    },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error'),
-  })
-
-  const ceMut = useMutation({
-    mutationFn: async () => {
-      const { data } = await api.patch(`/api/participations/invoices/${item.id}/egress`, {
-        egress_voucher: ce.trim(),
-        egress_voucher_date: ceDate || null,
-        egress_voucher_value: Number(ceValue) || 0,
-      })
-      return data
-    },
-    onSuccess: (d: any) => {
-      qc.invalidateQueries({ queryKey: ['participations'] })
-      ;(d.warnings ?? []).forEach((w: string) => toast.warning(w))
-      toast.success('Pago registrado')
-      onClose()
-    },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error'),
-  })
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <div>
-            <h3 className="text-base font-bold text-slate-900">Pago al tercero</h3>
-            <p className="text-xs text-slate-400">{item.finto_invoice} · {item.companies?.name ?? ''} · {item.participation?.third_party?.name ?? ''}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-5">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="bg-slate-50 rounded-lg p-2">
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Causado</p>
-              <p className="text-sm font-semibold text-slate-900">{fmtMoney(causado)}</p>
-            </div>
-            <div className="bg-emerald-50 rounded-lg p-2">
-              <p className="text-[10px] font-bold text-emerald-500 uppercase">Disponible</p>
-              <p className="text-sm font-bold text-emerald-700">{fmtMoney(available)}</p>
-            </div>
-            <div className="bg-violet-50 rounded-lg p-2">
-              <p className="text-[10px] font-bold text-violet-500 uppercase">Orden de Pago</p>
-              <p className="text-sm font-semibold text-violet-700">{op ?? '—'}</p>
-            </div>
-          </div>
-
-          {/* Paso 1: factura del tercero */}
-          <div>
-            <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">1 · Factura del tercero</p>
-            <div className="grid grid-cols-3 gap-2">
-              <input value={tpInv} onChange={e => setTpInv(e.target.value)} placeholder="N° factura"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <input type="date" value={tpDate} onChange={e => setTpDate(e.target.value)}
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <input type="number" min={0} value={tpValue} onChange={e => setTpValue(e.target.value)} placeholder="Valor"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-            </div>
-            <div className="flex justify-end mt-2">
-              <Button size="sm" variant="secondary" loading={tpMut.isPending} disabled={!tpInv.trim() || tpValue === ''} onClick={() => tpMut.mutate()}>
-                Conciliar y generar OP
-              </Button>
-            </div>
-            {msg && (
-              <p className={`text-[11px] mt-1 ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>
-                {msg.ok ? '✓ ' : '⚠ '}{msg.text}
-              </p>
-            )}
-          </div>
-
-          {/* Paso 2: comprobante de egreso */}
-          <div className={op ? '' : 'opacity-50 pointer-events-none'}>
-            <p className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">2 · Comprobante de egreso (pago)</p>
-            <div className="grid grid-cols-3 gap-2">
-              <input value={ce} onChange={e => setCe(e.target.value)} placeholder="N° comprobante"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <input type="date" value={ceDate} onChange={e => setCeDate(e.target.value)}
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-              <input type="number" min={0} value={ceValue} onChange={e => setCeValue(e.target.value)} placeholder="Valor pagado"
-                className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-            </div>
-            {!op && <p className="text-[11px] text-slate-400 mt-1">Primero concilia la factura del tercero para generar la Orden de Pago.</p>}
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
-          <Button variant="secondary" onClick={onClose}>Cerrar</Button>
-          <Button disabled={!op || !ce.trim() || ceValue === ''} loading={ceMut.isPending} onClick={() => ceMut.mutate()}>
-            Registrar pago
-          </Button>
         </div>
       </div>
     </div>
@@ -686,8 +644,8 @@ export function ParticipationsPage() {
   const [fromF, setFromF] = useState('')
   const [toF, setToF] = useState('')
   const [page, setPage] = useState(1)
-  const [showConsolidado, setShowConsolidado] = useState(false)
-  const [payItem, setPayItem] = useState<any | null>(null)
+  const [showMovimiento, setShowMovimiento] = useState(false)
+  const [showAccounts, setShowAccounts] = useState(false)
   const [detailItem, setDetailItem] = useState<any | null>(null)
   const [downloading, setDownloading] = useState(false)
 
@@ -815,8 +773,13 @@ export function ParticipationsPage() {
             </Button>
           )}
           {isAdmin && (
-            <Button size="sm" onClick={() => setShowConsolidado(true)} title="Un solo archivo: ventas + recaudo + pagos ya cruzados">
-              <Upload className="w-3.5 h-3.5" /> Importar informe
+            <Button size="sm" onClick={() => setShowMovimiento(true)} title='Reporte "Movimiento por cuenta contable": ventas, recaudo, factura del tercero y pagos en un solo archivo'>
+              <Upload className="w-3.5 h-3.5" /> Importar movimiento
+            </Button>
+          )}
+          {isAdmin && (
+            <Button size="sm" variant="secondary" onClick={() => setShowAccounts(true)} title="Configurar las cuentas contables que usa el import">
+              <SlidersHorizontal className="w-3.5 h-3.5" /> Cuentas
             </Button>
           )}
         </div>
@@ -828,8 +791,8 @@ export function ParticipationsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           {[
             { label: 'Participaciones', value: stats?.total ?? 0, cls: 'text-slate-900' },
-            { label: 'Recaudo parcial', value: stats?.partial_collection ?? 0, cls: 'text-amber-600' },
-            { label: 'Disponible p/pago', value: stats?.available ?? 0, cls: 'text-blue-600' },
+            { label: 'Pend. factura tercero', value: stats?.pending_third_invoice ?? 0, cls: 'text-amber-600' },
+            { label: 'Diferencia / pend. pago', value: (stats?.value_difference ?? 0) + (stats?.pending_payment ?? 0), cls: 'text-blue-600' },
             { label: 'Valor participaciones', value: fmtMoney(stats?.participation_total ?? 0), cls: 'text-primary-700' },
             { label: 'Disponible para tercero', value: fmtMoney(stats?.available_total ?? 0), cls: 'text-emerald-700' },
           ].map(k => (
@@ -857,7 +820,7 @@ export function ParticipationsPage() {
                 <tbody className="divide-y divide-slate-50">
                   {rows.map((r: any) => {
                     const p = r.participation ?? {}
-                    const st = INV_STATUS[r.status] ?? INV_STATUS.invoiced
+                    const st = INV_STATUS[r.status] ?? INV_STATUS.pending_third_invoice
                     const collected = Number(r.collected ?? 0)
                     const inv = Number(r.finto_invoice_value ?? 0)
                     return (
@@ -870,20 +833,14 @@ export function ParticipationsPage() {
                         <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{fmtMoney(inv)}</td>
                         <td className="px-3 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{fmtMoney(Number(r.participation_value))}</td>
                         <td className={`px-3 py-2.5 whitespace-nowrap ${collected > 0 ? 'text-slate-700' : 'text-slate-400'}`}>
-                          {fmtMoney(collected)}{inv > 0 && <span className="text-[10px] text-slate-400"> · {Math.round(collected / inv * 100)}%</span>}
+                          {fmtMoney(collected)}{inv > 0 && <span className="text-[10px] text-slate-400"> · {Math.min(100, Math.round(collected / inv * 100))}%</span>}
                         </td>
                         <td className={`px-3 py-2.5 whitespace-nowrap font-medium ${Number(r.available_for_payment) > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
                           {fmtMoney(Number(r.available_for_payment ?? 0))}
                         </td>
                         <td className="px-3 py-2.5"><span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>{st.label}</span></td>
                         <td className="px-3 py-2.5 text-right">
-                          {isAdmin && Number(r.available_for_payment) > 0 && r.status !== 'closed' ? (
-                            <button onClick={e => { e.stopPropagation(); setPayItem(r) }} className="text-xs font-medium text-primary-600 hover:underline whitespace-nowrap">
-                              Pago al tercero
-                            </button>
-                          ) : (
-                            <span className="text-xs text-slate-400">Ver detalle</span>
-                          )}
+                          <span className="text-xs text-slate-400">Ver detalle</span>
                         </td>
                       </tr>
                     )
@@ -892,7 +849,7 @@ export function ParticipationsPage() {
               </table>
               {!rows.length && (
                 <p className="px-4 py-12 text-center text-slate-400 text-sm">
-                  No hay participaciones por factura. {isAdmin && 'Usa "Importar informe" para crearlas desde el informe consolidado.'}
+                  No hay participaciones por factura. {isAdmin && 'Usa "Importar movimiento" para crearlas desde el reporte de movimiento contable.'}
                 </p>
               )}
             </div>
@@ -910,8 +867,8 @@ export function ParticipationsPage() {
         </>)}
       </div>
 
-      {showConsolidado && <ConsolidatedImportModal onClose={() => setShowConsolidado(false)} />}
-      {payItem && <ThirdPartyPaymentModal item={payItem} onClose={() => setPayItem(null)} />}
+      {showMovimiento && <MovimientoImportModal onClose={() => setShowMovimiento(false)} />}
+      {showAccounts && <AccountSettingsModal onClose={() => setShowAccounts(false)} />}
       {detailItem && <ParticipationDetailModal item={detailItem} onClose={() => setDetailItem(null)} />}
     </div>
   )

@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   Building2, Search, Plus, Eye, Pencil, Trash2, X,
   CheckCircle2, FileText, LayoutGrid, ListTodo, Activity,
-  FileSignature, Upload, Download, Handshake,
+  FileSignature, Upload, Download, Handshake, Info,
 } from 'lucide-react'
 
 function fmtDate(d: string) {
@@ -563,6 +563,7 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const [value, setValue] = useState<string>(row.service_value != null ? String(row.service_value) : '')
   const [hasThird, setHasThird] = useState<boolean>(row.has_third_party)
   const [thirdId, setThirdId] = useState<string>(row.third_party?.id ?? '')
+  const [ctype, setCtype] = useState<'servicio' | 'mandato'>(row.participation?.contract_type ?? 'servicio')
   const [ptype, setPtype] = useState<'percentage' | 'fixed'>(row.participation?.participation_type ?? 'percentage')
   const [pct, setPct] = useState<string>(row.participation?.percentage != null ? String(row.participation.percentage) : '')
   const [fixedValue, setFixedValue] = useState<string>(row.participation?.fixed_value != null ? String(row.participation.fixed_value) : '')
@@ -574,7 +575,9 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const valueNum = Number(value) || 0
   const pctNum = Number(pct) || 0
   const fixedNum = Number(fixedValue) || 0
-  const preview = ptype === 'fixed' ? fixedNum : Math.round(valueNum * (pctNum / 100) * 100) / 100
+  const isMandate = ctype === 'mandato'
+  // En mandato el monto lo aporta SIIGO (cuenta 28150601), no se calcula aquí.
+  const preview = isMandate ? 0 : (ptype === 'fixed' ? fixedNum : Math.round(valueNum * (pctNum / 100) * 100) / 100)
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -583,9 +586,11 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         service_value:      valueNum,
         has_third_party:    hasThird,
         third_party_id:     hasThird ? thirdId : null,
-        participation_type: ptype,
-        percentage:         hasThird && ptype === 'percentage' ? pctNum : undefined,
-        fixed_value:        hasThird && ptype === 'fixed' ? fixedNum : undefined,
+        contract_type:      ctype,
+        // Mandato: participación fija no aplica; el % es la comisión (informativa).
+        participation_type: isMandate ? 'percentage' : ptype,
+        percentage:         hasThird && (isMandate || ptype === 'percentage') ? pctNum : undefined,
+        fixed_value:        hasThird && !isMandate && ptype === 'fixed' ? fixedNum : undefined,
         start_date:         hasThird ? (startDate || undefined) : undefined,
         end_date:           hasThird ? (endDate || null) : undefined,
         active,
@@ -595,7 +600,8 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
   })
 
-  const valueOk = ptype === 'fixed' ? fixedNum > 0 : pct !== ''
+  // En mandato no se exige % ni valor fijo (el monto viene del reporte SIIGO).
+  const valueOk = isMandate ? true : (ptype === 'fixed' ? fixedNum > 0 : pct !== '')
   const canSave = value !== '' && (!hasThird || (thirdId && valueOk && startDate))
 
   return (
@@ -607,7 +613,10 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
           </span>
           <p className="text-sm font-semibold text-slate-900">{row.service?.name ?? '—'}</p>
         </div>
-        {hasThird && preview > 0 && (
+        {hasThird && isMandate && (
+          <span className="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded-full">Mandato</span>
+        )}
+        {hasThird && !isMandate && preview > 0 && (
           <span className="text-xs font-medium text-primary-700 bg-primary-50 px-2 py-1 rounded-full">
             Participación: {fmtMoney(preview)}
           </span>
@@ -650,31 +659,61 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
             <input readOnly value={selectedTercero?.identification ?? ''} placeholder="—"
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500" />
           </div>
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tipo de participación</label>
+          <div className="sm:col-span-2">
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tipo de contrato</label>
             <div className="grid grid-cols-2 gap-1.5">
-              <button type="button" onClick={() => setPtype('percentage')}
-                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${ptype === 'percentage' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                Porcentaje (%)
+              <button type="button" onClick={() => setCtype('servicio')}
+                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${!isMandate ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Servicio (comisión)
               </button>
-              <button type="button" onClick={() => setPtype('fixed')}
-                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${ptype === 'fixed' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                Valor fijo
+              <button type="button" onClick={() => setCtype('mandato')}
+                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${isMandate ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Contrato de mandato
               </button>
             </div>
           </div>
-          {ptype === 'percentage' ? (
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Porcentaje de participación (%)</label>
-              <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-            </div>
+
+          {!isMandate ? (
+            <>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tipo de participación</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button type="button" onClick={() => setPtype('percentage')}
+                    className={`py-2 rounded-lg border text-xs font-medium transition-colors ${ptype === 'percentage' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    Porcentaje (%)
+                  </button>
+                  <button type="button" onClick={() => setPtype('fixed')}
+                    className={`py-2 rounded-lg border text-xs font-medium transition-colors ${ptype === 'fixed' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                    Valor fijo
+                  </button>
+                </div>
+              </div>
+              {ptype === 'percentage' ? (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Porcentaje de participación (%)</label>
+                  <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor fijo del tercero</label>
+                  <input type="number" min={0} value={fixedValue} onChange={e => setFixedValue(e.target.value)} placeholder="0"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              )}
+            </>
           ) : (
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor fijo del tercero</label>
-              <input type="number" min={0} value={fixedValue} onChange={e => setFixedValue(e.target.value)} placeholder="0"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-            </div>
+            <>
+              <div className="sm:col-span-2 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-[11px] text-amber-700">
+                <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>La porción del mandante se <b>lee del reporte SIIGO</b> (cuenta 28150601) al importar; no se calcula aquí. El porcentaje es la comisión de la firma, informativa.</span>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Comisión de la firma (%) · opcional</label>
+                <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+            </>
           )}
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha de inicio</label>
