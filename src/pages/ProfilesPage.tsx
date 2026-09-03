@@ -234,8 +234,17 @@ export function ProfilesPage() {
 
 function InviteModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState({ full_name: '', email: '', role: 'rs_staff' })
+  const [form, setForm] = useState({ full_name: '', email: '', role: '' })
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+
+  // Roles internos disponibles (dinámicos, incluye roles custom).
+  const { data: roles = [] } = useQuery<{ key: string; name: string }[]>({
+    queryKey: ['assignable-roles', 'internal'],
+    queryFn: async () => {
+      const { data } = await api.get('/api/profiles/assignable-roles?scope=internal')
+      return data
+    },
+  })
 
   const inviteMut = useMutation({
     mutationFn: async () => {
@@ -303,10 +312,10 @@ function InviteModal({ onClose }: { onClose: () => void }) {
                 onChange={e => set('role', e.target.value)}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
-                <option value="rs_staff">Staff Finto</option>
-                <option value="contador">Contador / Controller</option>
-                <option value="rs_admin">Administrador Finto</option>
-                <option value="admin">Super Administrador</option>
+                <option value="" disabled>Selecciona un rol…</option>
+                {roles.map(r => (
+                  <option key={r.key} value={r.key}>{r.name}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -317,7 +326,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
             <Button
               onClick={() => inviteMut.mutate()}
               loading={inviteMut.isPending}
-              disabled={!form.full_name.trim() || !form.email.trim()}
+              disabled={!form.full_name.trim() || !form.email.trim() || !form.role}
             >
               <Mail className="w-4 h-4" /> Enviar invitación
             </Button>
