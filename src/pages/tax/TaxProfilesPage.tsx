@@ -282,7 +282,7 @@ function ProfileDrawer({ id, onClose, onSaved }: { id: string | null; onClose: (
     description: 'Se eliminará el perfil tributario. Los terceros que lo tengan asignado quedarán sin perfil.',
     type: 'danger',
     confirmLabel: 'Eliminar',
-    onConfirm: () => del.mutateAsync(),
+    onConfirm: async () => { await del.mutateAsync() },
   })
 
   const set = <K extends keyof TaxProfile>(k: K, v: TaxProfile[K]) => setForm(s => ({ ...s, [k]: v }))
