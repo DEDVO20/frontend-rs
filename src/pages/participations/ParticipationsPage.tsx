@@ -437,6 +437,44 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
             <Field label="Fecha" value={item.egress_voucher_date ?? '—'} />
             <Field label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
           </Stage>
+
+          {item.tax_partition && (
+            <div className="border border-primary-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-2 bg-primary-50 flex items-center gap-2">
+                <span className="text-xs font-bold text-primary-700 uppercase tracking-wider">Partición tributaria</span>
+                {!item.tax_partition.has_profile && (
+                  <span className="text-[10px] text-amber-600 ml-auto">Tercero sin perfil — cálculo neutro</span>
+                )}
+              </div>
+              <div className="px-4 py-3 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">Pagar al tercero</p>
+                  <p className="text-sm font-bold text-emerald-700">{fmtMoney(item.tax_partition.payThirdParty)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">Nos deben</p>
+                  <p className="text-sm font-bold text-blue-700">{fmtMoney(item.tax_partition.owedToUs)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">Queda en Finto</p>
+                  <p className="text-sm font-bold text-primary-700">{fmtMoney(item.tax_partition.staysInFinto)}</p>
+                </div>
+              </div>
+              {item.tax_partition.breakdown && (
+                <div className="px-4 pb-3 pt-1 border-t border-slate-100">
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">
+                    Desglose sobre la participación · recaudo {Math.round((item.tax_partition.collectionRatio ?? 0) * 100)}%
+                  </p>
+                  <Field label="IVA factura" value={fmtMoney(item.tax_partition.breakdown.invoiceIva)} />
+                  <Field label="Retención fuente" value={fmtMoney(item.tax_partition.breakdown.incomeWithholding.amount)} />
+                  <Field label="Retención ICA" value={fmtMoney(item.tax_partition.breakdown.icaWithholding.amount)} />
+                  <Field label="Retención IVA" value={fmtMoney(item.tax_partition.breakdown.ivaWithholding.amount)} />
+                  <Field label="Comisión + IVA" value={fmtMoney(item.tax_partition.breakdown.commissionTotal)} />
+                  <Field label="Giro final (100% recaudo)" value={fmtMoney(item.tax_partition.breakdown.finalTotal)} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end px-6 py-4 border-t border-slate-100 shrink-0">
