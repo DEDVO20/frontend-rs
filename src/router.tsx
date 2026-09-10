@@ -27,6 +27,8 @@ import { ClientRequestsPage } from '@/pages/client/ClientRequestsPage'
 import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
 import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
+import { TaxProfilesPage } from '@/pages/tax/TaxProfilesPage'
+import { ThirdPartiesPage } from '@/pages/tax/ThirdPartiesPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
@@ -83,6 +85,8 @@ export const router = createBrowserRouter([
       { path: 'collection',   element: <CollectionPage /> },
       { path: 'accounting',   element: <AccountingPage /> },
       { path: 'participations', element: <ParticipationsPage /> },
+      { path: 'tax-profiles', element: <TaxProfilesPage /> },
+      { path: 'third-parties', element: <ThirdPartiesPage /> },
       { path: 'onboarding',   element: <OnboardingPage /> },
       { path: 'tasks',        element: <SmartTasks /> },
       { path: 'documents',    element: <SmartDocuments /> },
