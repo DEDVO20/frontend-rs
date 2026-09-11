@@ -669,12 +669,94 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
   )
 }
 
+// Vista inversa: por comprobante de pago, qué facturas se le vincularon.
+function PaymentsView({ payments, loading }: { payments: any[]; loading: boolean }) {
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  if (loading) return <div className="py-10"><PageLoader /></div>
+  if (!payments.length) return (
+    <div className="bg-white border border-slate-200 rounded-xl px-4 py-12 text-center text-slate-400 text-sm">
+      No hay pagos registrados en el periodo. Importa el movimiento contable para ver recibos (RC) y pagos (RP).
+    </div>
+  )
+
+  const Group = ({ g }: { g: any }) => {
+    const key = `${g.kind}:${g.voucher}`
+    const isOpen = !!open[key]
+    const isRC = g.kind === 'RC'
+    const totalLabel = isRC ? 'Recaudado' : 'Pagado'
+    const totalValue = isRC ? g.collected_total : g.paid_total
+    return (
+      <div className="border-b border-slate-50 last:border-0">
+        <button onClick={() => setOpen(o => ({ ...o, [key]: !isOpen }))}
+          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left">
+          <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+          <span className="font-mono text-[12px] text-slate-700 whitespace-nowrap">{g.voucher}</span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isRC ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{g.kind}</span>
+          <span className="text-xs text-slate-400 whitespace-nowrap">{g.date ?? '—'}</span>
+          <span className={`text-xs font-medium whitespace-nowrap ${g.count > 1 ? 'text-primary-600' : 'text-slate-400'}`}>
+            {g.count} factura{g.count === 1 ? '' : 's'}
+          </span>
+          <span className="ml-auto text-sm font-semibold text-slate-800 whitespace-nowrap">{fmtMoney(totalValue)}</span>
+        </button>
+        {isOpen && (
+          <div className="px-4 pb-3">
+            <table className="w-full text-sm bg-slate-50/60 rounded-lg overflow-hidden">
+              <thead>
+                <tr className="text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th className="px-3 py-1.5">Factura</th>
+                  <th className="px-3 py-1.5">Cliente</th>
+                  <th className="px-3 py-1.5">Tercero</th>
+                  <th className="px-3 py-1.5">Participación</th>
+                  <th className="px-3 py-1.5">{totalLabel}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {g.invoices.map((inv: any, i: number) => (
+                  <tr key={i} className="border-t border-slate-100">
+                    <td className="px-3 py-1.5 text-slate-700 whitespace-nowrap">{inv.finto_invoice ?? '—'}</td>
+                    <td className="px-3 py-1.5 text-slate-600">{inv.company ?? '—'}</td>
+                    <td className="px-3 py-1.5 text-slate-500">{inv.third_party ?? '—'}</td>
+                    <td className="px-3 py-1.5 text-slate-600 whitespace-nowrap">{fmtMoney(inv.participation_value)}</td>
+                    <td className="px-3 py-1.5 text-slate-700 whitespace-nowrap">{fmtMoney(isRC ? inv.collected : inv.egress_voucher_value)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const Section = ({ title, kind }: { title: string; kind: 'RC' | 'RP' }) => {
+    const items = payments.filter(p => p.kind === kind)
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+          <span className="text-xs text-slate-400">{items.length} comprobante{items.length === 1 ? '' : 's'}</span>
+        </div>
+        {items.length ? items.map((g: any) => <Group key={`${g.kind}:${g.voucher}`} g={g} />)
+          : <p className="px-4 py-8 text-center text-slate-400 text-sm">Sin comprobantes.</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-slate-400">Un pago puede cubrir varias facturas (reparto FIFO). Despliega un comprobante para ver a qué facturas se aplicó.</p>
+      <Section title="Recaudos del cliente (pagos a Finto · RC)" kind="RC" />
+      <Section title="Pagos al tercero (RP)" kind="RP" />
+    </div>
+  )
+}
+
 export function ParticipationsPage() {
   const qc = useQueryClient()
   const { user } = useAuthStore()
   const isAdmin = ['admin', 'rs_admin'].includes(user?.role ?? '')
 
-  const [view, setView] = useState<'panel' | 'list'>('panel')
+  const [view, setView] = useState<'panel' | 'list' | 'payments'>('panel')
   const [showFilters, setShowFilters] = useState(false)
   const [statusF, setStatusF] = useState('')
   const [yearF, setYearF] = useState('')
@@ -757,6 +839,17 @@ export function ParticipationsPage() {
   const total: number = data?.total ?? 0
   const pages = Math.max(1, Math.ceil(total / 20))
 
+  const { data: paymentsData, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['participations', 'payments', monthPeriod, yearOnly, fromF, toF],
+    enabled: view === 'payments',
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      setDateParams(params)
+      const { data } = await api.get(`/api/participations/payments?${params}`)
+      return data
+    },
+  })
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <TopBar title="Participaciones" subtitle="Participación de terceros en la facturación" />
@@ -764,7 +857,7 @@ export function ParticipationsPage() {
       <div className="flex-1 overflow-y-auto scrollbar-slim p-4 md:p-6 space-y-4">
         {/* Vista: Resumen (panel) / Detalle (lista) */}
         <div className="flex gap-1 border-b border-slate-200">
-          {([['panel', 'Resumen'], ['list', 'Detalle']] as const).map(([k, l]) => (
+          {([['panel', 'Resumen'], ['list', 'Detalle'], ['payments', 'Pagos']] as const).map(([k, l]) => (
             <button key={k} onClick={() => setView(k)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${view === k ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
               {l}
@@ -824,6 +917,8 @@ export function ParticipationsPage() {
 
         {view === 'panel' && <BalancesPanel period={monthPeriod} year={yearOnly} from={fromF} to={toF} />}
 
+        {view === 'payments' && <PaymentsView payments={paymentsData?.payments ?? []} loading={paymentsLoading} />}
+
         {view === 'list' && (<>
         {/* Mini stats */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
@@ -850,7 +945,7 @@ export function ParticipationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
-                    {['OC', 'Cliente', 'Servicio', 'Tercero', 'Factura', 'Valor factura', 'Participación', 'Recaudado', 'Disponible', 'Estado', ''].map((h, i) => (
+                    {['OC', 'Cliente', 'Servicio', 'Tercero', 'Factura', 'Valor factura', 'Participación', 'Recaudado', 'Por cobrar', 'Disponible', 'Estado', ''].map((h, i) => (
                       <th key={i} className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -872,6 +967,9 @@ export function ParticipationsPage() {
                         <td className="px-3 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{fmtMoney(Number(r.participation_value))}</td>
                         <td className={`px-3 py-2.5 whitespace-nowrap ${collected > 0 ? 'text-slate-700' : 'text-slate-400'}`}>
                           {fmtMoney(collected)}{inv > 0 && <span className="text-[10px] text-slate-400"> · {Math.min(100, Math.round(collected / inv * 100))}%</span>}
+                        </td>
+                        <td className={`px-3 py-2.5 whitespace-nowrap font-semibold ${Math.max(0, inv - collected) > 0 ? 'text-blue-700' : 'text-slate-400'}`}>
+                          {fmtMoney(Math.max(0, inv - collected))}
                         </td>
                         <td className={`px-3 py-2.5 whitespace-nowrap font-medium ${Number(r.available_for_payment) > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
                           {fmtMoney(Number(r.available_for_payment ?? 0))}

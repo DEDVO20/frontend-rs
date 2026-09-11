@@ -19,10 +19,26 @@ const NAV_LINKS = [
 ]
 
 const SERVICES = [
-  { img: imgContabilidad, title: 'Contabilidad e impuestos' },
-  { img: imgController, title: 'Controller Financiero y Tesorería' },
-  { img: imgFacturacion, title: 'Facturación y recaudo' },
-  { img: imgPersonal, title: 'Gestión de Personal y compras' },
+  {
+    img: imgContabilidad,
+    title: 'Contabilidad e impuestos',
+    desc: 'Tus números al día y tus obligaciones bajo control, con información clara para tomar mejores decisiones.',
+  },
+  {
+    img: imgController,
+    title: 'Controller financiero',
+    desc: 'Convertimos tus números en decisiones: control de caja, presupuesto y proyecciones para anticiparte al futuro.',
+  },
+  {
+    img: imgFacturacion,
+    title: 'Facturación y cartera',
+    desc: 'Facturamos, hacemos seguimiento y aceleramos el recaudo para mantener saludable tu flujo de caja.',
+  },
+  {
+    img: imgPersonal,
+    title: 'Gestión de personal y compras',
+    desc: 'Simplificamos la gestión de tu equipo y tus compras para que tu operación fluya sin complicaciones.',
+  },
 ]
 
 const PROCESS = [
@@ -58,6 +74,10 @@ export function LandingPage() {
   // Giro 3D del mockup según el lado donde esté el mouse (0 = de frente)
   const [heroTilt, setHeroTilt] = useState(0)
   const TILT = 18 // grados de giro a cada lado
+  // Tarjeta de servicio volteada por toque (tablets/móvil sin hover)
+  const [flipped, setFlipped] = useState<string | null>(null)
+  // Paso del proceso activado por toque (tablets sin hover)
+  const [activeStep, setActiveStep] = useState<string | null>(null)
 
   return (
     <div className="min-h-screen bg-cream-50 font-sans text-navy-900">
@@ -181,17 +201,36 @@ export function LandingPage() {
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
             {SERVICES.map(s => (
-              <div key={s.title} className="group relative rounded-2xl overflow-hidden aspect-[3/4] shadow-lg shadow-navy-900/10 ring-1 ring-navy-900/5">
-                <img src={s.img} alt={s.title}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/20 to-transparent" />
-                <div className="absolute bottom-0 inset-x-0 p-4">
-                  <div className="w-9 h-9 rounded-lg bg-gold-500/90 flex items-center justify-center mb-2">
-                    <FintoIcon name="briefcase" variant="white" size={18} />
+              <button
+                type="button"
+                key={s.title}
+                onClick={() => setFlipped(f => (f === s.title ? null : s.title))}
+                aria-pressed={flipped === s.title}
+                className="group aspect-[3/4] [perspective:1200px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-2xl"
+              >
+                <div className={`relative h-full w-full transition-transform duration-700 [transform-style:preserve-3d] [@media(hover:hover)]:group-hover:[transform:rotateY(180deg)] ${flipped === s.title ? '[transform:rotateY(180deg)]' : ''}`}>
+                  {/* Frente — imagen + título */}
+                  <div className="absolute inset-0 rounded-2xl overflow-hidden shadow-lg shadow-navy-900/10 ring-1 ring-navy-900/5 [backface-visibility:hidden]">
+                    <img src={s.img} alt={s.title}
+                      className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-navy-950/90 via-navy-950/20 to-transparent" />
+                    <div className="absolute bottom-0 inset-x-0 p-4">
+                      <div className="w-9 h-9 rounded-lg bg-gold-500/90 flex items-center justify-center mb-2">
+                        <FintoIcon name="briefcase" variant="white" size={18} />
+                      </div>
+                      <p className="font-display font-bold text-cream-100 text-sm leading-tight">{s.title}</p>
+                    </div>
                   </div>
-                  <p className="font-display font-bold text-cream-100 text-sm leading-tight">{s.title}</p>
+                  {/* Reverso — descripción */}
+                  <div className="absolute inset-0 rounded-2xl overflow-hidden shadow-lg shadow-navy-900/10 ring-1 ring-navy-900/5 flex flex-col justify-center p-5 text-center bg-gradient-to-br from-navy-900 to-brand-700 [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                    <div className="w-9 h-9 rounded-lg bg-gold-500/90 flex items-center justify-center mb-3 mx-auto">
+                      <FintoIcon name="briefcase" variant="white" size={18} />
+                    </div>
+                    <p className="font-display font-bold text-cream-100 text-sm leading-tight mb-2">{s.title}</p>
+                    <p className="text-xs text-cream-100/80 leading-relaxed">{s.desc}</p>
+                  </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -242,27 +281,34 @@ export function LandingPage() {
                   { left: '50%', top: '97%' },  // abajo
                   { left: '3%',  top: '50%' },  // izquierda
                 ][i]!
+                const on = activeStep === step.title
                 return (
                   <div key={step.title}
-                    className="absolute z-10 hover:z-30 -translate-x-1/2 -translate-y-1/2"
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 ${on ? 'z-30' : 'z-10 hover:z-30'}`}
                     style={{ left: pos.left, top: pos.top }}>
-                    <div className="group relative flex flex-col items-center cursor-pointer">
-                      {/* Nodo (efecto lupa: crece al hacer hover) */}
-                      <div className="flex h-20 w-20 items-center justify-center rounded-full border-2 border-gold-400/60
+                    <button
+                      type="button"
+                      onClick={() => setActiveStep(a => (a === step.title ? null : step.title))}
+                      aria-pressed={on}
+                      className="group relative flex flex-col items-center cursor-pointer focus:outline-none">
+                      {/* Nodo (efecto lupa: crece al pasar el mouse o al tocar) */}
+                      <div className={`flex h-20 w-20 items-center justify-center rounded-full border-2 border-gold-400/60
                                       bg-navy-900/70 backdrop-blur transition-all duration-300 origin-center
-                                      group-hover:scale-[1.6] group-hover:border-gold-400
-                                      group-hover:bg-gradient-to-br group-hover:from-brand-500 group-hover:to-navy-900
-                                      group-hover:shadow-2xl group-hover:shadow-brand-500/50">
-                        <Icon className="h-8 w-8 text-cream-100 transition-transform duration-300 group-hover:scale-[0.55]" />
+                                      [@media(hover:hover)]:group-hover:scale-[1.6] [@media(hover:hover)]:group-hover:border-gold-400
+                                      [@media(hover:hover)]:group-hover:bg-gradient-to-br [@media(hover:hover)]:group-hover:from-brand-500 [@media(hover:hover)]:group-hover:to-navy-900
+                                      [@media(hover:hover)]:group-hover:shadow-2xl [@media(hover:hover)]:group-hover:shadow-brand-500/50
+                                      ${on ? 'scale-[1.6] border-gold-400 bg-gradient-to-br from-brand-500 to-navy-900 shadow-2xl shadow-brand-500/50' : ''}`}>
+                        <Icon className={`h-8 w-8 text-cream-100 transition-transform duration-300 [@media(hover:hover)]:group-hover:scale-[0.55] ${on ? 'scale-[0.55]' : ''}`} />
                       </div>
                       {/* Texto revelado */}
-                      <div className="pointer-events-none absolute top-[calc(100%+0.75rem)] w-52 text-center
-                                      translate-y-1 opacity-0 transition-all duration-300
-                                      group-hover:translate-y-0 group-hover:opacity-100">
+                      <div className={`pointer-events-none absolute top-[calc(100%+0.75rem)] w-52 text-center
+                                      transition-all duration-300
+                                      [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-hover:opacity-100
+                                      ${on ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}>
                         <p className="font-display font-bold text-cream-100 text-sm">{i + 1}. {step.title}</p>
                         <p className="mt-1 text-xs text-cream-100/75 leading-snug">{step.desc}</p>
                       </div>
-                    </div>
+                    </button>
                   </div>
                 )
               })}
