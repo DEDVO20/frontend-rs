@@ -569,6 +569,8 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const [fixedValue, setFixedValue] = useState<string>(row.participation?.fixed_value != null ? String(row.participation.fixed_value) : '')
   const [startDate, setStartDate] = useState<string>(row.participation?.start_date ?? '')
   const [endDate, setEndDate] = useState<string>(row.participation?.end_date ?? '')
+  const [billingDay, setBillingDay] = useState<1 | 15>(row.participation?.billing_day === 15 ? 15 : 1)
+  const [billingMode, setBillingMode] = useState<'vencido' | 'anticipado'>(row.participation?.billing_mode ?? 'vencido')
   const [active, setActive] = useState<boolean>(row.participation?.active ?? true)
 
   const selectedTercero = terceros.find((t: any) => t.id === thirdId)
@@ -593,6 +595,8 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         fixed_value:        hasThird && !isMandate && ptype === 'fixed' ? fixedNum : undefined,
         start_date:         hasThird ? (startDate || undefined) : undefined,
         end_date:           hasThird ? (endDate || null) : undefined,
+        billing_day:        billingDay,
+        billing_mode:       billingMode,
         active,
       })
     },
@@ -725,6 +729,35 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
           </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Día de facturación</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button type="button" onClick={() => setBillingDay(1)}
+                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${billingDay === 1 ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Día 1 · 100%
+              </button>
+              <button type="button" onClick={() => setBillingDay(15)}
+                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${billingDay === 15 ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Día 15 · 50%
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Modo de facturación</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button type="button" onClick={() => setBillingMode('vencido')}
+                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${billingMode === 'vencido' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Vencido
+              </button>
+              <button type="button" onClick={() => setBillingMode('anticipado')}
+                className={`py-2 rounded-lg border text-xs font-medium transition-colors ${billingMode === 'anticipado' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Anticipado
+              </button>
+            </div>
+          </div>
+          <p className="sm:col-span-2 text-[11px] text-slate-400 -mt-1">
+            Día 1 factura el mes completo; día 15, medio mes (solo el primer mes). Vencido genera la OC del mes anterior; anticipado, del mes actual. Al guardar se generan las OC faltantes desde la fecha de inicio.
+          </p>
           <label className="flex items-center gap-2 text-sm text-slate-600 sm:col-span-2">
             <input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} className="rounded border-slate-300" />
             Participación activa {!active && <span className="text-xs text-amber-600">(suspendida — no se procesa en el cron)</span>}
@@ -850,7 +883,7 @@ export function CompaniesPage() {
 
   // Update mutation
   const updateMut = useMutation({
-    mutationFn: async (input: Record<string, string>) => {
+    mutationFn: async (input: Record<string, string | null>) => {
       const { data } = await api.patch(`/api/companies/${selectedId}`, input)
       return data
     },
@@ -999,7 +1032,7 @@ export function CompaniesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => { setEditing(!editing); if (!editing) setEditForm({ name: co.name ?? '', nit: co.nit ?? '', city: co.city ?? '', dept: co.dept ?? '', sector: co.sector ?? '', size: co.size ?? '', contact: co.contact ?? '', email: co.email ?? '', phone: co.phone ?? '', asesor: co.asesor ?? '', notes: co.notes ?? '' }) }}>
+                  <Button size="sm" variant="secondary" onClick={() => { setEditing(!editing); if (!editing) setEditForm({ name: co.name ?? '', nit: co.nit ?? '', city: co.city ?? '', dept: co.dept ?? '', sector: co.sector ?? '', size: co.size ?? '', contact: co.contact ?? '', email: co.email ?? '', phone: co.phone ?? '', asesor: co.asesor ?? '', fecha_vinculacion: co.fecha_vinculacion ?? '', notes: co.notes ?? '' }) }}>
                     <Pencil className="w-3.5 h-3.5" /> Editar
                   </Button>
                   <Button size="sm" variant="secondary">
@@ -1087,6 +1120,15 @@ export function CompaniesPage() {
                               />
                             </div>
                           ))}
+                          <div>
+                            <label className="block text-xs font-medium text-slate-500 mb-1">Fecha de vinculación</label>
+                            <input
+                              type="date"
+                              value={editForm.fecha_vinculacion ?? ''}
+                              onChange={e => setEditForm(p => ({ ...p, fecha_vinculacion: e.target.value }))}
+                              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                          </div>
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-slate-500 mb-1">Notas internas</label>
@@ -1099,7 +1141,7 @@ export function CompaniesPage() {
                         </div>
                         <div className="flex gap-2 justify-end">
                           <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>Cancelar</Button>
-                          <Button size="sm" loading={updateMut.isPending} onClick={() => updateMut.mutate(editForm)}>Guardar</Button>
+                          <Button size="sm" loading={updateMut.isPending} onClick={() => updateMut.mutate({ ...editForm, fecha_vinculacion: editForm.fecha_vinculacion || null })}>Guardar</Button>
                         </div>
                       </div>
                     ) : (
@@ -1115,7 +1157,8 @@ export function CompaniesPage() {
                             { label: 'Contacto principal', value: co.contact },
                             { label: 'Email', value: co.email },
                             { label: 'Teléfono', value: co.phone },
-                            { label: 'Fecha vinculación', value: co.created_at ? fmtDate(co.created_at) : null },
+                            { label: 'Fecha de creación', value: co.created_at ? fmtDate(co.created_at) : null },
+                            { label: 'Fecha de vinculación', value: co.fecha_vinculacion ? fmtDate(co.fecha_vinculacion) : null },
                             { label: 'Asesor asignado', value: co.asesor },
                             { label: 'Plan', value: activeModules > 0 ? `${activeModules} módulo(s) activo(s)` : null },
                           ].map((f, i) => (

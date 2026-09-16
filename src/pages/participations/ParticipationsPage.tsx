@@ -562,6 +562,149 @@ function BalanceDetailModal({ kind, row, onClose }: { kind: 'cxc' | 'cxp'; row: 
   )
 }
 
+const DOC_BADGE: Record<string, string> = {
+  FV: 'bg-slate-100 text-slate-600', RC: 'bg-blue-100 text-blue-700', NC: 'bg-rose-100 text-rose-700',
+  ND: 'bg-amber-100 text-amber-700', FC: 'bg-violet-100 text-violet-700', RP: 'bg-emerald-100 text-emerald-700',
+}
+
+function DocTypeFilter({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <div className="flex gap-1">
+      {['', ...options].map(t => (
+        <button key={t} onClick={() => onChange(t)}
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${value === t ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+          {t || 'Todos'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function CruceView({ period }: { period: string }) {
+  const [docType, setDocType] = useState('')
+  const [nit, setNit] = useState('')
+  const { data, isLoading } = useQuery({
+    queryKey: ['participations', 'cruce', period, docType, nit],
+    queryFn: async () => {
+      const p = new URLSearchParams()
+      if (period) p.set('period', period)
+      if (docType) p.set('doc_type', docType)
+      if (nit.trim()) p.set('nit', nit.trim())
+      const { data } = await api.get(`/api/participations/cruce?${p}`)
+      return data
+    },
+  })
+  const alerts: any[] = data?.alerts ?? []
+  const by = data?.summary?.by_type ?? {}
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <DocTypeFilter value={docType} onChange={setDocType} options={['FV', 'RC', 'NC', 'ND', 'FC', 'RP']} />
+        <input value={nit} onChange={e => setNit(e.target.value)} placeholder="NIT cliente/tercero…"
+          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+        <span className="ml-auto text-xs text-slate-400">
+          {data?.summary?.total ?? 0} no cruzados{Object.keys(by).length ? ' · ' + Object.entries(by).map(([k, v]) => `${k}:${v}`).join(' ') : ''}
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-400">Documentos del último import que no cruzaron con una participación. El Cruce nunca genera OC.</p>
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>{['Tipo', 'Comprobante', 'FV', 'NIT', 'Nombre', 'Mes', 'Valor', 'Motivo'].map(h => (
+                <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {isLoading ? (
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">Cargando…</td></tr>
+              ) : !alerts.length ? (
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">Sin documentos no cruzados 🎉</td></tr>
+              ) : alerts.map((a: any) => (
+                <tr key={a.id} className="hover:bg-slate-50">
+                  <td className="px-3 py-2"><span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${DOC_BADGE[a.doc_type] ?? 'bg-slate-100 text-slate-600'}`}>{a.doc_type}</span></td>
+                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{a.comprobante}</td>
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.fv_ref || '—'}</td>
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.tercero_nit || '—'}</td>
+                  <td className="px-3 py-2 text-slate-600">{a.tercero_name || '—'}</td>
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.period || '—'}</td>
+                  <td className="px-3 py-2 text-slate-700 font-medium whitespace-nowrap text-right">{fmtMoney(Number(a.amount ?? 0))}</td>
+                  <td className="px-3 py-2 text-[11px] text-amber-600">{a.note || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SaldosView({ period }: { period: string }) {
+  const [docType, setDocType] = useState('')
+  const [nit, setNit] = useState('')
+  const { data, isLoading } = useQuery({
+    queryKey: ['participations', 'saldos', period, docType, nit],
+    queryFn: async () => {
+      const p = new URLSearchParams()
+      if (period) p.set('period', period)
+      if (docType) p.set('doc_type', docType)
+      if (nit.trim()) p.set('nit', nit.trim())
+      const { data } = await api.get(`/api/participations/pagos?${p}`)
+      return data
+    },
+  })
+  const items: any[] = data?.items ?? []
+  const s = data?.summary
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <DocTypeFilter value={docType} onChange={setDocType} options={['RC', 'RP']} />
+        <input value={nit} onChange={e => setNit(e.target.value)} placeholder="NIT tercero/cliente…"
+          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+        {s && (
+          <span className="ml-auto text-xs text-slate-500">
+            Saldo RC <b className="text-blue-700">{fmtMoney(s.rc_saldo ?? 0)}</b> · Saldo RP <b className="text-emerald-700">{fmtMoney(s.rp_saldo ?? 0)}</b>
+          </span>
+        )}
+      </div>
+      <p className="text-[11px] text-slate-400">Recaudos (RC) y pagos (RP) con saldo sin cruzar. Filtra por mes (selector de fecha), tipo y NIT.</p>
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>{['Tipo', 'Comprobante', 'FV', 'NIT', 'Nombre', 'Mes', 'Valor', 'Aplicado', 'Saldo'].map(h => (
+                <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {isLoading ? (
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400 text-sm">Cargando…</td></tr>
+              ) : !items.length ? (
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400 text-sm">Sin saldos pendientes 🎉</td></tr>
+              ) : items.map((a: any) => (
+                <tr key={a.id} className="hover:bg-slate-50">
+                  <td className="px-3 py-2"><span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${DOC_BADGE[a.doc_type] ?? 'bg-slate-100 text-slate-600'}`}>{a.doc_type}</span></td>
+                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{a.comprobante}</td>
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.fv_ref || '—'}</td>
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.tercero_nit || '—'}</td>
+                  <td className="px-3 py-2 text-slate-600">{a.tercero_name || '—'}</td>
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.period || '—'}</td>
+                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap text-right">{fmtMoney(Number(a.amount ?? 0))}</td>
+                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap text-right">{fmtMoney(Number(a.applied ?? 0))}</td>
+                  <td className="px-3 py-2 font-semibold text-slate-900 whitespace-nowrap text-right">{fmtMoney(Number(a.saldo ?? 0))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BalancesPanel({ period, year, from, to }: { period: string; year: string; from: string; to: string }) {
   const { data, isLoading } = useQuery({
     queryKey: ['participations', 'balances', period, year, from, to],
@@ -756,7 +899,7 @@ export function ParticipationsPage() {
   const { user } = useAuthStore()
   const isAdmin = ['admin', 'rs_admin'].includes(user?.role ?? '')
 
-  const [view, setView] = useState<'panel' | 'list' | 'payments'>('panel')
+  const [view, setView] = useState<'panel' | 'list' | 'payments' | 'cruce' | 'saldos'>('panel')
   const [showFilters, setShowFilters] = useState(false)
   const [statusF, setStatusF] = useState('')
   const [yearF, setYearF] = useState('')
@@ -857,7 +1000,7 @@ export function ParticipationsPage() {
       <div className="flex-1 overflow-y-auto scrollbar-slim p-4 md:p-6 space-y-4">
         {/* Vista: Resumen (panel) / Detalle (lista) */}
         <div className="flex gap-1 border-b border-slate-200">
-          {([['panel', 'Resumen'], ['list', 'Detalle'], ['payments', 'Pagos']] as const).map(([k, l]) => (
+          {([['panel', 'Resumen'], ['list', 'Detalle'], ['payments', 'Pagos'], ['cruce', 'Cruce'], ['saldos', 'Saldos']] as const).map(([k, l]) => (
             <button key={k} onClick={() => setView(k)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${view === k ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
               {l}
@@ -918,6 +1061,10 @@ export function ParticipationsPage() {
         {view === 'panel' && <BalancesPanel period={monthPeriod} year={yearOnly} from={fromF} to={toF} />}
 
         {view === 'payments' && <PaymentsView payments={paymentsData?.payments ?? []} loading={paymentsLoading} />}
+
+        {view === 'cruce' && <CruceView period={monthPeriod} />}
+
+        {view === 'saldos' && <SaldosView period={monthPeriod} />}
 
         {view === 'list' && (<>
         {/* Mini stats */}
