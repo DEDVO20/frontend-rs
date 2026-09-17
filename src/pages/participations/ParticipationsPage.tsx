@@ -1,4 +1,4 @@
-import { useState, useRef, type ReactNode, type DragEvent } from 'react'
+import { useState, useRef, useEffect, type ReactNode, type DragEvent } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { TopBar } from '@/components/layout/TopBar'
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
-import { X, Upload, Download, CheckCircle2, CalendarPlus, Filter, ChevronDown, Calendar, SlidersHorizontal } from 'lucide-react'
+import { X, Upload, Download, CheckCircle2, CalendarPlus, Filter, ChevronDown, Calendar, SlidersHorizontal, Search, ChevronsUpDown, AlertCircle, RotateCcw, Wallet, Receipt, CreditCard } from 'lucide-react'
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
@@ -420,8 +420,9 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
             <Field label="Valor factura" value={fmtMoney(inv)} />
           </Stage>
 
-          <Stage n={3} title="Recaudo del cliente (CxC)" done={collectDone}>
-            <Field label="Recibos de caja" value={item.cash_receipts ?? '—'} />
+          <Stage n={3} title="Recaudo del cliente (CxC · RC)" done={collectDone}>
+            <Field label="Recibo de caja (RC)" value={item.cash_receipts ?? 'Pendiente'} mono />
+            <Field label="Fecha de recaudo (RC)" value={item.cash_receipt_date ?? (item.cash_receipts ? 'Sin fecha' : '—')} />
             <Field label="Recaudado" value={`${fmtMoney(collected)}${inv > 0 ? ` · ${pct}%` : ''}`} />
             <Field label="Disponible para el tercero" value={fmtMoney(Number(item.available_for_payment ?? 0))} />
           </Stage>
@@ -432,9 +433,9 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
             <Field label="Orden de pago" value={item.payment_order ?? '—'} mono />
           </Stage>
 
-          <Stage n={5} title="Pago al tercero (egreso)" done={paymentDone}>
-            <Field label="Comprobante de egreso" value={item.egress_voucher ?? 'Pendiente'} />
-            <Field label="Fecha" value={item.egress_voucher_date ?? '—'} />
+          <Stage n={5} title="Pago al tercero (egreso · RP)" done={paymentDone}>
+            <Field label="Comprobante de egreso (RP)" value={item.egress_voucher ?? (paymentDone ? 'Registrado' : 'Pendiente')} mono />
+            <Field label="Fecha de pago (RP)" value={item.egress_voucher_date ?? (item.egress_voucher ? 'Sin fecha' : '—')} />
             <Field label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
           </Stage>
 
@@ -641,69 +642,6 @@ function CruceView({ period }: { period: string }) {
   )
 }
 
-function SaldosView({ period }: { period: string }) {
-  const [docType, setDocType] = useState('')
-  const [nit, setNit] = useState('')
-  const { data, isLoading } = useQuery({
-    queryKey: ['participations', 'saldos', period, docType, nit],
-    queryFn: async () => {
-      const p = new URLSearchParams()
-      if (period) p.set('period', period)
-      if (docType) p.set('doc_type', docType)
-      if (nit.trim()) p.set('nit', nit.trim())
-      const { data } = await api.get(`/api/participations/pagos?${p}`)
-      return data
-    },
-  })
-  const items: any[] = data?.items ?? []
-  const s = data?.summary
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <DocTypeFilter value={docType} onChange={setDocType} options={['RC', 'RP']} />
-        <input value={nit} onChange={e => setNit(e.target.value)} placeholder="NIT tercero/cliente…"
-          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500" />
-        {s && (
-          <span className="ml-auto text-xs text-slate-500">
-            Saldo RC <b className="text-blue-700">{fmtMoney(s.rc_saldo ?? 0)}</b> · Saldo RP <b className="text-emerald-700">{fmtMoney(s.rp_saldo ?? 0)}</b>
-          </span>
-        )}
-      </div>
-      <p className="text-[11px] text-slate-400">Recaudos (RC) y pagos (RP) con saldo sin cruzar. Filtra por mes (selector de fecha), tipo y NIT.</p>
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50">
-              <tr>{['Tipo', 'Comprobante', 'FV', 'NIT', 'Nombre', 'Mes', 'Valor', 'Aplicado', 'Saldo'].map(h => (
-                <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
-              ))}</tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {isLoading ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400 text-sm">Cargando…</td></tr>
-              ) : !items.length ? (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400 text-sm">Sin saldos pendientes 🎉</td></tr>
-              ) : items.map((a: any) => (
-                <tr key={a.id} className="hover:bg-slate-50">
-                  <td className="px-3 py-2"><span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${DOC_BADGE[a.doc_type] ?? 'bg-slate-100 text-slate-600'}`}>{a.doc_type}</span></td>
-                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{a.comprobante}</td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.fv_ref || '—'}</td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.tercero_nit || '—'}</td>
-                  <td className="px-3 py-2 text-slate-600">{a.tercero_name || '—'}</td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.period || '—'}</td>
-                  <td className="px-3 py-2 text-slate-600 whitespace-nowrap text-right">{fmtMoney(Number(a.amount ?? 0))}</td>
-                  <td className="px-3 py-2 text-slate-500 whitespace-nowrap text-right">{fmtMoney(Number(a.applied ?? 0))}</td>
-                  <td className="px-3 py-2 font-semibold text-slate-900 whitespace-nowrap text-right">{fmtMoney(Number(a.saldo ?? 0))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function BalancesPanel({ period, year, from, to }: { period: string; year: string; from: string; to: string }) {
   const { data, isLoading } = useQuery({
@@ -812,25 +750,96 @@ function BalancesPanel({ period, year, from, to }: { period: string; year: strin
   )
 }
 
-// Vista inversa: por comprobante de pago, qué facturas se le vincularon.
-function PaymentsView({ payments, loading }: { payments: any[]; loading: boolean }) {
-  const [open, setOpen] = useState<Record<string, boolean>>({})
-  if (loading) return <div className="py-10"><PageLoader /></div>
-  if (!payments.length) return (
-    <div className="bg-white border border-slate-200 rounded-xl px-4 py-12 text-center text-slate-400 text-sm">
-      No hay pagos registrados en el periodo. Importa el movimiento contable para ver recibos (RC) y pagos (RP).
-    </div>
-  )
+// ── Vista de Pagos: Saldos de RC y RP no cruzados con filtros por Tercero, Cliente y Mes ──
+function PaymentsView({
+  defaultPeriod,
+  appliedPayments = [],
+  appliedLoading = false,
+}: {
+  defaultPeriod: string
+  appliedPayments?: any[]
+  appliedLoading?: boolean
+}) {
+  const [subTab, setSubTab] = useState<'uncrossed' | 'applied'>('uncrossed')
+  const [period, setPeriod] = useState<string>(defaultPeriod || '')
+  const [docType, setDocType] = useState<string>('')
+  const [client, setClient] = useState<string>('')
+  const [thirdParty, setThirdParty] = useState<string>('')
+  const [search, setSearch] = useState<string>('')
+  const [openAccordion, setOpenAccordion] = useState<Record<string, boolean>>({})
 
-  const Group = ({ g }: { g: any }) => {
+  // Sincronizar si cambia el periodo general en la barra superior y no se ha modificado manualmente
+  useEffect(() => {
+    if (defaultPeriod) {
+      setPeriod(defaultPeriod)
+    }
+  }, [defaultPeriod])
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['participations', 'pagos', period, docType, client, thirdParty, search],
+    queryFn: async () => {
+      const p = new URLSearchParams()
+      if (period) p.set('period', period)
+      if (docType) p.set('doc_type', docType)
+      if (client.trim()) p.set('client', client.trim())
+      if (thirdParty.trim()) p.set('third_party', thirdParty.trim())
+      if (search.trim()) p.set('search', search.trim())
+      const { data } = await api.get(`/api/participations/pagos?${p}`)
+      return data
+    },
+  })
+
+  const items: any[] = data?.items ?? []
+  const s = data?.summary ?? { count: 0, rc_count: 0, rp_count: 0, rc_saldo: 0, rp_saldo: 0, total_saldo: 0 }
+  const options = data?.filter_options ?? { clients: [], third_parties: [], periods: [] }
+
+  const hasFilters = Boolean(period || docType || client || thirdParty || search)
+
+  const clearAllFilters = () => {
+    setPeriod('')
+    setDocType('')
+    setClient('')
+    setThirdParty('')
+    setSearch('')
+  }
+
+  const exportCsv = () => {
+    if (!items.length) return
+    const headers = ['Tipo', 'Comprobante', 'Factura_Ref', 'Tipo_Entidad', 'NIT', 'Nombre', 'Periodo', 'Fecha_Documento', 'Valor_Total', 'Aplicado', 'Saldo_Pendiente', 'Nota']
+    const rows = items.map(r => [
+      r.doc_type,
+      `"${(r.comprobante || '').replace(/"/g, '""')}"`,
+      `"${(r.fv_ref || '').replace(/"/g, '""')}"`,
+      r.doc_type === 'RC' ? 'Cliente' : 'Tercero',
+      `"${(r.tercero_nit || '').replace(/"/g, '""')}"`,
+      `"${(r.tercero_name || '').replace(/"/g, '""')}"`,
+      r.period || '',
+      r.doc_date || '',
+      r.amount ?? 0,
+      r.applied ?? 0,
+      r.saldo ?? 0,
+      `"${(r.note || '').replace(/"/g, '""')}"`,
+    ])
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n')
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement('a')
+    link.setAttribute('href', encodedUri)
+    link.setAttribute('download', `saldos_rc_rp_${period || 'todos'}_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // Componente de grupo histórico aplicado
+  const AppliedGroup = ({ g }: { g: any }) => {
     const key = `${g.kind}:${g.voucher}`
-    const isOpen = !!open[key]
+    const isOpen = !!openAccordion[key]
     const isRC = g.kind === 'RC'
     const totalLabel = isRC ? 'Recaudado' : 'Pagado'
     const totalValue = isRC ? g.collected_total : g.paid_total
     return (
-      <div className="border-b border-slate-50 last:border-0">
-        <button onClick={() => setOpen(o => ({ ...o, [key]: !isOpen }))}
+      <div className="border-b border-slate-100 last:border-0">
+        <button onClick={() => setOpenAccordion(o => ({ ...o, [key]: !isOpen }))}
           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left">
           <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
           <span className="font-mono text-[12px] text-slate-700 whitespace-nowrap">{g.voucher}</span>
@@ -871,25 +880,696 @@ function PaymentsView({ payments, loading }: { payments: any[]; loading: boolean
     )
   }
 
-  const Section = ({ title, kind }: { title: string; kind: 'RC' | 'RP' }) => {
-    const items = payments.filter(p => p.kind === kind)
+  const AppliedSection = ({ title, kind }: { title: string; kind: 'RC' | 'RP' }) => {
+    const groupItems = appliedPayments.filter(p => p.kind === kind)
     return (
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-          <span className="text-xs text-slate-400">{items.length} comprobante{items.length === 1 ? '' : 's'}</span>
+          <span className="text-xs text-slate-400">{groupItems.length} comprobante{groupItems.length === 1 ? '' : 's'}</span>
         </div>
-        {items.length ? items.map((g: any) => <Group key={`${g.kind}:${g.voucher}`} g={g} />)
-          : <p className="px-4 py-8 text-center text-slate-400 text-sm">Sin comprobantes.</p>}
+        {groupItems.length ? groupItems.map((g: any) => <AppliedGroup key={`${g.kind}:${g.voucher}`} g={g} />)
+          : <p className="px-4 py-8 text-center text-slate-400 text-sm">Sin comprobantes aplicados en este periodo.</p>}
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-slate-400">Un pago puede cubrir varias facturas (reparto FIFO). Despliega un comprobante para ver a qué facturas se aplicó.</p>
-      <Section title="Recaudos del cliente (pagos a Finto · RC)" kind="RC" />
-      <Section title="Pagos al tercero (RP)" kind="RP" />
+      {/* Sub-selector de vista dentro de Pagos */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSubTab('uncrossed')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              subTab === 'uncrossed'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Wallet className="w-3.5 h-3.5" />
+            Saldos No Cruzados (RC / RP)
+            <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+              subTab === 'uncrossed' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'
+            }`}>
+              {s.count}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setSubTab('applied')}
+            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              subTab === 'applied'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            Comprobantes Aplicados a Facturas
+            <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+              subTab === 'applied' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'
+            }`}>
+              {appliedPayments.length}
+            </span>
+          </button>
+        </div>
+
+        {subTab === 'uncrossed' && (
+          <div className="flex items-center gap-2 ml-auto">
+            <Button size="sm" variant="secondary" onClick={exportCsv} disabled={!items.length}>
+              <Download className="w-3.5 h-3.5" /> Exportar saldos CSV
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {subTab === 'applied' ? (
+        appliedLoading ? <div className="py-10"><PageLoader /></div> : (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-400">Un pago puede cubrir varias facturas (reparto FIFO). Despliega un comprobante para ver a qué facturas se aplicó.</p>
+            <AppliedSection title="Recaudos del cliente (pagos a Finto · RC)" kind="RC" />
+            <AppliedSection title="Pagos al tercero (RP)" kind="RP" />
+          </div>
+        )
+      ) : (
+        <>
+          {/* Tarjetas KPI de Saldos */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Total Saldo */}
+            <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col justify-between shadow-xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Saldo No Cruzado</span>
+                <span className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
+                  <Wallet className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-xl font-bold text-slate-900">{fmtMoney(s.total_saldo)}</div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                <b className="text-slate-800">{s.count}</b> documento{s.count === 1 ? '' : 's'} con saldo pendiente
+              </p>
+            </div>
+
+            {/* Saldo RC Clientes */}
+            <div className="bg-blue-50/50 border border-blue-200/70 rounded-xl p-4 flex flex-col justify-between shadow-xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Saldo RC · Recaudos Clientes</span>
+                <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
+                  <Receipt className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-xl font-bold text-blue-900">{fmtMoney(s.rc_saldo)}</div>
+              <p className="text-[11px] text-blue-600/90 mt-1">
+                <b className="text-blue-900">{s.rc_count}</b> recibo{s.rc_count === 1 ? '' : 's'} pendiente{s.rc_count === 1 ? '' : 's'} por cruzar
+              </p>
+            </div>
+
+            {/* Saldo RP Terceros */}
+            <div className="bg-emerald-50/50 border border-emerald-200/70 rounded-xl p-4 flex flex-col justify-between shadow-xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Saldo RP · Pagos a Terceros</span>
+                <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
+                  <CreditCard className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-xl font-bold text-emerald-900">{fmtMoney(s.rp_saldo)}</div>
+              <p className="text-[11px] text-emerald-600/90 mt-1">
+                <b className="text-emerald-900">{s.rp_count}</b> comprobante{s.rp_count === 1 ? '' : 's'} de egreso pendiente{s.rp_count === 1 ? '' : 's'}
+              </p>
+            </div>
+          </div>
+
+          {/* Barra de Filtros: Tercero, Cliente, Mes y Tipo */}
+          <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-3 shadow-xs">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Filtro por Tipo */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg text-xs font-medium">
+                <button
+                  onClick={() => setDocType('')}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    docType === '' ? 'bg-white text-slate-900 font-semibold shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Todos ({s.count})
+                </button>
+                <button
+                  onClick={() => setDocType('RC')}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    docType === 'RC' ? 'bg-white text-blue-700 font-semibold shadow-xs' : 'text-slate-500 hover:text-blue-700'
+                  }`}
+                >
+                  RC Clientes ({s.rc_count})
+                </button>
+                <button
+                  onClick={() => setDocType('RP')}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    docType === 'RP' ? 'bg-white text-emerald-700 font-semibold shadow-xs' : 'text-slate-500 hover:text-emerald-700'
+                  }`}
+                >
+                  RP Terceros ({s.rp_count})
+                </button>
+              </div>
+
+              {/* Filtro por Mes */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold text-slate-500">Mes:</span>
+                <select
+                  value={period}
+                  onChange={e => setPeriod(e.target.value)}
+                  className={`text-xs border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white ${
+                    period ? 'border-primary-400 text-primary-800 font-medium' : 'border-slate-200 text-slate-600'
+                  }`}
+                >
+                  <option value="">Todos los meses</option>
+                  {options.periods.map((m: string) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                  {period && !options.periods.includes(period) && (
+                    <option value={period}>{period}</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Filtro por Cliente (visible para Todos o RC) */}
+              {docType !== 'RP' && (
+                <div className="flex items-center gap-1.5 min-w-[200px] flex-1 sm:flex-initial">
+                  <span className="text-xs font-semibold text-blue-700">Cliente:</span>
+                  <select
+                    value={client}
+                    onChange={e => setClient(e.target.value)}
+                    className={`w-full text-xs border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white ${
+                      client ? 'border-blue-400 text-blue-800 font-medium' : 'border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <option value="">Todos los clientes (RC)</option>
+                    {options.clients.map((c: any) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Filtro por Tercero (visible para Todos o RP) */}
+              {docType !== 'RC' && (
+                <div className="flex items-center gap-1.5 min-w-[200px] flex-1 sm:flex-initial">
+                  <span className="text-xs font-semibold text-emerald-700">Tercero:</span>
+                  <select
+                    value={thirdParty}
+                    onChange={e => setThirdParty(e.target.value)}
+                    className={`w-full text-xs border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white ${
+                      thirdParty ? 'border-emerald-400 text-emerald-800 font-medium' : 'border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <option value="">Todos los terceros (RP)</option>
+                    {options.third_parties.map((tp: any) => (
+                      <option key={tp.value} value={tp.value}>{tp.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Búsqueda libre */}
+              <div className="relative min-w-[180px] flex-1 sm:flex-initial ml-auto">
+                <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar comprobante, FV, NIT..."
+                  className="w-full text-xs pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                {search && (
+                  <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Limpiar filtros */}
+              {hasFilters && (
+                <button
+                  onClick={clearAllFilters}
+                  className="flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 font-medium px-2 py-1 hover:bg-rose-50 rounded-lg transition-colors"
+                  title="Restablecer todos los filtros"
+                >
+                  <RotateCcw className="w-3 h-3" /> Limpiar
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tabla de Saldos Pendientes */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Tipo</th>
+                    <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Comprobante</th>
+                    <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Factura Ref.</th>
+                    <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cliente / Tercero</th>
+                    <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Mes / Fecha</th>
+                    <th className="text-right px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Valor Total</th>
+                    <th className="text-right px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Aplicado</th>
+                    <th className="text-right px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Saldo Pendiente</th>
+                    <th className="text-center px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Estado</th>
+                    <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Nota</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-12 text-center text-slate-400 text-sm">
+                        <PageLoader />
+                      </td>
+                    </tr>
+                  ) : !items.length ? (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-12 text-center text-slate-400 text-sm">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                          <p className="font-semibold text-slate-700">No hay saldos de RC o RP pendientes con los filtros seleccionados</p>
+                          <p className="text-xs text-slate-400">Todos los comprobantes correspondientes se encuentran debidamente cruzados.</p>
+                          {hasFilters && (
+                            <Button size="sm" variant="secondary" onClick={clearAllFilters} className="mt-2">
+                              Restablecer filtros
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    items.map((r: any) => {
+                      const isRC = r.doc_type === 'RC'
+                      const pctUncrossed = r.amount > 0 ? Math.round(((r.saldo ?? 0) / r.amount) * 100) : 100
+                      const isPartial = (Number(r.applied ?? 0) > 0)
+                      return (
+                        <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-3.5 py-2.5 whitespace-nowrap">
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                              isRC ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {r.doc_type}
+                              <span className="text-[9px] font-normal opacity-75">
+                                {isRC ? 'Recaudo' : 'Egreso'}
+                              </span>
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs font-semibold text-slate-800 whitespace-nowrap">
+                            {r.comprobante}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-xs text-slate-600 whitespace-nowrap">
+                            {r.fv_ref ? (
+                              <span className="font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">{r.fv_ref}</span>
+                            ) : (
+                              <span className="text-slate-400 italic text-[11px]">Sin FV</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 min-w-[220px]">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-800 text-xs leading-tight">
+                                {r.tercero_name || '—'}
+                              </span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className={`text-[10px] font-bold uppercase ${isRC ? 'text-blue-600' : 'text-emerald-600'}`}>
+                                  {isRC ? 'Cliente' : 'Tercero'}:
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-400">
+                                  {r.tercero_nit || 'Sin NIT'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3.5 py-2.5 text-xs text-slate-600 whitespace-nowrap">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-slate-700">{r.period || '—'}</span>
+                              <span className="text-[11px] text-slate-400">{r.doc_date ?? ''}</span>
+                            </div>
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right font-medium text-slate-700 whitespace-nowrap text-xs">
+                            {fmtMoney(Number(r.amount ?? 0))}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right text-slate-500 whitespace-nowrap text-xs">
+                            {fmtMoney(Number(r.applied ?? 0))}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                            <div className="flex flex-col items-end">
+                              <span className={`text-xs font-bold ${isRC ? 'text-blue-700' : 'text-emerald-700'}`}>
+                                {fmtMoney(Number(r.saldo ?? 0))}
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {pctUncrossed}% pendiente
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-3.5 py-2.5 text-center whitespace-nowrap">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isPartial
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-slate-100 text-slate-600 border border-slate-200'
+                            }`}>
+                              {isPartial ? 'Cruce parcial' : 'Sin cruzar'}
+                            </span>
+                          </td>
+                          <td className="px-3.5 py-2.5 text-xs text-slate-500 max-w-[200px] truncate" title={r.note || ''}>
+                            {r.note || '—'}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {items.length > 0 && (
+              <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span>Mostrando <b>{items.length}</b> comprobante{items.length === 1 ? '' : 's'}</span>
+                <span>
+                  Saldo pendiente acumulado: <b className="text-slate-900">{fmtMoney(s.total_saldo)}</b>
+                </span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ThirdPartiesView({
+  period, year, from, to, onSelectInvoice,
+}: {
+  period: string
+  year: string
+  from: string
+  to: string
+  onSelectInvoice: (item: any) => void
+}) {
+  const [search, setSearch] = useState('')
+  const [filterOwed, setFilterOwed] = useState<'all' | 'owed' | 'settled'>('all')
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['participations', 'by-third-party', period, year, from, to, search],
+    queryFn: async () => {
+      const p = new URLSearchParams()
+      if (period) p.set('period', period)
+      else if (year) p.set('year', year)
+      if (from) p.set('from', from)
+      if (to) p.set('to', to)
+      if (search.trim()) p.set('q', search.trim())
+      const { data } = await api.get(`/api/participations/by-third-party?${p}`)
+      return data
+    },
+  })
+
+  const summary = data?.summary ?? {}
+  const rawList: any[] = data?.third_parties ?? []
+
+  const thirdParties = rawList.filter(tp => {
+    if (filterOwed === 'owed') return tp.balance_owed > 0
+    if (filterOwed === 'settled') return tp.balance_owed <= 0
+    return true
+  })
+
+  const allExpanded = thirdParties.length > 0 && thirdParties.every(tp => !!expanded[tp.id])
+  const toggleAll = () => {
+    if (allExpanded) {
+      setExpanded({})
+    } else {
+      const next: Record<string, boolean> = {}
+      thirdParties.forEach(tp => { next[tp.id] = true })
+      setExpanded(next)
+    }
+  }
+
+  if (isLoading) return <div className="py-12"><PageLoader /></div>
+
+  return (
+    <div className="space-y-4">
+      {/* Tarjetas resumen superiores */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {[
+          { label: 'Terceros', value: summary.third_parties_count ?? 0, cls: 'text-slate-800', sub: `${summary.invoices_count ?? 0} facturas/OC` },
+          { label: 'Participación Bruta', value: fmtMoney(summary.participation_total ?? 0), cls: 'text-slate-700', sub: 'comisión causada' },
+          { label: 'Giro Neto (Impuestos)', value: fmtMoney(summary.net_payable_total ?? 0), cls: 'text-emerald-700', sub: 'tras retenciones e IVA' },
+          { label: 'Facturado Tercero', value: fmtMoney(summary.third_party_invoiced_total ?? 0), cls: 'text-violet-700', sub: 'facturas compra (FC)' },
+          { label: 'Pagado al Tercero', value: fmtMoney(summary.paid_total ?? 0), cls: 'text-slate-700', sub: 'egresos (RP)' },
+          { label: 'Saldo Neto por Pagar', value: fmtMoney(summary.net_balance_owed_total ?? 0), cls: 'text-rose-600', sub: 'neto disponible pendiente' },
+        ].map(k => (
+          <div key={k.label} className="bg-white border border-slate-200 rounded-xl p-3">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{k.label}</p>
+            <p className={`text-lg font-bold mt-0.5 ${k.cls}`}>{k.value}</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">{k.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Barra de búsqueda y filtros */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-xl p-3">
+        <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar tercero por nombre, NIT, factura o cliente…"
+              className="w-full pl-9 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          {/* Filtro de estado de saldo */}
+          <div className="flex gap-1">
+            {([
+              ['all', 'Todos'],
+              ['owed', 'Con saldo por pagar'],
+              ['settled', 'Al día'],
+            ] as const).map(([k, l]) => (
+              <button
+                key={k}
+                onClick={() => setFilterOwed(k)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                  filterOwed === k
+                    ? 'border-primary-300 bg-primary-50 text-primary-700'
+                    : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {thirdParties.length > 0 && (
+          <Button size="sm" variant="secondary" onClick={toggleAll}>
+            <ChevronsUpDown className="w-3.5 h-3.5" />
+            {allExpanded ? 'Colapsar todos' : 'Expandir todos'}
+          </Button>
+        )}
+      </div>
+
+      {/* Lista de terceros con facturas */}
+      {!thirdParties.length ? (
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-12 text-center text-slate-400 text-sm">
+          No se encontraron terceros con facturas registradas para los filtros aplicados.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {thirdParties.map((tp: any) => {
+            const isOpen = !!expanded[tp.id]
+            const invs: any[] = tp.invoices ?? []
+            return (
+              <div key={tp.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-slate-300 transition-colors">
+                {/* Cabecera del tercero */}
+                <div
+                  onClick={() => setExpanded(prev => ({ ...prev, [tp.id]: !isOpen }))}
+                  className="px-4 py-3.5 flex flex-wrap items-center justify-between gap-3 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-[240px]">
+                    <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-bold text-slate-800">{tp.name}</h4>
+                        {tp.identification && (
+                          <span className="font-mono text-xs text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                            NIT {tp.identification}
+                          </span>
+                        )}
+                        {tp.has_tax_profile ? (
+                          <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded" title="Perfil tributario asignado">
+                            {tp.tax_profile_name}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded" title="Sin perfil asignado. Cálculo neutro (sin retenciones ni IVA).">
+                            Sin perfil (neutro)
+                          </span>
+                        )}
+                        <span className="text-[11px] font-semibold text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">
+                          {tp.invoices_count} {tp.invoices_count === 1 ? 'factura' : 'facturas'}
+                        </span>
+                        {tp.unmatched_fc_count > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full"
+                            title={`${tp.unmatched_fc_count} factura(s) de compra en Siigo pendientes de asociar por valor de ${fmtMoney(tp.unmatched_fc_total)}`}
+                          >
+                            <AlertCircle className="w-3 h-3 text-amber-500" />
+                            {tp.unmatched_fc_count} FC en Siigo sin cruzar
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Métricas consolidadas en el encabezado */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Part. Bruta</span>
+                      <span className="font-semibold text-slate-700">{fmtMoney(tp.participation_total)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-emerald-700 block uppercase font-bold">Giro Neto</span>
+                      <span className="font-bold text-emerald-700">{fmtMoney(tp.net_payable_total ?? tp.available_total)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Facturado FC</span>
+                      <span className="font-semibold text-slate-700">{fmtMoney(tp.third_party_invoiced_total)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Pagado RP</span>
+                      <span className="font-semibold text-slate-700">{fmtMoney(tp.paid_total)}</span>
+                    </div>
+                    <div className="text-right pl-2 border-l border-slate-200">
+                      <span className="text-[10px] text-slate-400 block uppercase font-medium">Saldo Neto</span>
+                      <span className={`font-bold ${(tp.net_balance_owed ?? tp.balance_owed) > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                        {fmtMoney(tp.net_balance_owed ?? tp.balance_owed)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Detalle de facturas del tercero */}
+                {isOpen && (
+                  <div className="border-t border-slate-100">
+                    <div className="overflow-x-auto scrollbar-slim">
+                      <table className="w-full text-sm">
+                        <thead className="bg-slate-100/60 border-b border-slate-200/80">
+                          <tr>
+                            {['OC / Periodo', 'Cliente', 'Factura Finto (FV)', 'Factura Tercero (FC)', 'Part. Bruta', 'Recaudado (RC)', 'Giro Neto (Impuestos)', 'Pago (RP)', 'Saldo Neto', 'Estado', ''].map(h => (
+                              <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {invs.map((inv: any) => {
+                            const st = INV_STATUS[inv.status] ?? INV_STATUS.pending_third_invoice
+                            const fintoVal = Number(inv.finto_invoice_value ?? 0)
+                            const coll = Number(inv.collected ?? 0)
+                            const collPct = fintoVal > 0 ? Math.min(100, Math.round((coll / fintoVal) * 100)) : 0
+                            const thirdVal = inv.third_party_invoice_value != null ? Number(inv.third_party_invoice_value) : null
+                            const paidVal = Number(inv.egress_voucher_value ?? 0)
+                            const netPay = Number(inv.net_payable ?? inv.available_for_payment ?? 0)
+                            const netOwed = Number(inv.net_balance_owed ?? inv.balance_owed ?? 0)
+
+                            return (
+                              <tr
+                                key={inv.id}
+                                onClick={() => onSelectInvoice(inv._raw)}
+                                className="hover:bg-slate-50/80 cursor-pointer transition-colors"
+                              >
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="font-mono text-[11px] font-semibold text-slate-700">{inv.purchase_order}</div>
+                                  <div className="text-[10px] text-slate-400">{inv.period ?? '—'}</div>
+                                </td>
+
+                                <td className="px-3 py-2">
+                                  <div className="text-xs font-medium text-slate-800">{inv.client_name}</div>
+                                  {inv.client_nit && <div className="text-[10px] text-slate-400">NIT {inv.client_nit}</div>}
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="text-xs font-semibold text-slate-700">{inv.finto_invoice || '—'}</div>
+                                  <div className="text-[10px] text-slate-400">{inv.finto_invoice_date || '—'} · {fmtMoney(fintoVal)}</div>
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  {inv.third_party_invoice ? (
+                                    <>
+                                      <div className="text-xs font-medium text-violet-700">{inv.third_party_invoice}</div>
+                                      <div className="text-[10px] text-slate-400">{inv.third_party_invoice_date || '—'} · {thirdVal != null ? fmtMoney(thirdVal) : '—'}</div>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-slate-400 italic">Pendiente</span>
+                                  )}
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="text-xs font-semibold text-slate-800">{fmtMoney(Number(inv.participation_value ?? 0))}</div>
+                                  <div className="text-[10px] text-slate-400">{inv.contract_type === 'mandato' ? 'Mandato' : 'Servicio'}</div>
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="text-xs text-slate-700 font-medium">{fmtMoney(coll)} <span className="text-[10px] text-slate-400">({collPct}%)</span></div>
+                                  {inv.cash_receipts && (
+                                    <div className="text-[10px] text-blue-700 font-medium">
+                                      RC: {inv.cash_receipts}
+                                      {inv.cash_receipt_date && <span className="text-slate-500 font-normal"> ({inv.cash_receipt_date})</span>}
+                                    </div>
+                                  )}
+                                  <div className="text-[10px] text-slate-500">Disp. bruto {fmtMoney(Number(inv.available_for_payment ?? 0))}</div>
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <div className="text-xs font-bold text-emerald-700">{fmtMoney(netPay)}</div>
+                                  <div className="text-[10px]">
+                                    {inv.has_tax_profile ? (
+                                      <span className="text-emerald-600 font-medium">Liquidado</span>
+                                    ) : (
+                                      <span className="text-amber-600 font-medium">Neutro</span>
+                                    )}
+                                  </div>
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  {inv.egress_voucher ? (
+                                    <>
+                                      <div className="text-xs font-medium text-emerald-700">{inv.egress_voucher}</div>
+                                      <div className="text-[10px] text-slate-400">{inv.egress_voucher_date || '—'} · {fmtMoney(paidVal)}</div>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-slate-400 italic">Sin egreso</span>
+                                  )}
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap font-semibold">
+                                  <span className={netOwed > 0 ? 'text-red-600' : 'text-slate-400'}>
+                                    {fmtMoney(netOwed)}
+                                  </span>
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap">
+                                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${st.cls}`}>
+                                    {st.label}
+                                  </span>
+                                </td>
+
+                                <td className="px-3 py-2 whitespace-nowrap text-right">
+                                  <span className="text-xs text-primary-600 hover:text-primary-700 font-medium">
+                                    Ver detalle
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -899,7 +1579,7 @@ export function ParticipationsPage() {
   const { user } = useAuthStore()
   const isAdmin = ['admin', 'rs_admin'].includes(user?.role ?? '')
 
-  const [view, setView] = useState<'panel' | 'list' | 'payments' | 'cruce' | 'saldos'>('panel')
+  const [view, setView] = useState<'panel' | 'list' | 'third_parties' | 'payments' | 'cruce' | 'saldos'>('panel')
   const [showFilters, setShowFilters] = useState(false)
   const [statusF, setStatusF] = useState('')
   const [yearF, setYearF] = useState('')
@@ -1000,7 +1680,7 @@ export function ParticipationsPage() {
       <div className="flex-1 overflow-y-auto scrollbar-slim p-4 md:p-6 space-y-4">
         {/* Vista: Resumen (panel) / Detalle (lista) */}
         <div className="flex gap-1 border-b border-slate-200">
-          {([['panel', 'Resumen'], ['list', 'Detalle'], ['payments', 'Pagos'], ['cruce', 'Cruce'], ['saldos', 'Saldos']] as const).map(([k, l]) => (
+          {([['panel', 'Resumen'], ['list', 'Detalle'], ['third_parties', 'Terceros'], ['payments', 'Pagos'], ['cruce', 'Cruce']] as const).map(([k, l]) => (
             <button key={k} onClick={() => setView(k)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${view === k ? 'border-primary-500 text-primary-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
               {l}
@@ -1060,11 +1740,33 @@ export function ParticipationsPage() {
 
         {view === 'panel' && <BalancesPanel period={monthPeriod} year={yearOnly} from={fromF} to={toF} />}
 
-        {view === 'payments' && <PaymentsView payments={paymentsData?.payments ?? []} loading={paymentsLoading} />}
+        {view === 'third_parties' && (
+          <ThirdPartiesView
+            period={monthPeriod}
+            year={yearOnly}
+            from={fromF}
+            to={toF}
+            onSelectInvoice={item => setDetailItem(item)}
+          />
+        )}
+
+        {view === 'payments' && (
+          <PaymentsView
+            defaultPeriod={monthPeriod}
+            appliedPayments={paymentsData?.payments ?? []}
+            appliedLoading={paymentsLoading}
+          />
+        )}
 
         {view === 'cruce' && <CruceView period={monthPeriod} />}
 
-        {view === 'saldos' && <SaldosView period={monthPeriod} />}
+        {view === 'saldos' && (
+          <PaymentsView
+            defaultPeriod={monthPeriod}
+            appliedPayments={paymentsData?.payments ?? []}
+            appliedLoading={paymentsLoading}
+          />
+        )}
 
         {view === 'list' && (<>
         {/* Mini stats */}
@@ -1092,7 +1794,7 @@ export function ParticipationsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
-                    {['OC', 'Cliente', 'Servicio', 'Tercero', 'Factura', 'Valor factura', 'Participación', 'Recaudado', 'Por cobrar', 'Disponible', 'Estado', ''].map((h, i) => (
+                    {['OC', 'Cliente', 'Servicio', 'Tercero', 'Factura (FV)', 'Participación', 'Recaudo (RC)', 'Por cobrar', 'Disponible', 'Pago Tercero (RP)', 'Estado', ''].map((h, i) => (
                       <th key={i} className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -1109,11 +1811,23 @@ export function ParticipationsPage() {
                         <td className="px-3 py-2.5 text-slate-700">{r.companies?.name ?? '—'}</td>
                         <td className="px-3 py-2.5 text-slate-500">{p.company_service?.services?.name ?? '—'}</td>
                         <td className="px-3 py-2.5 text-slate-500">{p.third_party?.name ?? '—'}</td>
-                        <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{r.finto_invoice}</td>
-                        <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">{fmtMoney(inv)}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <div className="font-semibold text-slate-700">{r.finto_invoice || '—'}</div>
+                          <div className="text-[10px] text-slate-400">{r.finto_invoice_date || '—'} · {fmtMoney(inv)}</div>
+                        </td>
                         <td className="px-3 py-2.5 font-semibold text-slate-900 whitespace-nowrap">{fmtMoney(Number(r.participation_value))}</td>
-                        <td className={`px-3 py-2.5 whitespace-nowrap ${collected > 0 ? 'text-slate-700' : 'text-slate-400'}`}>
-                          {fmtMoney(collected)}{inv > 0 && <span className="text-[10px] text-slate-400"> · {Math.min(100, Math.round(collected / inv * 100))}%</span>}
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <div className={`font-semibold ${collected > 0 ? 'text-slate-800' : 'text-slate-400'}`}>
+                            {fmtMoney(collected)}{inv > 0 && <span className="text-[10px] font-normal text-slate-400"> · {Math.min(100, Math.round(collected / inv * 100))}%</span>}
+                          </div>
+                          {r.cash_receipts ? (
+                            <div className="text-[10px] text-blue-700 font-medium">
+                              RC: {r.cash_receipts}
+                              {r.cash_receipt_date && <span className="text-slate-500 font-normal"> ({r.cash_receipt_date})</span>}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-slate-400 italic">Sin recaudo</div>
+                          )}
                         </td>
                         <td className={`px-3 py-2.5 whitespace-nowrap font-semibold ${Math.max(0, inv - collected) > 0 ? 'text-blue-700' : 'text-slate-400'}`}>
                           {fmtMoney(Math.max(0, inv - collected))}
@@ -1121,9 +1835,26 @@ export function ParticipationsPage() {
                         <td className={`px-3 py-2.5 whitespace-nowrap font-medium ${Number(r.available_for_payment) > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
                           {fmtMoney(Number(r.available_for_payment ?? 0))}
                         </td>
-                        <td className="px-3 py-2.5"><span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>{st.label}</span></td>
-                        <td className="px-3 py-2.5 text-right">
-                          <span className="text-xs text-slate-400">Ver detalle</span>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          {r.egress_voucher ? (
+                            <>
+                              <div className="font-semibold text-slate-800">{fmtMoney(Number(r.egress_voucher_value ?? 0))}</div>
+                              <div className="text-[10px] text-emerald-700 font-medium">
+                                RP: {r.egress_voucher}
+                                {r.egress_voucher_date && <span className="text-slate-500 font-normal"> ({r.egress_voucher_date})</span>}
+                              </div>
+                            </>
+                          ) : Number(r.available_for_payment ?? 0) > 0 ? (
+                            <span className="text-[11px] text-amber-700 font-medium bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                              Pend. pago
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap"><span className={`text-xs font-medium px-2 py-1 rounded-full ${st.cls}`}>{st.label}</span></td>
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                          <span className="text-xs text-primary-600 hover:text-primary-700 font-medium">Ver detalle</span>
                         </td>
                       </tr>
                     )

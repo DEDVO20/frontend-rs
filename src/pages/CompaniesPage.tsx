@@ -10,7 +10,7 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   Building2, Search, Plus, Eye, Pencil, Trash2, X,
   CheckCircle2, FileText, LayoutGrid, ListTodo, Activity,
-  FileSignature, Upload, Download, Handshake, Info,
+  FileSignature, Upload, Download, Handshake, Info, Calendar,
 } from 'lucide-react'
 
 function fmtDate(d: string) {
@@ -287,9 +287,64 @@ const MODULE_ICONS: Record<string, string> = {
   'Gestión de Personal': '👥',
 }
 
+function ActivateModuleModal({
+  service,
+  onClose,
+  onActivate,
+  loading,
+}: {
+  service: any
+  onClose: () => void
+  onActivate: (startDate: string) => void
+  loading: boolean
+}) {
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{MODULE_ICONS[service.name] ?? '📦'}</span>
+            <h3 className="text-base font-bold text-slate-900">Activar módulo: {service.name}</h3>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          Indica la fecha desde la cual el cliente cuenta con este servicio. Si el cliente ya operaba con este módulo en meses anteriores, selecciona la fecha retroactiva para que el sistema pueda generar las Órdenes de Compra (OC) correspondientes a esos periodos.
+        </p>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+            Fecha de activación / inicio del servicio *
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button loading={loading} disabled={!date} onClick={() => onActivate(date)}>
+            Activar módulo
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ModulesPanel({ companyId }: { companyId: string }) {
   const qc = useQueryClient()
   const confirm = useConfirm()
+  const [activatingService, setActivatingService] = useState<any | null>(null)
 
   const { data: allServices } = useQuery({
     queryKey: ['all-services'],
@@ -301,12 +356,12 @@ function ModulesPanel({ companyId }: { companyId: string }) {
     queryFn: async () => { const { data } = await api.get(`/api/company-services/${companyId}`); return data },
   })
 
-  const enabledIds = new Set((companyServices ?? []).map((cs: any) => cs.service_id))
+  const enabledMap = new Map<string, any>((companyServices ?? []).map((cs: any) => [cs.service_id, cs]))
 
   const toggleMut = useMutation({
-    mutationFn: async ({ serviceId, enable }: { serviceId: string; enable: boolean }) => {
+    mutationFn: async ({ serviceId, enable, start_date }: { serviceId: string; enable: boolean; start_date?: string }) => {
       if (enable) {
-        await api.post(`/api/company-services/${companyId}`, { service_id: serviceId })
+        await api.post(`/api/company-services/${companyId}`, { service_id: serviceId, start_date })
       } else {
         await api.delete(`/api/company-services/${companyId}/${serviceId}`)
       }
@@ -314,61 +369,124 @@ function ModulesPanel({ companyId }: { companyId: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['company-services', companyId] })
       qc.invalidateQueries({ queryKey: ['company-detail', companyId] })
+      qc.invalidateQueries({ queryKey: ['company-participations', companyId] })
+      qc.invalidateQueries({ queryKey: ['participations'] })
       toast.success('Módulo actualizado')
+      setActivatingService(null)
     },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al actualizar módulo'),
+  })
+
+  const updateDateMut = useMutation({
+    mutationFn: async ({ serviceId, start_date }: { serviceId: string; start_date: string }) => {
+      await api.patch(`/api/company-services/${companyId}/${serviceId}`, { start_date })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['company-services', companyId] })
+      qc.invalidateQueries({ queryKey: ['company-participations', companyId] })
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      toast.success('Fecha de activación actualizada')
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al actualizar fecha'),
   })
 
   const services: any[] = allServices ?? []
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="w-1 h-5 bg-primary-500 rounded-full" />
-        <h3 className="text-xs font-bold text-primary-600 uppercase tracking-wider">Servicios contratados</h3>
+    <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+      <div>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-1 h-5 bg-primary-500 rounded-full" />
+          <h3 className="text-xs font-bold text-primary-600 uppercase tracking-wider">Servicios contratados</h3>
+        </div>
+        <h4 className="text-sm font-bold text-slate-900 mt-2">Módulos habilitados</h4>
+        <p className="text-xs text-slate-400">
+          Activa o desactiva los módulos disponibles para este cliente y define la fecha en la que se activa para generar las Órdenes de Compra (OC) mensuales y anteriores.
+        </p>
       </div>
-      <h4 className="text-sm font-bold text-slate-900 mt-2">Módulos habilitados</h4>
-      <p className="text-xs text-slate-400 mb-4">Activa o desactiva los módulos disponibles para este cliente</p>
 
       {!services.length ? (
         <p className="text-sm text-slate-400 text-center py-8">Sin servicios registrados en la plataforma</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {services.map((s: any) => {
-            const enabled = enabledIds.has(s.id)
+            const cs = enabledMap.get(s.id)
+            const enabled = !!cs
             const icon = MODULE_ICONS[s.name] ?? '📦'
             return (
               <div
                 key={s.id}
-                className={`flex items-center gap-3 p-4 rounded-xl border transition-colors ${enabled ? 'border-primary-200 bg-primary-50/30' : 'border-slate-200 bg-slate-50'
-                  }`}
+                className={`p-4 rounded-xl border transition-colors ${
+                  enabled ? 'border-primary-200 bg-primary-50/20' : 'border-slate-200 bg-slate-50'
+                }`}
               >
-                <span className="text-xl shrink-0">{icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-900">{s.name}</p>
-                  <p className="text-xs text-slate-400 truncate">{s.description ?? '—'}</p>
-                </div>
-                <button
-                  onClick={() => confirm({
-                    title: enabled ? `¿Desactivar "${s.name}"?` : `¿Activar "${s.name}"?`,
-                    description: enabled
-                      ? 'El cliente perderá acceso a este módulo.'
-                      : 'El cliente tendrá acceso a este módulo y podrá utilizarlo.',
-                    type: enabled ? 'warning' : 'info',
-                    confirmLabel: enabled ? 'Desactivar' : 'Activar',
-                    onConfirm: () => toggleMut.mutateAsync({ serviceId: s.id, enable: !enabled }),
-                  })}
-                  disabled={toggleMut.isPending}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 ${enabled ? 'bg-primary-600' : 'bg-slate-300'
+                <div className="flex items-center gap-3">
+                  <span className="text-xl shrink-0">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">{s.name}</p>
+                    <p className="text-xs text-slate-400 truncate">{s.description ?? '—'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (enabled) {
+                        confirm({
+                          title: `¿Desactivar "${s.name}"?`,
+                          description: 'El cliente perderá acceso a este módulo y se registrará la fecha de retiro de hoy.',
+                          type: 'warning',
+                          confirmLabel: 'Desactivar',
+                          onConfirm: () => toggleMut.mutateAsync({ serviceId: s.id, enable: false }),
+                        })
+                      } else {
+                        setActivatingService(s)
+                      }
+                    }}
+                    disabled={toggleMut.isPending}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full shrink-0 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 ${
+                      enabled ? 'bg-primary-600' : 'bg-slate-300'
                     }`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${
+                        enabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {enabled && (
+                  <div className="mt-3 pt-3 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-primary-600 shrink-0" />
+                      <span className="text-[11px] font-semibold text-slate-600">Fecha de activación:</span>
+                    </div>
+                    <input
+                      type="date"
+                      value={cs.start_date ?? ''}
+                      onChange={e => {
+                        if (e.target.value) {
+                          updateDateMut.mutate({ serviceId: s.id, start_date: e.target.value })
+                        }
+                      }}
+                      className="text-xs border border-slate-200 bg-white rounded-lg px-2 py-1 text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      title="Fecha de activación (usada para liquidar y generar las OC anteriores)"
+                    />
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
+      )}
+
+      {activatingService && (
+        <ActivateModuleModal
+          service={activatingService}
+          onClose={() => setActivatingService(null)}
+          loading={toggleMut.isPending}
+          onActivate={(startDate) =>
+            toggleMut.mutateAsync({ serviceId: activatingService.id, enable: true, start_date: startDate })
+          }
+        />
       )}
     </div>
   )
@@ -567,8 +685,8 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const [ptype, setPtype] = useState<'percentage' | 'fixed'>(row.participation?.participation_type ?? 'percentage')
   const [pct, setPct] = useState<string>(row.participation?.percentage != null ? String(row.participation.percentage) : '')
   const [fixedValue, setFixedValue] = useState<string>(row.participation?.fixed_value != null ? String(row.participation.fixed_value) : '')
-  const [startDate, setStartDate] = useState<string>(row.participation?.start_date ?? '')
-  const [endDate, setEndDate] = useState<string>(row.participation?.end_date ?? '')
+  const [startDate, setStartDate] = useState<string>(row.participation?.start_date ?? row.start_date ?? '')
+  const [endDate, setEndDate] = useState<string>(row.participation?.end_date ?? row.end_date ?? '')
   const [billingDay, setBillingDay] = useState<1 | 15>(row.participation?.billing_day === 15 ? 15 : 1)
   const [billingMode, setBillingMode] = useState<'vencido' | 'anticipado'>(row.participation?.billing_mode ?? 'vencido')
   const [active, setActive] = useState<boolean>(row.participation?.active ?? true)
