@@ -806,6 +806,97 @@ function LinkPaymentToInvoiceModal({
   )
 }
 
+function AvailableDocumentsPicker({
+  docType,
+  nit,
+  title,
+  onSelect,
+}: {
+  docType: 'FV' | 'RC' | 'FC' | 'RP'
+  nit: string
+  title: string
+  onSelect: (doc: any) => void
+}) {
+  const { data: docs, isLoading } = useQuery({
+    queryKey: ['participations', 'available-documents', docType, nit],
+    enabled: !!nit,
+    queryFn: async () => {
+      const { data } = await api.get(`/api/participations/available-documents?doc_type=${docType}&nit=${encodeURIComponent(nit)}`)
+      return (data ?? []) as any[]
+    },
+  })
+
+  if (!nit) {
+    return (
+      <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-2">
+        Sin NIT registrado para buscar comprobantes de tipo {docType} en SIIGO.
+      </p>
+    )
+  }
+
+  if (isLoading) {
+    return <div className="py-2 text-center text-slate-400 text-xs"><PageLoader /></div>
+  }
+
+  if (!docs || docs.length === 0) {
+    return (
+      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-500 text-[11px]">
+        No se encontraron comprobantes tipo <b>{docType}</b> en SIIGO para el NIT <b>{nit}</b>. Puedes digitar los valores manualmente abajo.
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1.5 bg-slate-50 p-2.5 border border-slate-200 rounded-xl">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-bold text-slate-700">{title}</span>
+        <span className="text-[10px] text-slate-400 font-medium">{docs.length} encontrado(s) en SIIGO</span>
+      </div>
+      <div className="border border-slate-200 rounded-lg overflow-hidden max-h-36 overflow-y-auto scrollbar-slim bg-white">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase sticky top-0 border-b border-slate-100">
+            <tr>
+              <th className="px-2.5 py-1.5 text-left">Comprobante</th>
+              <th className="px-2.5 py-1.5 text-left">Fecha</th>
+              <th className="px-2.5 py-1.5 text-right">Valor</th>
+              <th className="px-2.5 py-1.5 text-center">Estado</th>
+              <th className="px-2.5 py-1.5 text-right">Acción</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {docs.map((d: any) => {
+              const val = d.doc_type === 'RC' || d.doc_type === 'RP' ? Number(d.saldo ?? d.amount ?? 0) : Number(d.amount ?? 0)
+              return (
+                <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="px-2.5 py-1 font-mono font-bold text-slate-800 whitespace-nowrap">{d.comprobante}</td>
+                  <td className="px-2.5 py-1 text-slate-500 whitespace-nowrap">{d.doc_date || d.period || '—'}</td>
+                  <td className="px-2.5 py-1 text-right font-semibold text-slate-700 whitespace-nowrap">{fmtMoney(val)}</td>
+                  <td className="px-2.5 py-1 text-center whitespace-nowrap">
+                    {d.matched ? (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Cruzado</span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">Disponible</span>
+                    )}
+                  </td>
+                  <td className="px-2.5 py-1 text-right whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() => onSelect(d)}
+                      className="text-[10px] font-bold text-primary-600 hover:text-primary-700 px-2 py-0.5 rounded bg-primary-50 hover:bg-primary-100 transition-colors"
+                    >
+                      Asignar
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; onClose: () => void }) {
   const qc = useQueryClient()
   const [item, setItem] = useState(initialItem)
@@ -821,9 +912,11 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
 
   const clientNit = item.companies?.nit || item.client_nit || ''
   const clientName = item.companies?.name || item.client_name || ''
+  const p = item.participation ?? {}
+  const thirdPartyNit = p.third_party?.identification || item.nit_tercero || ''
+  const thirdPartyName = p.third_party?.name || item.tercero || ''
 
   const st = INV_STATUS[item.status] ?? INV_STATUS.pending_third_invoice
-  const p = item.participation ?? {}
   const inv = Number(item.finto_invoice_value ?? 0)
   const collected = Number(item.collected ?? 0)
   const pct = inv > 0 ? Math.min(100, Math.round(collected / inv * 100)) : 0
@@ -952,7 +1045,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
               <span className="font-mono text-sm text-slate-600">{item.purchase_order}</span>
               <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
             </h3>
-            <p className="text-xs text-slate-400">{item.companies?.name ?? '—'} · {p.third_party?.name ?? 'sin tercero'}</p>
+            <p className="text-xs text-slate-400">{clientName || '—'} · {thirdPartyName || 'sin tercero'}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X className="w-4 h-4" /></button>
         </div>
@@ -987,6 +1080,20 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
           >
             {editingStage === 2 ? (
               <div className="space-y-3">
+                <AvailableDocumentsPicker
+                  docType="FV"
+                  nit={clientNit}
+                  title="Facturas de venta de este cliente en SIIGO:"
+                  onSelect={(doc) => {
+                    setEditForm(f => ({
+                      ...f,
+                      finto_invoice: doc.comprobante,
+                      finto_invoice_date: doc.doc_date || f.finto_invoice_date || '',
+                      finto_invoice_value: Number(doc.amount ?? 0),
+                    }))
+                    toast.info(`Datos cargados de la factura ${doc.comprobante}`)
+                  }}
+                />
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1">Factura de venta (FV)</label>
                   <input
@@ -994,7 +1101,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                     value={editForm.finto_invoice ?? ''}
                     onChange={e => setEditForm(f => ({ ...f, finto_invoice: e.target.value }))}
                     placeholder="ej: FV-4-1234"
-                    className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -1004,7 +1111,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       type="date"
                       value={editForm.finto_invoice_date ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, finto_invoice_date: e.target.value }))}
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
@@ -1015,7 +1122,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       value={editForm.finto_invoice_value ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, finto_invoice_value: e.target.value }))}
                       placeholder="0"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1054,6 +1161,20 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
           >
             {editingStage === 3 ? (
               <div className="space-y-3">
+                <AvailableDocumentsPicker
+                  docType="RC"
+                  nit={clientNit}
+                  title="Recibos de caja de este cliente en SIIGO:"
+                  onSelect={(doc) => {
+                    setEditForm(f => ({
+                      ...f,
+                      cash_receipts: doc.comprobante,
+                      cash_receipt_date: doc.doc_date || f.cash_receipt_date || '',
+                      collected: Number(doc.saldo ?? doc.amount ?? 0),
+                    }))
+                    toast.info(`Datos cargados del recibo ${doc.comprobante}`)
+                  }}
+                />
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1">Recibo(s) de caja (RC)</label>
                   <input
@@ -1061,7 +1182,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                     value={editForm.cash_receipts ?? ''}
                     onChange={e => setEditForm(f => ({ ...f, cash_receipts: e.target.value }))}
                     placeholder="ej: RC-1-53, RC-1-80"
-                    className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -1071,7 +1192,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       type="date"
                       value={editForm.cash_receipt_date ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, cash_receipt_date: e.target.value }))}
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
@@ -1082,7 +1203,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       value={editForm.collected ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, collected: e.target.value }))}
                       placeholder="0"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1152,6 +1273,20 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
           >
             {editingStage === 4 ? (
               <div className="space-y-3">
+                <AvailableDocumentsPicker
+                  docType="FC"
+                  nit={thirdPartyNit}
+                  title="Facturas de compra del tercero en SIIGO:"
+                  onSelect={(doc) => {
+                    setEditForm(f => ({
+                      ...f,
+                      third_party_invoice: doc.comprobante,
+                      third_party_invoice_date: doc.doc_date || f.third_party_invoice_date || '',
+                      third_party_invoice_value: Number(doc.amount ?? 0),
+                    }))
+                    toast.info(`Datos cargados de la factura ${doc.comprobante}`)
+                  }}
+                />
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-500 mb-1">Factura tercero (FC)</label>
@@ -1160,7 +1295,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       value={editForm.third_party_invoice ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, third_party_invoice: e.target.value }))}
                       placeholder="ej: FC-1234"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
@@ -1169,7 +1304,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       type="date"
                       value={editForm.third_party_invoice_date ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, third_party_invoice_date: e.target.value }))}
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1182,7 +1317,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       value={editForm.third_party_invoice_value ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, third_party_invoice_value: e.target.value }))}
                       placeholder="0"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
@@ -1192,7 +1327,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       value={editForm.payment_order ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, payment_order: e.target.value }))}
                       placeholder="ej: OP-202608-000001"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1231,6 +1366,20 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
           >
             {editingStage === 5 ? (
               <div className="space-y-3">
+                <AvailableDocumentsPicker
+                  docType="RP"
+                  nit={thirdPartyNit}
+                  title="Comprobantes de egreso / pagos en SIIGO:"
+                  onSelect={(doc) => {
+                    setEditForm(f => ({
+                      ...f,
+                      egress_voucher: doc.comprobante,
+                      egress_voucher_date: doc.doc_date || f.egress_voucher_date || '',
+                      egress_voucher_value: Number(doc.saldo ?? doc.amount ?? 0),
+                    }))
+                    toast.info(`Datos cargados del pago ${doc.comprobante}`)
+                  }}
+                />
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1">Comprobante de egreso (RP)</label>
                   <input
@@ -1238,7 +1387,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                     value={editForm.egress_voucher ?? ''}
                     onChange={e => setEditForm(f => ({ ...f, egress_voucher: e.target.value }))}
                     placeholder="ej: RP-1-456"
-                    className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -1248,7 +1397,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       type="date"
                       value={editForm.egress_voucher_date ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, egress_voucher_date: e.target.value }))}
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                   <div>
@@ -1259,7 +1408,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                       value={editForm.egress_voucher_value ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, egress_voucher_value: e.target.value }))}
                       placeholder="0"
-                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
                 </div>
@@ -1276,6 +1425,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
               </>
             )}
           </Stage>
+
 
           {item.tax_partition && (
             <div className="border border-primary-200 rounded-xl overflow-hidden">
