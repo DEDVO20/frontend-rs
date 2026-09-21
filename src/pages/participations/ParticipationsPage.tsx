@@ -356,6 +356,91 @@ function AccountSettingsModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function UnlinkSaleInvoiceModal({
+  item,
+  onClose,
+  onSuccess,
+}: {
+  item: any
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [unlinkReceipts, setUnlinkReceipts] = useState(false)
+  const qc = useQueryClient()
+  const collected = Number(item.collected ?? 0)
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/api/participations/unlink-sale-invoice', {
+        invoice_id: item.id,
+        unlink_receipts: unlinkReceipts,
+      })
+      return data
+    },
+    onSuccess: () => {
+      toast.success('Factura de venta desvinculada de la orden de compra')
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      onSuccess()
+      onClose()
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? 'Error al desvincular la factura')
+    },
+  })
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-rose-600 font-bold">
+            <Unlink className="w-5 h-5" />
+            <h3 className="text-base text-slate-900">Desvincular Factura de Venta (FV)</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          Se quitará la factura de venta <strong className="font-mono text-slate-800">{item.finto_invoice}</strong> ({fmtMoney(Number(item.finto_invoice_value ?? 0))}) de la orden <strong className="font-mono text-slate-800">{item.purchase_order}</strong>.
+        </p>
+
+        <div className="p-3 bg-slate-50 rounded-xl space-y-2 text-xs text-slate-600 border border-slate-200">
+          <p>• La orden de compra regresará al estado <strong>Pendiente de factura</strong>.</p>
+          <p>• La factura <span className="font-mono font-semibold">{item.finto_invoice}</span> quedará liberada en SIIGO para poder asignarse a otra OC.</p>
+          {collected > 0 && (
+            <div className="mt-2 pt-2 border-t border-slate-200">
+              <p className="text-amber-800 font-medium mb-1.5">
+                Esta OC tiene actualmente un recaudo registrado de <strong>{fmtMoney(collected)}</strong>.
+              </p>
+              <label className="flex items-center gap-2 cursor-pointer select-none text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={unlinkReceipts}
+                  onChange={e => setUnlinkReceipts(e.target.checked)}
+                  className="rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                />
+                <span>Desvincular y liberar también los recibos de caja asociados</span>
+              </label>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button
+            variant="danger"
+            size="sm"
+            loading={mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            Confirmar Desvinculación
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function UnlinkPaymentModal({
   invoice,
   onClose,
@@ -897,6 +982,60 @@ function AvailableDocumentsPicker({
   )
 }
 
+function DetailField({ label, value, mono }: { label: string; value: any; mono?: boolean }) {
+  return (
+    <div className="flex justify-between gap-4 py-1">
+      <span className="text-xs text-slate-400">{label}</span>
+      <span className={`text-sm text-slate-700 text-right ${mono ? 'font-mono text-[12px]' : ''}`}>{value ?? '—'}</span>
+    </div>
+  )
+}
+
+function DetailStage({
+  n,
+  title,
+  done,
+  editable,
+  isEditing,
+  onToggleEdit,
+  children,
+}: {
+  n: number
+  title: string
+  done: boolean
+  editable?: boolean
+  isEditing?: boolean
+  onToggleEdit?: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="border border-slate-200 rounded-xl overflow-hidden transition-shadow hover:shadow-sm">
+      <div className={`px-4 py-2 flex items-center gap-2 ${done ? 'bg-emerald-50' : 'bg-slate-50'}`}>
+        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${done ? 'bg-emerald-500 text-white' : 'bg-slate-300 text-white'}`}>{n}</span>
+        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{title}</span>
+        <div className="ml-auto flex items-center gap-2">
+          {done && !isEditing && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+          {editable && onToggleEdit && (
+            <button
+              type="button"
+              onClick={onToggleEdit}
+              className={`text-[11px] font-semibold px-2 py-0.5 rounded transition-colors flex items-center gap-1 ${
+                isEditing
+                  ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-primary-600 hover:border-primary-300 shadow-xs'
+              }`}
+            >
+              <Edit2 className="w-3 h-3" />
+              {isEditing ? 'Cancelar' : 'Editar'}
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="px-4 py-3">{children}</div>
+    </div>
+  )
+}
+
 function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; onClose: () => void }) {
   const qc = useQueryClient()
   const [item, setItem] = useState(initialItem)
@@ -905,6 +1044,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
   const [reallocateOpen, setReallocateOpen] = useState(false)
   const [linkOpen, setLinkOpen] = useState(false)
   const [unlinkOpen, setUnlinkOpen] = useState(false)
+  const [unlinkFvOpen, setUnlinkFvOpen] = useState(false)
 
   useEffect(() => {
     setItem(initialItem)
@@ -931,55 +1071,6 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
   const purchaseDone  = rank >= 3 || !!item.third_party_invoice || !!item.payment_order
   const paymentDone   = rank >= 5 || !!item.egress_voucher
 
-  const Field = ({ label, value, mono }: { label: string; value: any; mono?: boolean }) => (
-    <div className="flex justify-between gap-4 py-1">
-      <span className="text-xs text-slate-400">{label}</span>
-      <span className={`text-sm text-slate-700 text-right ${mono ? 'font-mono text-[12px]' : ''}`}>{value ?? '—'}</span>
-    </div>
-  )
-
-  const Stage = ({
-    n,
-    title,
-    done,
-    editable,
-    isEditing,
-    onToggleEdit,
-    children,
-  }: {
-    n: number
-    title: string
-    done: boolean
-    editable?: boolean
-    isEditing?: boolean
-    onToggleEdit?: () => void
-    children: ReactNode
-  }) => (
-    <div className="border border-slate-200 rounded-xl overflow-hidden transition-shadow hover:shadow-sm">
-      <div className={`px-4 py-2 flex items-center gap-2 ${done ? 'bg-emerald-50' : 'bg-slate-50'}`}>
-        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${done ? 'bg-emerald-500 text-white' : 'bg-slate-300 text-white'}`}>{n}</span>
-        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{title}</span>
-        <div className="ml-auto flex items-center gap-2">
-          {done && !isEditing && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-          {editable && onToggleEdit && (
-            <button
-              type="button"
-              onClick={onToggleEdit}
-              className={`text-[11px] font-semibold px-2 py-0.5 rounded transition-colors flex items-center gap-1 ${
-                isEditing
-                  ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:text-primary-600 hover:border-primary-300 shadow-xs'
-              }`}
-            >
-              <Edit2 className="w-3 h-3" />
-              {isEditing ? 'Cancelar' : 'Editar'}
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="px-4 py-3">{children}</div>
-    </div>
-  )
 
   const updateMutation = useMutation({
     mutationFn: async (payload: any) => {
@@ -1000,11 +1091,10 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
   const handleSaveStage = () => {
     const payload: Record<string, any> = {}
     if (editingStage === 2) {
-      if (editForm.finto_invoice !== undefined) payload.finto_invoice = editForm.finto_invoice.trim() || null
-      if (editForm.finto_invoice_date !== undefined) payload.finto_invoice_date = editForm.finto_invoice_date || null
-      if (editForm.finto_invoice_value !== undefined && editForm.finto_invoice_value !== '') {
-        payload.finto_invoice_value = Number(editForm.finto_invoice_value) || 0
-      }
+      const fv = editForm.finto_invoice?.trim() || null
+      payload.finto_invoice = fv
+      payload.finto_invoice_date = fv ? (editForm.finto_invoice_date || null) : null
+      payload.finto_invoice_value = fv ? (Number(editForm.finto_invoice_value) || 0) : 0
     } else if (editingStage === 3) {
       if (editForm.cash_receipts !== undefined) payload.cash_receipts = editForm.cash_receipts.trim() || null
       if (editForm.cash_receipt_date !== undefined) payload.cash_receipt_date = editForm.cash_receipt_date || null
@@ -1052,15 +1142,15 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
 
         <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-3">
           {/* Etapa 1: Solo lectura */}
-          <Stage n={1} title="Generación · OC" done>
-            <Field label="Orden de compra" value={item.purchase_order} mono />
-            <Field label="Periodo" value={item.period ?? '—'} />
-            <Field label="Servicio" value={p.company_service?.services?.name ?? '—'} />
-            <Field label="Participación causada" value={fmtMoney(Number(item.participation_value ?? 0))} />
-          </Stage>
+          <DetailStage n={1} title="Generación · OC" done>
+            <DetailField label="Orden de compra" value={item.purchase_order} mono />
+            <DetailField label="Periodo" value={item.period ?? '—'} />
+            <DetailField label="Servicio" value={p.company_service?.services?.name ?? '—'} />
+            <DetailField label="Participación causada" value={fmtMoney(Number(item.participation_value ?? 0))} />
+          </DetailStage>
 
           {/* Etapa 2: Venta Finto */}
-          <Stage
+          <DetailStage
             n={2}
             title="Venta (factura Finto)"
             done={saleDone}
@@ -1095,7 +1185,25 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                   }}
                 />
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Factura de venta (FV)</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-slate-500">Factura de venta (FV)</label>
+                    {editForm.finto_invoice && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditForm(f => ({
+                            ...f,
+                            finto_invoice: '',
+                            finto_invoice_date: '',
+                            finto_invoice_value: '',
+                          }))
+                        }}
+                        className="text-[10px] text-rose-600 hover:text-rose-700 font-semibold"
+                      >
+                        Limpiar / Quitar FV
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={editForm.finto_invoice ?? ''}
@@ -1133,15 +1241,26 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
               </div>
             ) : (
               <>
-                <Field label="Factura de venta" value={item.finto_invoice ?? 'Pendiente'} />
-                <Field label="Fecha" value={item.finto_invoice_date ?? '—'} />
-                <Field label="Valor factura" value={fmtMoney(inv)} />
+                <DetailField label="Factura de venta" value={item.finto_invoice ?? 'Pendiente'} />
+                <DetailField label="Fecha" value={item.finto_invoice_date ?? '—'} />
+                <DetailField label="Valor factura" value={fmtMoney(inv)} />
+                {item.finto_invoice && (
+                  <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setUnlinkFvOpen(true)}
+                      className="text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                    >
+                      <Unlink className="w-3 h-3 text-rose-600" /> Desvincular factura (FV)
+                    </button>
+                  </div>
+                )}
               </>
             )}
-          </Stage>
+          </DetailStage>
 
           {/* Etapa 3: Recaudo CxC */}
-          <Stage
+          <DetailStage
             n={3}
             title="Recaudo del cliente (CxC · RC)"
             done={collectDone}
@@ -1214,10 +1333,10 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
               </div>
             ) : (
               <div className="space-y-2">
-                <Field label="Recibo de caja (RC)" value={item.cash_receipts ?? 'Pendiente'} mono />
-                <Field label="Fecha de recaudo (RC)" value={item.cash_receipt_date ?? (item.cash_receipts ? 'Sin fecha' : '—')} />
-                <Field label="Recaudado" value={`${fmtMoney(collected)}${inv > 0 ? ` · ${pct}%` : ''}`} />
-                <Field label="Disponible para el tercero" value={fmtMoney(Number(item.available_for_payment ?? 0))} />
+                <DetailField label="Recibo de caja (RC)" value={item.cash_receipts ?? 'Pendiente'} mono />
+                <DetailField label="Fecha de recaudo (RC)" value={item.cash_receipt_date ?? (item.cash_receipts ? 'Sin fecha' : '—')} />
+                <DetailField label="Recaudado" value={`${fmtMoney(collected)}${inv > 0 ? ` · ${pct}%` : ''}`} />
+                <DetailField label="Disponible para el tercero" value={fmtMoney(Number(item.available_for_payment ?? 0))} />
 
                 {/* Acciones manuales de recaudo */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
@@ -1249,10 +1368,10 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                 </div>
               </div>
             )}
-          </Stage>
+          </DetailStage>
 
           {/* Etapa 4: Factura de compra tercero + OP */}
-          <Stage
+          <DetailStage
             n={4}
             title="Factura de compra + Orden de Pago"
             done={purchaseDone}
@@ -1338,15 +1457,15 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
               </div>
             ) : (
               <>
-                <Field label="Factura del tercero" value={item.third_party_invoice ?? (purchaseDone ? 'No registrada (pago directo)' : 'Pendiente')} />
-                <Field label="Valor" value={item.third_party_invoice_value != null ? fmtMoney(Number(item.third_party_invoice_value)) : '—'} />
-                <Field label="Orden de pago" value={item.payment_order ?? '—'} mono />
+                <DetailField label="Factura del tercero" value={item.third_party_invoice ?? (purchaseDone ? 'No registrada (pago directo)' : 'Pendiente')} />
+                <DetailField label="Valor" value={item.third_party_invoice_value != null ? fmtMoney(Number(item.third_party_invoice_value)) : '—'} />
+                <DetailField label="Orden de pago" value={item.payment_order ?? '—'} mono />
               </>
             )}
-          </Stage>
+          </DetailStage>
 
           {/* Etapa 5: Pago al tercero RP */}
-          <Stage
+          <DetailStage
             n={5}
             title="Pago al tercero (egreso · RP)"
             done={paymentDone}
@@ -1419,12 +1538,12 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
               </div>
             ) : (
               <>
-                <Field label="Comprobante de egreso (RP)" value={item.egress_voucher ?? (paymentDone ? 'Registrado' : 'Pendiente')} mono />
-                <Field label="Fecha de pago (RP)" value={item.egress_voucher_date ?? (item.egress_voucher ? 'Sin fecha' : '—')} />
-                <Field label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
+                <DetailField label="Comprobante de egreso (RP)" value={item.egress_voucher ?? (paymentDone ? 'Registrado' : 'Pendiente')} mono />
+                <DetailField label="Fecha de pago (RP)" value={item.egress_voucher_date ?? (item.egress_voucher ? 'Sin fecha' : '—')} />
+                <DetailField label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
               </>
             )}
-          </Stage>
+          </DetailStage>
 
 
           {item.tax_partition && (
@@ -1454,12 +1573,12 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                   <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1">
                     Desglose sobre la participación · recaudo {Math.round((item.tax_partition.collectionRatio ?? 0) * 100)}%
                   </p>
-                  <Field label="IVA factura" value={fmtMoney(item.tax_partition.breakdown.invoiceIva)} />
-                  <Field label="Retención fuente" value={fmtMoney(item.tax_partition.breakdown.incomeWithholding.amount)} />
-                  <Field label="Retención ICA" value={fmtMoney(item.tax_partition.breakdown.icaWithholding.amount)} />
-                  <Field label="Retención IVA" value={fmtMoney(item.tax_partition.breakdown.ivaWithholding.amount)} />
-                  <Field label="Comisión + IVA" value={fmtMoney(item.tax_partition.breakdown.commissionTotal)} />
-                  <Field label="Giro final (100% recaudo)" value={fmtMoney(item.tax_partition.breakdown.finalTotal)} />
+                  <DetailField label="IVA factura" value={fmtMoney(item.tax_partition.breakdown.invoiceIva)} />
+                  <DetailField label="Retención fuente" value={fmtMoney(item.tax_partition.breakdown.incomeWithholding.amount)} />
+                  <DetailField label="Retención ICA" value={fmtMoney(item.tax_partition.breakdown.icaWithholding.amount)} />
+                  <DetailField label="Retención IVA" value={fmtMoney(item.tax_partition.breakdown.ivaWithholding.amount)} />
+                  <DetailField label="Comisión + IVA" value={fmtMoney(item.tax_partition.breakdown.commissionTotal)} />
+                  <DetailField label="Giro final (100% recaudo)" value={fmtMoney(item.tax_partition.breakdown.finalTotal)} />
                 </div>
               )}
             </div>
@@ -1471,7 +1590,7 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
         </div>
       </div>
 
-      {/* Sub-modales de recaudo */}
+      {/* Sub-modales de recaudo y factura */}
       {reallocateOpen && (
         <ReallocatePaymentModal
           fromInvoice={item}
@@ -1496,6 +1615,14 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
           clientNit={clientNit}
           clientName={clientName}
           onClose={() => setLinkOpen(false)}
+          onSuccess={() => reloadInvoice()}
+        />
+      )}
+
+      {unlinkFvOpen && (
+        <UnlinkSaleInvoiceModal
+          item={item}
+          onClose={() => setUnlinkFvOpen(false)}
           onSuccess={() => reloadInvoice()}
         />
       )}
