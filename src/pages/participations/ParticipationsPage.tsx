@@ -581,7 +581,240 @@ function DocTypeFilter({ value, onChange, options }: { value: string; onChange: 
   )
 }
 
-function CruceView({ period }: { period: string }) {
+function ManualPaymentModal({
+  data: initialData,
+  onClose,
+}: {
+  data: { comprobante: string; clientNit?: string; clientName?: string; amount: number; fvRef?: string }
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const comprobante = initialData.comprobante
+  const clientNit = initialData.clientNit || ''
+  const totalAmount = Number(initialData.amount ?? 0)
+
+  const [allocations, setAllocations] = useState<Record<string, number>>({})
+
+  const { data: openInvoices, isLoading } = useQuery({
+    queryKey: ['participations', 'client-pending-invoices', clientNit],
+    enabled: !!clientNit,
+    queryFn: async () => {
+      const { data } = await api.get(`/api/participations/client-pending-invoices?nit=${encodeURIComponent(clientNit)}`)
+      return (data ?? []) as any[]
+    },
+  })
+
+  const roundMoney = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+
+  // Autollenar con orden FIFO (factura más antigua primero)
+  const autoFillFifo = () => {
+    if (!openInvoices?.length) return
+    let remaining = totalAmount
+    const newAlloc: Record<string, number> = {}
+
+    const sorted = [...openInvoices].sort((a, b) =>
+      String(a.finto_invoice_date ?? a.period ?? '').localeCompare(String(b.finto_invoice_date ?? b.period ?? ''))
+    )
+
+    for (const inv of sorted) {
+      if (remaining <= 0.01) break
+      const bal = Number(inv.balance ?? 0)
+      if (bal <= 0) continue
+      const toApply = roundMoney(Math.min(remaining, bal))
+      newAlloc[inv.id] = toApply
+      remaining = roundMoney(remaining - toApply)
+    }
+
+    setAllocations(newAlloc)
+  }
+
+  // Pre-llenar automáticamente al cargar las facturas
+  useEffect(() => {
+    if (openInvoices && openInvoices.length > 0 && Object.keys(allocations).length === 0) {
+      autoFillFifo()
+    }
+  }, [openInvoices])
+
+  const currentTotal = roundMoney(Object.values(allocations).reduce((a, b) => a + (Number(b) || 0), 0))
+  const remainingTotal = roundMoney(Math.max(0, totalAmount - currentTotal))
+  const isOverAllocated = currentTotal > totalAmount + 0.01
+
+  const applyMutation = useMutation({
+    mutationFn: async () => {
+      const allocList = Object.entries(allocations)
+        .filter(([_, val]) => val > 0)
+        .map(([invoice_id, amount]) => ({ invoice_id, amount }))
+
+      const { data } = await api.post('/api/participations/apply-manual-payment', {
+        comprobante,
+        client_nit: clientNit,
+        allocations: allocList,
+      })
+      return data
+    },
+    onSuccess: (res: any) => {
+      toast.success(`Recaudo aplicado correctamente a ${res.invoices?.length ?? 0} factura(s)`)
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      onClose()
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? 'Error al aplicar el recaudo')
+    },
+  })
+
+  const setInvoiceAmount = (id: string, val: number) => {
+    setAllocations(prev => {
+      const copy = { ...prev }
+      if (val <= 0) delete copy[id]
+      else copy[id] = roundMoney(val)
+      return copy
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700">RC</span>
+              <h3 className="text-base font-bold text-slate-900">Aplicación Manual de Recaudo</h3>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Comprobante <b>{comprobante}</b> · Cliente: <b>{initialData.clientName || clientNit || '—'}</b> (NIT: {clientNit || '—'})
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-4">
+          {/* Card de resumen del monto */}
+          <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Recibo</p>
+              <p className="text-sm font-bold text-slate-800">{fmtMoney(totalAmount)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Asignado</p>
+              <p className={`text-sm font-bold ${isOverAllocated ? 'text-rose-600' : 'text-emerald-600'}`}>
+                {fmtMoney(currentTotal)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Por Asignar</p>
+              <p className="text-sm font-bold text-slate-600">{fmtMoney(remainingTotal)}</p>
+            </div>
+          </div>
+
+          {/* Acciones de llenado rápido */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-700">Facturas Pendientes del Cliente (FIFO):</span>
+            <Button size="sm" variant="secondary" onClick={autoFillFifo} disabled={isLoading || !openInvoices?.length}>
+              <RotateCcw className="w-3 h-3" /> Autollenar FIFO (Más antigua primero)
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="py-12 text-center text-slate-400"><PageLoader /></div>
+          ) : !openInvoices?.length ? (
+            <div className="p-8 text-center bg-slate-50 rounded-xl border border-slate-100">
+              <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-slate-700">Sin facturas pendientes con saldo</p>
+              <p className="text-xs text-slate-400">Todas las facturas de este cliente se encuentran completamente pagadas o no hay facturas configuradas para este NIT.</p>
+            </div>
+          ) : (
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Factura</th>
+                    <th className="px-3 py-2 text-left">Fecha / Mes</th>
+                    <th className="px-3 py-2 text-right">Valor Total</th>
+                    <th className="px-3 py-2 text-right">Recaudado</th>
+                    <th className="px-3 py-2 text-right">Saldo Pend.</th>
+                    <th className="px-3 py-2 text-right w-36">Abonar ($)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {openInvoices.map((inv: any) => {
+                    const allocatedVal = allocations[inv.id] || 0
+                    return (
+                      <tr key={inv.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-3 py-2 font-mono font-medium text-slate-800 whitespace-nowrap">
+                          {inv.finto_invoice || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-slate-500 whitespace-nowrap">
+                          {inv.finto_invoice_date || inv.period || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right text-slate-600 whitespace-nowrap">
+                          {fmtMoney(inv.finto_invoice_value)}
+                        </td>
+                        <td className="px-3 py-2 text-right text-emerald-600 whitespace-nowrap">
+                          {fmtMoney(inv.collected)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-semibold text-slate-800 whitespace-nowrap">
+                          {fmtMoney(inv.balance)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max={inv.balance}
+                              step="any"
+                              value={allocatedVal || ''}
+                              onChange={e => setInvoiceAmount(inv.id, Number(e.target.value) || 0)}
+                              placeholder="0"
+                              className="w-24 text-right text-xs font-semibold px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setInvoiceAmount(inv.id, inv.balance)}
+                              title="Asignar saldo completo"
+                              className="text-[10px] font-bold text-primary-600 hover:text-primary-700 px-1.5 py-0.5 rounded bg-primary-50 hover:bg-primary-100"
+                            >
+                              Max
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {isOverAllocated && (
+            <p className="text-xs text-rose-600 font-medium">
+              ⚠️ El valor asignado ({fmtMoney(currentTotal)}) supera el monto disponible del recibo ({fmtMoney(totalAmount)}).
+            </p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100 shrink-0 bg-slate-50 rounded-b-2xl">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button
+            size="sm"
+            loading={applyMutation.isPending}
+            disabled={currentTotal <= 0 || isOverAllocated}
+            onClick={() => applyMutation.mutate()}
+          >
+            Confirmar y Aplicar Recaudo
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CruceView({ period, onApplyPayment }: { period: string; onApplyPayment?: (data: any) => void }) {
   const [docType, setDocType] = useState('')
   const [nit, setNit] = useState('')
   const { data, isLoading } = useQuery({
@@ -613,15 +846,15 @@ function CruceView({ period }: { period: string }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50">
-              <tr>{['Tipo', 'Comprobante', 'FV', 'NIT', 'Nombre', 'Mes', 'Valor', 'Motivo'].map(h => (
+              <tr>{['Tipo', 'Comprobante', 'FV', 'NIT', 'Nombre', 'Mes', 'Valor', 'Motivo', 'Acción'].map(h => (
                 <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
               ))}</tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {isLoading ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">Cargando…</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400 text-sm">Cargando…</td></tr>
               ) : !alerts.length ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">Sin documentos no cruzados 🎉</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400 text-sm">Sin documentos no cruzados 🎉</td></tr>
               ) : alerts.map((a: any) => (
                 <tr key={a.id} className="hover:bg-slate-50">
                   <td className="px-3 py-2"><span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${DOC_BADGE[a.doc_type] ?? 'bg-slate-100 text-slate-600'}`}>{a.doc_type}</span></td>
@@ -632,6 +865,23 @@ function CruceView({ period }: { period: string }) {
                   <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{a.period || '—'}</td>
                   <td className="px-3 py-2 text-slate-700 font-medium whitespace-nowrap text-right">{fmtMoney(Number(a.amount ?? 0))}</td>
                   <td className="px-3 py-2 text-[11px] text-amber-600">{a.note || '—'}</td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    {a.doc_type === 'RC' && onApplyPayment && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onApplyPayment({
+                          comprobante: a.comprobante,
+                          clientNit: a.tercero_nit,
+                          clientName: a.tercero_name,
+                          amount: Number(a.amount ?? 0),
+                          fvRef: a.fv_ref,
+                        })}
+                      >
+                        <Receipt className="w-3 h-3" /> Aplicar pago
+                      </Button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -755,10 +1005,12 @@ function PaymentsView({
   defaultPeriod,
   appliedPayments = [],
   appliedLoading = false,
+  onApplyPayment,
 }: {
   defaultPeriod: string
   appliedPayments?: any[]
   appliedLoading?: boolean
+  onApplyPayment?: (data: any) => void
 }) {
   const [subTab, setSubTab] = useState<'uncrossed' | 'applied'>('uncrossed')
   const [period, setPeriod] = useState<string>(defaultPeriod || '')
@@ -1132,18 +1384,19 @@ function PaymentsView({
                     <th className="text-right px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Saldo Pendiente</th>
                     <th className="text-center px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Estado</th>
                     <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Nota</th>
+                    <th className="text-right px-3.5 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-slate-400 text-sm">
+                      <td colSpan={11} className="px-4 py-12 text-center text-slate-400 text-sm">
                         <PageLoader />
                       </td>
                     </tr>
                   ) : !items.length ? (
                     <tr>
-                      <td colSpan={10} className="px-4 py-12 text-center text-slate-400 text-sm">
+                      <td colSpan={11} className="px-4 py-12 text-center text-slate-400 text-sm">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                           <p className="font-semibold text-slate-700">No hay saldos de RC o RP pendientes con los filtros seleccionados</p>
@@ -1231,6 +1484,23 @@ function PaymentsView({
                           </td>
                           <td className="px-3.5 py-2.5 text-xs text-slate-500 max-w-[200px] truncate" title={r.note || ''}>
                             {r.note || '—'}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
+                            {isRC && onApplyPayment && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => onApplyPayment({
+                                  comprobante: r.comprobante,
+                                  clientNit: r.tercero_nit,
+                                  clientName: r.tercero_name,
+                                  amount: Number(r.saldo ?? r.amount ?? 0),
+                                  fvRef: r.fv_ref,
+                                })}
+                              >
+                                <Receipt className="w-3 h-3" /> Aplicar
+                              </Button>
+                            )}
                           </td>
                         </tr>
                       )
@@ -1591,6 +1861,7 @@ export function ParticipationsPage() {
   const [showAccounts, setShowAccounts] = useState(false)
   const [detailItem, setDetailItem] = useState<any | null>(null)
   const [downloading, setDownloading] = useState(false)
+  const [manualPaymentData, setManualPaymentData] = useState<{ comprobante: string; clientNit?: string; clientName?: string; amount: number; fvRef?: string } | null>(null)
 
   const dateSel: DateSel = { year: yearF, month: monthF, from: fromF, to: toF }
   const onDateChange = (v: DateSel) => {
@@ -1755,16 +2026,23 @@ export function ParticipationsPage() {
             defaultPeriod={monthPeriod}
             appliedPayments={paymentsData?.payments ?? []}
             appliedLoading={paymentsLoading}
+            onApplyPayment={setManualPaymentData}
           />
         )}
 
-        {view === 'cruce' && <CruceView period={monthPeriod} />}
+        {view === 'cruce' && (
+          <CruceView
+            period={monthPeriod}
+            onApplyPayment={setManualPaymentData}
+          />
+        )}
 
         {view === 'saldos' && (
           <PaymentsView
             defaultPeriod={monthPeriod}
             appliedPayments={paymentsData?.payments ?? []}
             appliedLoading={paymentsLoading}
+            onApplyPayment={setManualPaymentData}
           />
         )}
 
@@ -1884,6 +2162,7 @@ export function ParticipationsPage() {
       {showMovimiento && <MovimientoImportModal onClose={() => setShowMovimiento(false)} />}
       {showAccounts && <AccountSettingsModal onClose={() => setShowAccounts(false)} />}
       {detailItem && <ParticipationDetailModal item={detailItem} onClose={() => setDetailItem(null)} />}
+      {manualPaymentData && <ManualPaymentModal data={manualPaymentData} onClose={() => setManualPaymentData(null)} />}
     </div>
   )
 }
