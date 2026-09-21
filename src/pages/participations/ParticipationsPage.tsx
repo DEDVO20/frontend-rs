@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
-import { X, Upload, Download, CheckCircle2, CalendarPlus, Filter, ChevronDown, Calendar, SlidersHorizontal, Search, ChevronsUpDown, AlertCircle, RotateCcw, Wallet, Receipt, CreditCard, Edit2, ArrowLeftRight, Unlink, Plus } from 'lucide-react'
+import { X, Upload, Download, CheckCircle2, CalendarPlus, Filter, ChevronDown, Calendar, SlidersHorizontal, Search, ChevronsUpDown, AlertCircle, RotateCcw, Wallet, Receipt, CreditCard, Edit2, ArrowLeftRight, Unlink, Plus, Layers } from 'lucide-react'
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
@@ -721,12 +721,14 @@ function LinkPaymentToInvoiceModal({
   clientName,
   onClose,
   onSuccess,
+  onOpenManualPayment,
 }: {
   invoice: any
   clientNit: string
   clientName: string
   onClose: () => void
   onSuccess: () => void
+  onOpenManualPayment?: (data: any) => void
 }) {
   const qc = useQueryClient()
   const invVal = Number(invoice.finto_invoice_value ?? 0)
@@ -873,6 +875,29 @@ function LinkPaymentToInvoiceModal({
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Enlace para distribución multi-factura */}
+        <div className="flex items-center justify-between p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-xs">
+          <div className="flex items-center gap-1.5 text-purple-900 font-medium text-[11px]">
+            <Layers className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+            <span>¿Este pago cubre varias facturas de este cliente?</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onClose()
+              onOpenManualPayment?.({
+                comprobante: comprobante.trim(),
+                clientNit,
+                clientName,
+                amount: Number(amount) || 0,
+              })
+            }}
+            className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-white border border-purple-200 hover:bg-purple-100/50 px-2.5 py-1 rounded-lg transition-colors shadow-xs"
+          >
+            Distribuir en varias facturas →
+          </button>
         </div>
 
         <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
@@ -1036,7 +1061,15 @@ function DetailStage({
   )
 }
 
-function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; onClose: () => void }) {
+function ParticipationDetailModal({
+  item: initialItem,
+  onClose,
+  onOpenManualPayment,
+}: {
+  item: any
+  onClose: () => void
+  onOpenManualPayment?: (data: any) => void
+}) {
   const qc = useQueryClient()
   const [item, setItem] = useState(initialItem)
   const [editingStage, setEditingStage] = useState<number | null>(null)
@@ -1285,15 +1318,48 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                   nit={clientNit}
                   title="Recibos de caja de este cliente en SIIGO:"
                   onSelect={(doc) => {
+                    const invVal = Number(item.finto_invoice_value ?? 0)
+                    const curColl = Number(item.collected ?? 0)
+                    const needed = Math.max(0, invVal - curColl)
+                    const docAvail = Number(doc.saldo ?? doc.amount ?? 0)
+                    const toApply = needed > 0 ? Math.min(docAvail, needed) : docAvail
                     setEditForm(f => ({
                       ...f,
                       cash_receipts: doc.comprobante,
                       cash_receipt_date: doc.doc_date || f.cash_receipt_date || '',
-                      collected: Number(doc.saldo ?? doc.amount ?? 0),
+                      collected: toApply,
                     }))
-                    toast.info(`Datos cargados del recibo ${doc.comprobante}`)
+                    if (needed > 0 && docAvail > needed) {
+                      toast.info(`Se asignaron ${fmtMoney(toApply)} a esta factura. Quedan ${fmtMoney(docAvail - toApply)} disponibles de este recibo para otras facturas.`)
+                    } else {
+                      toast.info(`Datos cargados del recibo ${doc.comprobante}`)
+                    }
                   }}
                 />
+
+                {/* Enlace para distribución multi-factura si el pago cubre varias */}
+                <div className="flex items-center justify-between p-2.5 bg-purple-50 border border-purple-200 rounded-xl text-xs">
+                  <div className="flex items-center gap-1.5 text-purple-900 font-medium text-[11px]">
+                    <Layers className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                    <span>¿Un pago cubre varias facturas de este cliente?</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose()
+                      onOpenManualPayment?.({
+                        comprobante: editForm.cash_receipts || item.cash_receipts || '',
+                        clientNit,
+                        clientName,
+                        amount: Number(editForm.collected || 0),
+                      })
+                    }}
+                    className="text-[11px] font-bold text-purple-700 hover:text-purple-900 bg-white border border-purple-200 hover:bg-purple-100/50 px-2.5 py-1 rounded-lg transition-colors shadow-xs"
+                  >
+                    Distribuir en varias facturas →
+                  </button>
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1">Recibo(s) de caja (RC)</label>
                   <input
@@ -1364,6 +1430,21 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
                     className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
                   >
                     <Plus className="w-3 h-3 text-emerald-600" /> Vincular pago manual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose()
+                      onOpenManualPayment?.({
+                        comprobante: item.cash_receipts || '',
+                        clientNit,
+                        clientName,
+                        amount: 0,
+                      })
+                    }}
+                    className="text-[11px] font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                  >
+                    <Layers className="w-3 h-3 text-purple-600" /> Distribuir pago en varias facturas
                   </button>
                 </div>
               </div>
@@ -1616,6 +1697,11 @@ function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; o
           clientName={clientName}
           onClose={() => setLinkOpen(false)}
           onSuccess={() => reloadInvoice()}
+          onOpenManualPayment={(data) => {
+            setLinkOpen(false)
+            onClose()
+            onOpenManualPayment?.(data)
+          }}
         />
       )}
 
@@ -1734,9 +1820,9 @@ function ManualPaymentModal({
   onClose: () => void
 }) {
   const qc = useQueryClient()
-  const comprobante = initialData.comprobante
   const clientNit = initialData.clientNit || ''
-  const totalAmount = Number(initialData.amount ?? 0)
+  const [comprobante, setComprobante] = useState(initialData.comprobante || '')
+  const [totalAmount, setTotalAmount] = useState<number>(Number(initialData.amount ?? 0))
 
   const [allocations, setAllocations] = useState<Record<string, number>>({})
 
@@ -1748,6 +1834,36 @@ function ManualPaymentModal({
       return (data ?? []) as any[]
     },
   })
+
+  // Consultar recibos no cruzados del cliente por si necesita seleccionar uno o cambiar
+  const { data: uncrossedReceipts } = useQuery({
+    queryKey: ['participations', 'client-uncrossed-receipts', clientNit],
+    enabled: !!clientNit,
+    queryFn: async () => {
+      const { data } = await api.get(`/api/participations/client-uncrossed-receipts?nit=${encodeURIComponent(clientNit)}`)
+      return (data ?? []) as any[]
+    },
+  })
+
+  // Pre-llenar totalAmount y comprobante si vinieron vacíos
+  useEffect(() => {
+    if (totalAmount <= 0 && uncrossedReceipts && uncrossedReceipts.length > 0) {
+      if (comprobante) {
+        const cNorm = String(comprobante).toLowerCase().replace(/[^a-z0-9]/g, '')
+        const found = uncrossedReceipts.find((r: any) =>
+          String(r.comprobante ?? '').toLowerCase().replace(/[^a-z0-9]/g, '') === cNorm
+        )
+        if (found) {
+          setTotalAmount(Number(found.saldo ?? found.amount ?? 0))
+          return
+        }
+      }
+      if (!comprobante && uncrossedReceipts[0]) {
+        setComprobante(uncrossedReceipts[0].comprobante)
+        setTotalAmount(Number(uncrossedReceipts[0].saldo ?? uncrossedReceipts[0].amount ?? 0))
+      }
+    }
+  }, [uncrossedReceipts, comprobante, totalAmount])
 
   const roundMoney = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
 
@@ -1775,10 +1891,10 @@ function ManualPaymentModal({
 
   // Pre-llenar automáticamente al cargar las facturas
   useEffect(() => {
-    if (openInvoices && openInvoices.length > 0 && Object.keys(allocations).length === 0) {
+    if (openInvoices && openInvoices.length > 0 && Object.keys(allocations).length === 0 && totalAmount > 0) {
       autoFillFifo()
     }
-  }, [openInvoices])
+  }, [openInvoices, totalAmount])
 
   const currentTotal = roundMoney(Object.values(allocations).reduce((a, b) => a + (Number(b) || 0), 0))
   const remainingTotal = roundMoney(Math.max(0, totalAmount - currentTotal))
@@ -1828,7 +1944,7 @@ function ManualPaymentModal({
               <h3 className="text-base font-bold text-slate-900">Aplicación Manual de Recaudo</h3>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Comprobante <b>{comprobante}</b> · Cliente: <b>{initialData.clientName || clientNit || '—'}</b> (NIT: {clientNit || '—'})
+              Comprobante <b>{comprobante || 'Sin definir'}</b> · Cliente: <b>{initialData.clientName || clientNit || '—'}</b> (NIT: {clientNit || '—'})
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
@@ -1838,6 +1954,61 @@ function ManualPaymentModal({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-4">
+          {/* Selector de comprobante y monto si se desea ajustar */}
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+            <div className="flex-1 min-w-[220px]">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Comprobante de Recaudo (RC)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={comprobante}
+                  onChange={e => setComprobante(e.target.value)}
+                  placeholder="ej: RC-1-53"
+                  className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary-500"
+                />
+                {uncrossedReceipts && uncrossedReceipts.length > 0 && (
+                  <select
+                    value=""
+                    onChange={e => {
+                      const sel = uncrossedReceipts.find((r: any) => r.comprobante === e.target.value)
+                      if (sel) {
+                        setComprobante(sel.comprobante)
+                        setTotalAmount(Number(sel.saldo ?? sel.amount ?? 0))
+                        setAllocations({})
+                      }
+                    }}
+                    className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none"
+                  >
+                    <option value="">Elegir de SIIGO…</option>
+                    {uncrossedReceipts.map((r: any) => (
+                      <option key={r.id} value={r.comprobante}>
+                        {r.comprobante} · {fmtMoney(Number(r.saldo ?? r.amount ?? 0))}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+            <div className="w-36">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                Monto del Pago ($)
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={totalAmount || ''}
+                onChange={e => {
+                  setTotalAmount(Number(e.target.value) || 0)
+                  setAllocations({})
+                }}
+                placeholder="0"
+                className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+
           {/* Card de resumen del monto */}
           <div className="grid grid-cols-3 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
             <div>
@@ -3306,7 +3477,13 @@ export function ParticipationsPage() {
 
       {showMovimiento && <MovimientoImportModal onClose={() => setShowMovimiento(false)} />}
       {showAccounts && <AccountSettingsModal onClose={() => setShowAccounts(false)} />}
-      {detailItem && <ParticipationDetailModal item={detailItem} onClose={() => setDetailItem(null)} />}
+      {detailItem && (
+        <ParticipationDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          onOpenManualPayment={setManualPaymentData}
+        />
+      )}
       {manualPaymentData && <ManualPaymentModal data={manualPaymentData} onClose={() => setManualPaymentData(null)} />}
     </div>
   )
