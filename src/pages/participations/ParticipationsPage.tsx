@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
-import { X, Upload, Download, CheckCircle2, CalendarPlus, Filter, ChevronDown, Calendar, SlidersHorizontal, Search, ChevronsUpDown, AlertCircle, RotateCcw, Wallet, Receipt, CreditCard } from 'lucide-react'
+import { X, Upload, Download, CheckCircle2, CalendarPlus, Filter, ChevronDown, Calendar, SlidersHorizontal, Search, ChevronsUpDown, AlertCircle, RotateCcw, Wallet, Receipt, CreditCard, Edit2, ArrowLeftRight, Unlink, Plus } from 'lucide-react'
 
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
@@ -356,14 +356,478 @@ function AccountSettingsModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () => void }) {
+function UnlinkPaymentModal({
+  invoice,
+  onClose,
+  onSuccess,
+}: {
+  invoice: any
+  onClose: () => void
+  onSuccess: (newCollected: number) => void
+}) {
+  const qc = useQueryClient()
+  const collected = Number(invoice.collected ?? 0)
+  const receipts = String(invoice.cash_receipts ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const [selectedReceipt, setSelectedReceipt] = useState(receipts[0] ?? '')
+  const [amount, setAmount] = useState<number>(collected)
+
+  const unlinkMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/api/participations/unlink-payment', {
+        invoice_id: invoice.id,
+        amount: Number(amount),
+        comprobante: selectedReceipt,
+      })
+      return data
+    },
+    onSuccess: (res: any) => {
+      toast.success('Recaudo desvinculado correctamente')
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      onSuccess(res.collected)
+      onClose()
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? 'Error al desvincular el recaudo')
+    },
+  })
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-rose-600 font-bold">
+            <Unlink className="w-5 h-5" />
+            <h3 className="text-base text-slate-900">Desvincular Recaudo</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          Al desvincular este pago, el saldo se restará de la factura <b>{invoice.finto_invoice || invoice.purchase_order}</b> y el recibo de caja quedará nuevamente libre en el sistema (Cruce / Pagos) para poder asociarse a la factura correcta.
+        </p>
+
+        <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Comprobante a desvincular</label>
+            {receipts.length > 1 ? (
+              <select
+                value={selectedReceipt}
+                onChange={e => setSelectedReceipt(e.target.value)}
+                className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded-lg bg-white"
+              >
+                {receipts.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={selectedReceipt}
+                onChange={e => setSelectedReceipt(e.target.value)}
+                className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded-lg bg-white"
+              />
+            )}
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Monto a retirar ($)</label>
+            <input
+              type="number"
+              min="0.01"
+              max={collected}
+              step="any"
+              value={amount || ''}
+              onChange={e => setAmount(Number(e.target.value) || 0)}
+              className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded-lg bg-white"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button
+            size="sm"
+            variant="danger"
+            loading={unlinkMutation.isPending}
+            disabled={!selectedReceipt.trim() || amount <= 0 || amount > collected + 0.01}
+            onClick={() => unlinkMutation.mutate()}
+          >
+            Confirmar Desvinculación
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReallocatePaymentModal({
+  fromInvoice,
+  clientNit,
+  clientName,
+  onClose,
+  onSuccess,
+}: {
+  fromInvoice: any
+  clientNit: string
+  clientName: string
+  onClose: () => void
+  onSuccess: (res: any) => void
+}) {
+  const qc = useQueryClient()
+  const fromColl = Number(fromInvoice.collected ?? 0)
+  const receipts = String(fromInvoice.cash_receipts ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const [selectedReceipt, setSelectedReceipt] = useState(receipts[0] ?? '')
+  const [targetInvoiceId, setTargetInvoiceId] = useState<string>('')
+  const [transferAmount, setTransferAmount] = useState<number>(fromColl)
+
+  const { data: openInvoices, isLoading } = useQuery({
+    queryKey: ['participations', 'client-pending-invoices', clientNit],
+    enabled: !!clientNit,
+    queryFn: async () => {
+      const { data } = await api.get(`/api/participations/client-pending-invoices?nit=${encodeURIComponent(clientNit)}`)
+      return (data ?? []) as any[]
+    },
+  })
+
+  const otherInvoices = (openInvoices ?? []).filter(inv => inv.id !== fromInvoice.id)
+  const targetInvoice = otherInvoices.find(i => i.id === targetInvoiceId)
+
+  useEffect(() => {
+    if (otherInvoices.length > 0 && !targetInvoiceId) {
+      setTargetInvoiceId(otherInvoices[0].id)
+      const bal = Number(otherInvoices[0].balance ?? 0)
+      if (bal > 0) {
+        setTransferAmount(Math.min(fromColl, bal))
+      }
+    }
+  }, [otherInvoices])
+
+  const reallocateMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/api/participations/reallocate-payment', {
+        from_invoice_id: fromInvoice.id,
+        to_invoice_id:   targetInvoiceId,
+        amount:          Number(transferAmount),
+        comprobante:     selectedReceipt || undefined,
+      })
+      return data
+    },
+    onSuccess: (res: any) => {
+      toast.success(`Pago reasignado correctamente a ${res.to_invoice || 'la factura de destino'}`)
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      onSuccess(res)
+      onClose()
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? 'Error al reasignar el pago')
+    },
+  })
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-blue-600 font-bold">
+            <ArrowLeftRight className="w-5 h-5" />
+            <h3 className="text-base text-slate-900">Reasignar Recaudo a Otra Factura</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          Mueve el pago aplicado erróneamente en esta factura a otra factura del cliente <b>{clientName || clientNit}</b>.
+        </p>
+
+        {/* Origen */}
+        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-xs">
+          <div className="flex justify-between">
+            <span className="text-slate-400 font-medium">Factura origen:</span>
+            <span className="font-bold text-slate-800 font-mono">{fromInvoice.finto_invoice || fromInvoice.purchase_order} ({fromInvoice.period ?? '—'})</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-400 font-medium">Recaudado actual en origen:</span>
+            <span className="font-bold text-emerald-600">{fmtMoney(fromColl)}</span>
+          </div>
+        </div>
+
+        {/* Destino */}
+        <div className="space-y-3 text-xs">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">Factura destino del cliente:</label>
+            {isLoading ? (
+              <div className="py-4 text-center text-slate-400"><PageLoader /></div>
+            ) : otherInvoices.length === 0 ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs">
+                No hay otras facturas con saldo pendiente para este cliente.
+              </div>
+            ) : (
+              <select
+                value={targetInvoiceId}
+                onChange={e => {
+                  setTargetInvoiceId(e.target.value)
+                  const chosen = otherInvoices.find(i => i.id === e.target.value)
+                  if (chosen) setTransferAmount(Math.min(fromColl, Number(chosen.balance ?? fromColl)))
+                }}
+                className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+              >
+                {otherInvoices.map(inv => (
+                  <option key={inv.id} value={inv.id}>
+                    {inv.finto_invoice || inv.purchase_order} — {inv.finto_invoice_date || inv.period} — Saldo: {fmtMoney(inv.balance)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">Comprobante (RC):</label>
+              <input
+                type="text"
+                value={selectedReceipt}
+                onChange={e => setSelectedReceipt(e.target.value)}
+                placeholder="ej: RC-1-53"
+                className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-slate-700 mb-1">Monto a transferir ($):</label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0.01"
+                  max={fromColl}
+                  step="any"
+                  value={transferAmount || ''}
+                  onChange={e => setTransferAmount(Number(e.target.value) || 0)}
+                  placeholder="0"
+                  className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setTransferAmount(targetInvoice ? Math.min(fromColl, Number(targetInvoice.balance ?? fromColl)) : fromColl)}
+                  className="text-[10px] font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 px-2 py-2 rounded-lg"
+                >
+                  Max
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button
+            size="sm"
+            loading={reallocateMutation.isPending}
+            disabled={!targetInvoiceId || transferAmount <= 0 || transferAmount > fromColl + 0.01}
+            onClick={() => reallocateMutation.mutate()}
+          >
+            Confirmar Reasignación
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LinkPaymentToInvoiceModal({
+  invoice,
+  clientNit,
+  clientName,
+  onClose,
+  onSuccess,
+}: {
+  invoice: any
+  clientNit: string
+  clientName: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const qc = useQueryClient()
+  const invVal = Number(invoice.finto_invoice_value ?? 0)
+  const coll = Number(invoice.collected ?? 0)
+  const balance = Math.max(0, invVal - coll)
+
+  const [comprobante, setComprobante] = useState('')
+  const [amount, setAmount] = useState<number>(balance)
+
+  const { data: uncrossed } = useQuery({
+    queryKey: ['participations', 'client-uncrossed-receipts', clientNit],
+    enabled: !!clientNit,
+    queryFn: async () => {
+      const { data } = await api.get(`/api/participations/client-uncrossed-receipts?nit=${encodeURIComponent(clientNit)}`)
+      return (data ?? []) as any[]
+    },
+  })
+
+  const linkMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/api/participations/apply-manual-payment', {
+        comprobante,
+        client_nit: clientNit,
+        allocations: [{ invoice_id: invoice.id, amount: Number(amount) }],
+      })
+      return data
+    },
+    onSuccess: () => {
+      toast.success(`Pago vinculado correctamente a ${invoice.finto_invoice || invoice.purchase_order}`)
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      onSuccess()
+      onClose()
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? 'Error al vincular el pago')
+    },
+  })
+
+  const handleSelectRc = (rc: any) => {
+    setComprobante(rc.comprobante)
+    const rcAvail = Number(rc.saldo ?? rc.amount ?? 0)
+    setAmount(Math.min(rcAvail, balance > 0 ? balance : rcAvail))
+  }
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-emerald-600 font-bold">
+            <Plus className="w-5 h-5" />
+            <h3 className="text-base text-slate-900">Vincular Pago Manual / Recibo</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          Factura: <b>{invoice.finto_invoice || invoice.purchase_order}</b> · Cliente: <b>{clientName || clientNit}</b>
+        </p>
+
+        {/* Resumen factura */}
+        <div className="grid grid-cols-3 gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Valor Factura</p>
+            <p className="font-bold text-slate-800">{fmtMoney(invVal)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Recaudado</p>
+            <p className="font-bold text-emerald-600">{fmtMoney(coll)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase">Saldo Pendiente</p>
+            <p className="font-bold text-slate-800">{fmtMoney(balance)}</p>
+          </div>
+        </div>
+
+        {/* Recibos no cruzados disponibles en SIIGO */}
+        {uncrossed && uncrossed.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[11px] font-bold text-slate-700">Recibos de caja pendientes de este cliente (SIIGO):</p>
+            <div className="border border-slate-200 rounded-xl overflow-hidden max-h-36 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase">
+                  <tr>
+                    <th className="px-2.5 py-1.5 text-left">RC</th>
+                    <th className="px-2.5 py-1.5 text-left">Fecha</th>
+                    <th className="px-2.5 py-1.5 text-right">Saldo Disp.</th>
+                    <th className="px-2.5 py-1.5 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {uncrossed.map((rc: any) => (
+                    <tr key={rc.id} className="hover:bg-slate-50/60">
+                      <td className="px-2.5 py-1 font-mono font-medium">{rc.comprobante}</td>
+                      <td className="px-2.5 py-1 text-slate-500">{rc.doc_date || rc.period || '—'}</td>
+                      <td className="px-2.5 py-1 text-right font-semibold text-emerald-600">{fmtMoney(Number(rc.saldo ?? rc.amount ?? 0))}</td>
+                      <td className="px-2.5 py-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectRc(rc)}
+                          className="text-[10px] font-bold text-primary-600 hover:text-primary-700 px-2 py-0.5 rounded bg-primary-50 hover:bg-primary-100"
+                        >
+                          Usar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Inputs comprobante y monto */}
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">Comprobante de recaudo (RC):</label>
+            <input
+              type="text"
+              value={comprobante}
+              onChange={e => setComprobante(e.target.value)}
+              placeholder="ej: RC-1-53"
+              className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 mb-1">Monto a aplicar ($):</label>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min="0.01"
+                step="any"
+                value={amount || ''}
+                onChange={e => setAmount(Number(e.target.value) || 0)}
+                placeholder="0"
+                className="w-full text-xs font-semibold px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+              />
+              <button
+                type="button"
+                onClick={() => setAmount(balance)}
+                className="text-[10px] font-bold text-primary-600 bg-primary-50 hover:bg-primary-100 px-2 py-2 rounded-lg"
+              >
+                Max
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button
+            size="sm"
+            loading={linkMutation.isPending}
+            disabled={!comprobante.trim() || amount <= 0}
+            onClick={() => linkMutation.mutate()}
+          >
+            Vincular Recaudo
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ParticipationDetailModal({ item: initialItem, onClose }: { item: any; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [item, setItem] = useState(initialItem)
+  const [editingStage, setEditingStage] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState<Record<string, any>>({})
+  const [reallocateOpen, setReallocateOpen] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [unlinkOpen, setUnlinkOpen] = useState(false)
+
+  useEffect(() => {
+    setItem(initialItem)
+  }, [initialItem])
+
+  const clientNit = item.companies?.nit || item.client_nit || ''
+  const clientName = item.companies?.name || item.client_name || ''
+
   const st = INV_STATUS[item.status] ?? INV_STATUS.pending_third_invoice
   const p = item.participation ?? {}
   const inv = Number(item.finto_invoice_value ?? 0)
   const collected = Number(item.collected ?? 0)
   const pct = inv > 0 ? Math.min(100, Math.round(collected / inv * 100)) : 0
 
-  // Cada etapa se marca "hecha" por su dato propio o por el estado alcanzado.
   const RANK: Record<string, number> = {
     pending_invoice: 1, pending_third_invoice: 2,
     value_difference: 3, pending_payment: 4, complete: 5,
@@ -380,16 +844,103 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
       <span className={`text-sm text-slate-700 text-right ${mono ? 'font-mono text-[12px]' : ''}`}>{value ?? '—'}</span>
     </div>
   )
-  const Stage = ({ n, title, done, children }: { n: number; title: string; done: boolean; children: ReactNode }) => (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+
+  const Stage = ({
+    n,
+    title,
+    done,
+    editable,
+    isEditing,
+    onToggleEdit,
+    children,
+  }: {
+    n: number
+    title: string
+    done: boolean
+    editable?: boolean
+    isEditing?: boolean
+    onToggleEdit?: () => void
+    children: ReactNode
+  }) => (
+    <div className="border border-slate-200 rounded-xl overflow-hidden transition-shadow hover:shadow-sm">
       <div className={`px-4 py-2 flex items-center gap-2 ${done ? 'bg-emerald-50' : 'bg-slate-50'}`}>
         <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold ${done ? 'bg-emerald-500 text-white' : 'bg-slate-300 text-white'}`}>{n}</span>
         <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{title}</span>
-        {done && <CheckCircle2 className="w-4 h-4 text-emerald-500 ml-auto" />}
+        <div className="ml-auto flex items-center gap-2">
+          {done && !isEditing && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+          {editable && onToggleEdit && (
+            <button
+              type="button"
+              onClick={onToggleEdit}
+              className={`text-[11px] font-semibold px-2 py-0.5 rounded transition-colors flex items-center gap-1 ${
+                isEditing
+                  ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:text-primary-600 hover:border-primary-300 shadow-xs'
+              }`}
+            >
+              <Edit2 className="w-3 h-3" />
+              {isEditing ? 'Cancelar' : 'Editar'}
+            </button>
+          )}
+        </div>
       </div>
-      <div className="px-4 py-2">{children}</div>
+      <div className="px-4 py-3">{children}</div>
     </div>
   )
+
+  const updateMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const { data } = await api.patch(`/api/participations/invoices/${item.id}`, payload)
+      return data
+    },
+    onSuccess: (updated: any) => {
+      setItem(updated)
+      setEditingStage(null)
+      toast.success('Etapa actualizada correctamente')
+      qc.invalidateQueries({ queryKey: ['participations'] })
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? 'Error al actualizar la etapa')
+    },
+  })
+
+  const handleSaveStage = () => {
+    const payload: Record<string, any> = {}
+    if (editingStage === 2) {
+      if (editForm.finto_invoice !== undefined) payload.finto_invoice = editForm.finto_invoice.trim() || null
+      if (editForm.finto_invoice_date !== undefined) payload.finto_invoice_date = editForm.finto_invoice_date || null
+      if (editForm.finto_invoice_value !== undefined && editForm.finto_invoice_value !== '') {
+        payload.finto_invoice_value = Number(editForm.finto_invoice_value) || 0
+      }
+    } else if (editingStage === 3) {
+      if (editForm.cash_receipts !== undefined) payload.cash_receipts = editForm.cash_receipts.trim() || null
+      if (editForm.cash_receipt_date !== undefined) payload.cash_receipt_date = editForm.cash_receipt_date || null
+      if (editForm.collected !== undefined && editForm.collected !== '') {
+        payload.collected = Number(editForm.collected) || 0
+      }
+    } else if (editingStage === 4) {
+      if (editForm.third_party_invoice !== undefined) payload.third_party_invoice = editForm.third_party_invoice.trim() || null
+      if (editForm.third_party_invoice_date !== undefined) payload.third_party_invoice_date = editForm.third_party_invoice_date || null
+      if (editForm.third_party_invoice_value !== undefined) {
+        payload.third_party_invoice_value = editForm.third_party_invoice_value !== '' ? Number(editForm.third_party_invoice_value) : null
+      }
+      if (editForm.payment_order !== undefined) payload.payment_order = editForm.payment_order.trim() || null
+    } else if (editingStage === 5) {
+      if (editForm.egress_voucher !== undefined) payload.egress_voucher = editForm.egress_voucher.trim() || null
+      if (editForm.egress_voucher_date !== undefined) payload.egress_voucher_date = editForm.egress_voucher_date || null
+      if (editForm.egress_voucher_value !== undefined) {
+        payload.egress_voucher_value = editForm.egress_voucher_value !== '' ? Number(editForm.egress_voucher_value) : null
+      }
+    }
+    updateMutation.mutate(payload)
+  }
+
+  const reloadInvoice = async () => {
+    try {
+      const { data } = await api.get(`/api/participations/invoices/${item.id}`)
+      if (data) setItem(data)
+    } catch { /* ignore */ }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -407,6 +958,7 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-3">
+          {/* Etapa 1: Solo lectura */}
           <Stage n={1} title="Generación · OC" done>
             <Field label="Orden de compra" value={item.purchase_order} mono />
             <Field label="Periodo" value={item.period ?? '—'} />
@@ -414,29 +966,315 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
             <Field label="Participación causada" value={fmtMoney(Number(item.participation_value ?? 0))} />
           </Stage>
 
-          <Stage n={2} title="Venta (factura Finto)" done={saleDone}>
-            <Field label="Factura de venta" value={item.finto_invoice ?? 'Pendiente'} />
-            <Field label="Fecha" value={item.finto_invoice_date ?? '—'} />
-            <Field label="Valor factura" value={fmtMoney(inv)} />
+          {/* Etapa 2: Venta Finto */}
+          <Stage
+            n={2}
+            title="Venta (factura Finto)"
+            done={saleDone}
+            editable
+            isEditing={editingStage === 2}
+            onToggleEdit={() => {
+              if (editingStage === 2) setEditingStage(null)
+              else {
+                setEditForm({
+                  finto_invoice: item.finto_invoice ?? '',
+                  finto_invoice_date: item.finto_invoice_date ?? '',
+                  finto_invoice_value: item.finto_invoice_value ?? '',
+                })
+                setEditingStage(2)
+              }
+            }}
+          >
+            {editingStage === 2 ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Factura de venta (FV)</label>
+                  <input
+                    type="text"
+                    value={editForm.finto_invoice ?? ''}
+                    onChange={e => setEditForm(f => ({ ...f, finto_invoice: e.target.value }))}
+                    placeholder="ej: FV-4-1234"
+                    className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha factura</label>
+                    <input
+                      type="date"
+                      value={editForm.finto_invoice_date ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, finto_invoice_date: e.target.value }))}
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor factura ($)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={editForm.finto_invoice_value ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, finto_invoice_value: e.target.value }))}
+                      placeholder="0"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button size="sm" variant="secondary" onClick={() => setEditingStage(null)}>Cancelar</Button>
+                  <Button size="sm" loading={updateMutation.isPending} onClick={handleSaveStage}>Guardar cambios</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Field label="Factura de venta" value={item.finto_invoice ?? 'Pendiente'} />
+                <Field label="Fecha" value={item.finto_invoice_date ?? '—'} />
+                <Field label="Valor factura" value={fmtMoney(inv)} />
+              </>
+            )}
           </Stage>
 
-          <Stage n={3} title="Recaudo del cliente (CxC · RC)" done={collectDone}>
-            <Field label="Recibo de caja (RC)" value={item.cash_receipts ?? 'Pendiente'} mono />
-            <Field label="Fecha de recaudo (RC)" value={item.cash_receipt_date ?? (item.cash_receipts ? 'Sin fecha' : '—')} />
-            <Field label="Recaudado" value={`${fmtMoney(collected)}${inv > 0 ? ` · ${pct}%` : ''}`} />
-            <Field label="Disponible para el tercero" value={fmtMoney(Number(item.available_for_payment ?? 0))} />
+          {/* Etapa 3: Recaudo CxC */}
+          <Stage
+            n={3}
+            title="Recaudo del cliente (CxC · RC)"
+            done={collectDone}
+            editable
+            isEditing={editingStage === 3}
+            onToggleEdit={() => {
+              if (editingStage === 3) setEditingStage(null)
+              else {
+                setEditForm({
+                  cash_receipts: item.cash_receipts ?? '',
+                  cash_receipt_date: item.cash_receipt_date ?? '',
+                  collected: item.collected ?? '',
+                })
+                setEditingStage(3)
+              }
+            }}
+          >
+            {editingStage === 3 ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Recibo(s) de caja (RC)</label>
+                  <input
+                    type="text"
+                    value={editForm.cash_receipts ?? ''}
+                    onChange={e => setEditForm(f => ({ ...f, cash_receipts: e.target.value }))}
+                    placeholder="ej: RC-1-53, RC-1-80"
+                    className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha de recaudo</label>
+                    <input
+                      type="date"
+                      value={editForm.cash_receipt_date ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, cash_receipt_date: e.target.value }))}
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor recaudado ($)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={editForm.collected ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, collected: e.target.value }))}
+                      placeholder="0"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button size="sm" variant="secondary" onClick={() => setEditingStage(null)}>Cancelar</Button>
+                  <Button size="sm" loading={updateMutation.isPending} onClick={handleSaveStage}>Guardar cambios</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Field label="Recibo de caja (RC)" value={item.cash_receipts ?? 'Pendiente'} mono />
+                <Field label="Fecha de recaudo (RC)" value={item.cash_receipt_date ?? (item.cash_receipts ? 'Sin fecha' : '—')} />
+                <Field label="Recaudado" value={`${fmtMoney(collected)}${inv > 0 ? ` · ${pct}%` : ''}`} />
+                <Field label="Disponible para el tercero" value={fmtMoney(Number(item.available_for_payment ?? 0))} />
+
+                {/* Acciones manuales de recaudo */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+                  {collected > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setReallocateOpen(true)}
+                        className="text-[11px] font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                      >
+                        <ArrowLeftRight className="w-3 h-3 text-blue-600" /> Reasignar a otra factura
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setUnlinkOpen(true)}
+                        className="text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                      >
+                        <Unlink className="w-3 h-3 text-rose-600" /> Desvincular recaudo
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setLinkOpen(true)}
+                    className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                  >
+                    <Plus className="w-3 h-3 text-emerald-600" /> Vincular pago manual
+                  </button>
+                </div>
+              </div>
+            )}
           </Stage>
 
-          <Stage n={4} title="Factura de compra + Orden de Pago" done={purchaseDone}>
-            <Field label="Factura del tercero" value={item.third_party_invoice ?? (purchaseDone ? 'No registrada (pago directo)' : 'Pendiente')} />
-            <Field label="Valor" value={item.third_party_invoice_value != null ? fmtMoney(Number(item.third_party_invoice_value)) : '—'} />
-            <Field label="Orden de pago" value={item.payment_order ?? '—'} mono />
+          {/* Etapa 4: Factura de compra tercero + OP */}
+          <Stage
+            n={4}
+            title="Factura de compra + Orden de Pago"
+            done={purchaseDone}
+            editable
+            isEditing={editingStage === 4}
+            onToggleEdit={() => {
+              if (editingStage === 4) setEditingStage(null)
+              else {
+                setEditForm({
+                  third_party_invoice: item.third_party_invoice ?? '',
+                  third_party_invoice_date: item.third_party_invoice_date ?? '',
+                  third_party_invoice_value: item.third_party_invoice_value ?? '',
+                  payment_order: item.payment_order ?? '',
+                })
+                setEditingStage(4)
+              }
+            }}
+          >
+            {editingStage === 4 ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Factura tercero (FC)</label>
+                    <input
+                      type="text"
+                      value={editForm.third_party_invoice ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, third_party_invoice: e.target.value }))}
+                      placeholder="ej: FC-1234"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha factura tercero</label>
+                    <input
+                      type="date"
+                      value={editForm.third_party_invoice_date ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, third_party_invoice_date: e.target.value }))}
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor factura tercero ($)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={editForm.third_party_invoice_value ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, third_party_invoice_value: e.target.value }))}
+                      placeholder="0"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Orden de pago (OP)</label>
+                    <input
+                      type="text"
+                      value={editForm.payment_order ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, payment_order: e.target.value }))}
+                      placeholder="ej: OP-202608-000001"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button size="sm" variant="secondary" onClick={() => setEditingStage(null)}>Cancelar</Button>
+                  <Button size="sm" loading={updateMutation.isPending} onClick={handleSaveStage}>Guardar cambios</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Field label="Factura del tercero" value={item.third_party_invoice ?? (purchaseDone ? 'No registrada (pago directo)' : 'Pendiente')} />
+                <Field label="Valor" value={item.third_party_invoice_value != null ? fmtMoney(Number(item.third_party_invoice_value)) : '—'} />
+                <Field label="Orden de pago" value={item.payment_order ?? '—'} mono />
+              </>
+            )}
           </Stage>
 
-          <Stage n={5} title="Pago al tercero (egreso · RP)" done={paymentDone}>
-            <Field label="Comprobante de egreso (RP)" value={item.egress_voucher ?? (paymentDone ? 'Registrado' : 'Pendiente')} mono />
-            <Field label="Fecha de pago (RP)" value={item.egress_voucher_date ?? (item.egress_voucher ? 'Sin fecha' : '—')} />
-            <Field label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
+          {/* Etapa 5: Pago al tercero RP */}
+          <Stage
+            n={5}
+            title="Pago al tercero (egreso · RP)"
+            done={paymentDone}
+            editable
+            isEditing={editingStage === 5}
+            onToggleEdit={() => {
+              if (editingStage === 5) setEditingStage(null)
+              else {
+                setEditForm({
+                  egress_voucher: item.egress_voucher ?? '',
+                  egress_voucher_date: item.egress_voucher_date ?? '',
+                  egress_voucher_value: item.egress_voucher_value ?? '',
+                })
+                setEditingStage(5)
+              }
+            }}
+          >
+            {editingStage === 5 ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Comprobante de egreso (RP)</label>
+                  <input
+                    type="text"
+                    value={editForm.egress_voucher ?? ''}
+                    onChange={e => setEditForm(f => ({ ...f, egress_voucher: e.target.value }))}
+                    placeholder="ej: RP-1-456"
+                    className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha de pago</label>
+                    <input
+                      type="date"
+                      value={editForm.egress_voucher_date ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, egress_voucher_date: e.target.value }))}
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor pagado ($)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={editForm.egress_voucher_value ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, egress_voucher_value: e.target.value }))}
+                      placeholder="0"
+                      className="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button size="sm" variant="secondary" onClick={() => setEditingStage(null)}>Cancelar</Button>
+                  <Button size="sm" loading={updateMutation.isPending} onClick={handleSaveStage}>Guardar cambios</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Field label="Comprobante de egreso (RP)" value={item.egress_voucher ?? (paymentDone ? 'Registrado' : 'Pendiente')} mono />
+                <Field label="Fecha de pago (RP)" value={item.egress_voucher_date ?? (item.egress_voucher ? 'Sin fecha' : '—')} />
+                <Field label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
+              </>
+            )}
           </Stage>
 
           {item.tax_partition && (
@@ -482,9 +1320,39 @@ function ParticipationDetailModal({ item, onClose }: { item: any; onClose: () =>
           <Button variant="secondary" onClick={onClose}>Cerrar</Button>
         </div>
       </div>
+
+      {/* Sub-modales de recaudo */}
+      {reallocateOpen && (
+        <ReallocatePaymentModal
+          fromInvoice={item}
+          clientNit={clientNit}
+          clientName={clientName}
+          onClose={() => setReallocateOpen(false)}
+          onSuccess={() => reloadInvoice()}
+        />
+      )}
+
+      {unlinkOpen && (
+        <UnlinkPaymentModal
+          invoice={item}
+          onClose={() => setUnlinkOpen(false)}
+          onSuccess={() => reloadInvoice()}
+        />
+      )}
+
+      {linkOpen && (
+        <LinkPaymentToInvoiceModal
+          invoice={item}
+          clientNit={clientNit}
+          clientName={clientName}
+          onClose={() => setLinkOpen(false)}
+          onSuccess={() => reloadInvoice()}
+        />
+      )}
     </div>
   )
 }
+
 
 function BalanceDetailModal({ kind, row, onClose }: { kind: 'cxc' | 'cxp'; row: any; onClose: () => void }) {
   const isCxc = kind === 'cxc'
