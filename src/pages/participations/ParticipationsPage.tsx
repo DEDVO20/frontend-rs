@@ -367,12 +367,14 @@ function UnlinkSaleInvoiceModal({
 }) {
   const [unlinkReceipts, setUnlinkReceipts] = useState(false)
   const qc = useQueryClient()
-  const collected = Number(item.collected ?? 0)
+  const collected = Number(item?.collected ?? 0)
+  const invId = item?.id || item?._raw?.id || item?.invoice_id
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (!invId) throw new Error('ID de factura no disponible para desvincular')
       const { data } = await api.post('/api/participations/unlink-sale-invoice', {
-        invoice_id: item.id,
+        invoice_id: invId,
         unlink_receipts: unlinkReceipts,
       })
       return data
@@ -384,7 +386,7 @@ function UnlinkSaleInvoiceModal({
       onClose()
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.error ?? 'Error al desvincular la factura')
+      toast.error(err.response?.data?.error ?? err.message ?? 'Error al desvincular la factura')
     },
   })
 
@@ -1105,9 +1107,12 @@ function ParticipationDetailModal({
   const paymentDone   = rank >= 5 || !!item.egress_voucher
 
 
+  const currentInvoiceId = item?.id || item?._raw?.id || item?.invoice_id || initialItem?.id || initialItem?._raw?.id
+
   const updateMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const { data } = await api.patch(`/api/participations/invoices/${item.id}`, payload)
+      if (!currentInvoiceId) throw new Error('ID de factura no disponible para actualizar')
+      const { data } = await api.patch(`/api/participations/invoices/${currentInvoiceId}`, payload)
       return data
     },
     onSuccess: (updated: any) => {
@@ -1117,7 +1122,7 @@ function ParticipationDetailModal({
       qc.invalidateQueries({ queryKey: ['participations'] })
     },
     onError: (err: any) => {
-      toast.error(err.response?.data?.error ?? 'Error al actualizar la etapa')
+      toast.error(err.response?.data?.error ?? err.message ?? 'Error al actualizar la etapa')
     },
   })
 
@@ -1152,8 +1157,9 @@ function ParticipationDetailModal({
   }
 
   const reloadInvoice = async () => {
+    if (!currentInvoiceId) return
     try {
-      const { data } = await api.get(`/api/participations/invoices/${item.id}`)
+      const { data } = await api.get(`/api/participations/invoices/${currentInvoiceId}`)
       if (data) setItem(data)
     } catch { /* ignore */ }
   }
@@ -3059,7 +3065,7 @@ function ThirdPartiesView({
                             return (
                               <tr
                                 key={inv.id}
-                                onClick={() => onSelectInvoice(inv._raw)}
+                                onClick={() => onSelectInvoice(inv._raw ? { ...inv._raw, id: inv.id || inv._raw.id } : inv)}
                                 className="hover:bg-slate-50/80 cursor-pointer transition-colors"
                               >
                                 <td className="px-3 py-2 whitespace-nowrap">
