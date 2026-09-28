@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   LayoutDashboard, Building2, UserCheck, ClipboardList,
   FileText, MessageSquareMore, Landmark, BarChart3, Repeat,
-  Users, Settings, Globe, LogOut, X, Calculator, Handshake, ShieldCheck, Percent, Contact,
+  Users, Settings, Globe, LogOut, X, Calculator, Handshake, ShieldCheck, Percent, Contact, BookOpen,
 } from 'lucide-react'
 
 type NavItem = {
@@ -52,6 +52,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { to: '/app/task-templates', label: 'Tareas recurrentes', icon: Repeat, adminOnly: true },
       { to: '/app/profiles', label: 'Usuarios', icon: Users, adminOnly: true },
       { to: '/app/roles', label: 'Roles y permisos', icon: ShieldCheck, adminOnly: true, module: 'roles' },
+      { to: '/app/blog', label: 'Blog y Artículos', icon: BookOpen, adminOnly: true },
       { to: '/app/settings', label: 'Configuración', icon: Settings, adminOnly: true },
       { to: '/', label: 'Ver sitio web', icon: Globe },
     ],

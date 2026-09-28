@@ -30,6 +30,7 @@ import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { TaxProfilesPage } from '@/pages/tax/TaxProfilesPage'
 import { ThirdPartiesPage } from '@/pages/tax/ThirdPartiesPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
+import { BlogAdminPage } from '@/pages/admin/BlogAdminPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff']
@@ -96,6 +97,7 @@ export const router = createBrowserRouter([
       { path: 'task-templates', element: <TaskTemplatesPage /> },
       { path: 'profiles',     element: <ProfilesPage /> },
       { path: 'roles',        element: <RolesPage /> },
+      { path: 'blog',         element: <BlogAdminPage /> },
       { path: 'audit',        element: <AuditPage /> },
       { path: 'settings',     element: <SettingsPage /> },
       { path: '*',            element: <NotFoundPage /> },

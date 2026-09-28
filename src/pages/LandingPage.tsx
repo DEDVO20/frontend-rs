@@ -3,6 +3,7 @@ import { ArrowRight, Menu, X, Search, Settings2, FileText, BarChart3, User } fro
 import { useState } from 'react'
 import { FintoLogo } from '@/components/ui/FintoLogo'
 import { FintoIcon, type FintoIconName } from '@/components/ui/FintoIcon'
+import { BlogSection } from '@/components/blog/BlogSection'
 
 import mockupHero from '@/assets/finto/images/mockup-hero.webp'
 import mockupPortal from '@/assets/finto/images/mockup-portal.webp'
@@ -15,6 +16,7 @@ const NAV_LINKS = [
   { label: 'Servicios', href: '#servicios' },
   { label: 'Cómo funciona', href: '#proceso' },
   { label: 'Plataforma', href: '#plataforma' },
+  { label: 'Artículos', href: '#articulos' },
   { label: 'Contacto', href: '#contacto' },
 ]
 
@@ -377,6 +379,9 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Artículos y Publicaciones (Blog) ───────────────────── */}
+      <BlogSection />
 
       {/* ── CTA ────────────────────────────────────────────────── */}
       <section id="contacto" className="relative overflow-hidden py-20 md:py-28 bg-gradient-to-br from-navy-900 to-brand-700">
