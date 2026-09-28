@@ -128,3 +128,509 @@
   .scrollbar-slim::-webkit-scrollbar { width: 8px; height: 8px; }
   .scrollbar-slim::-webkit-scrollbar-thumb { border-width: 2px; }
 }
+
+/* ── Contact Form Modal ───────────────────────────────────────────────────── */
+@layer components {
+
+  .contact-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(18, 26, 51, 0.75);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: contact-fade-in 0.2s ease;
+  }
+
+  .contact-modal-panel {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #fffdf7;
+    border-radius: 20px;
+    box-shadow:
+      0 32px 80px rgba(18, 26, 51, 0.35),
+      0 0 0 1px rgba(18, 26, 51, 0.08);
+    display: flex;
+    flex-direction: column;
+    animation: contact-slide-up 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .contact-modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(18, 26, 51, 0.07);
+    color: #1a2545;
+    transition: background 0.15s;
+  }
+  .contact-modal-close:hover { background: rgba(18, 26, 51, 0.14); }
+
+  /* ── Header ── */
+  .contact-modal-header {
+    padding: 1.5rem 1.75rem 0;
+  }
+
+  .contact-modal-step-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #315aa8;
+    margin-bottom: 0.6rem;
+  }
+
+  .contact-progress-track {
+    height: 4px;
+    background: rgba(61, 107, 193, 0.15);
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+  .contact-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3d6bc1, #bc984a);
+    border-radius: 9999px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* ── Body ── */
+  .contact-modal-body {
+    padding: 1.5rem 1.75rem;
+    flex: 1;
+  }
+
+  .contact-step-enter {
+    animation: contact-step-in 0.22s ease;
+  }
+
+  .contact-question-title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1a2545;
+    margin-bottom: 0.35rem;
+    line-height: 1.3;
+  }
+
+  .contact-question-sub {
+    font-size: 0.83rem;
+    color: rgba(26, 37, 69, 0.55);
+    margin-bottom: 1.1rem;
+  }
+
+  /* ── Option cards (grid) ── */
+  .contact-options-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+  .contact-options-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* ── Option pills (list) ── */
+  .contact-options-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .contact-option-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.4rem;
+    padding: 0.85rem 0.9rem;
+    border-radius: 12px;
+    background: rgba(61, 107, 193, 0.05);
+    border: 1.5px solid rgba(61, 107, 193, 0.12);
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .contact-option-card:hover {
+    background: rgba(61, 107, 193, 0.1);
+    border-color: rgba(61, 107, 193, 0.3);
+    transform: translateY(-1px);
+  }
+  .contact-option-card.selected {
+    background: rgba(61, 107, 193, 0.12);
+    border-color: #3d6bc1;
+    box-shadow: 0 0 0 3px rgba(61, 107, 193, 0.18);
+  }
+
+  /* Variant: multi-select (checkmark badge) */
+  .contact-option-card.multi {
+    position: relative;
+  }
+  .contact-option-card.multi.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .contact-option-check {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    background: #3d6bc1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    animation: contact-pop 0.18s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  /* Selection count badge */
+  .contact-selection-count {
+    margin-top: 0.6rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #3d6bc1;
+    text-align: center;
+    animation: contact-step-in 0.2s ease;
+  }
+
+  .contact-option-emoji {
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+  .contact-option-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1a2545;
+    line-height: 1.3;
+  }
+
+  .contact-option-pill {
+    padding: 0.5rem 1.1rem;
+    border-radius: 9999px;
+    border: 1.5px solid rgba(61, 107, 193, 0.18);
+    background: rgba(61, 107, 193, 0.04);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1a2545;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .contact-option-pill:hover {
+    background: rgba(61, 107, 193, 0.1);
+    border-color: rgba(61, 107, 193, 0.35);
+  }
+  .contact-option-pill.selected {
+    background: #3d6bc1;
+    border-color: #3d6bc1;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(61, 107, 193, 0.35);
+  }
+
+  /* ── Contact fields ── */
+  .contact-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 1rem;
+  }
+  .contact-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .contact-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(26, 37, 69, 0.6);
+  }
+  .contact-input {
+    padding: 0.65rem 0.9rem;
+    border-radius: 10px;
+    border: 1.5px solid rgba(61, 107, 193, 0.18);
+    background: #fff;
+    font-size: 0.9rem;
+    color: #1a2545;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .contact-input::placeholder { color: rgba(26, 37, 69, 0.35); }
+  .contact-input:focus {
+    border-color: #3d6bc1;
+    box-shadow: 0 0 0 3px rgba(61, 107, 193, 0.15);
+  }
+
+  .contact-error {
+    margin-top: 0.75rem;
+    font-size: 0.82rem;
+    color: #c0392b;
+    background: rgba(192, 57, 43, 0.08);
+    border-radius: 8px;
+    padding: 0.6rem 0.9rem;
+  }
+
+  /* ── Footer ── */
+  .contact-modal-footer {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.75rem 1.5rem;
+    border-top: 1px solid rgba(61, 107, 193, 0.1);
+    gap: 0.6rem;
+  }
+  .contact-footer-spacer { flex: 1; }
+
+  .contact-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.65rem 1.4rem;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #3d6bc1, #2a4f96);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    box-shadow: 0 4px 16px rgba(61, 107, 193, 0.35);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .contact-btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4576cc, #315aa8);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(61, 107, 193, 0.45);
+  }
+  .contact-btn-primary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .contact-btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.65rem 1rem;
+    border-radius: 9999px;
+    color: rgba(26, 37, 69, 0.6);
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+  }
+  .contact-btn-ghost:hover:not(:disabled) {
+    background: rgba(26, 37, 69, 0.06);
+    color: #1a2545;
+  }
+
+  /* ── Success screen ── */
+  .contact-modal-success {
+    padding: 2.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+  }
+  .contact-success-icon {
+    width: 5rem;
+    height: 5rem;
+    border-radius: 50%;
+    background: rgba(61, 107, 193, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: contact-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .contact-success-title {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1a2545;
+  }
+  .contact-success-body {
+    font-size: 0.9rem;
+    color: rgba(26, 37, 69, 0.65);
+    line-height: 1.7;
+    max-width: 360px;
+  }
+
+  /* ── Animations ── */
+  @keyframes contact-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes contact-slide-up {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+  }
+  @keyframes contact-step-in {
+    from { opacity: 0; transform: translateX(10px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes contact-pop {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  /* ── Quote card (Step 3 — Cotizador) ── */
+  .quote-card {
+    margin-top: 1rem;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1.5px solid rgba(61, 107, 193, 0.15);
+    box-shadow: 0 8px 32px rgba(26, 37, 69, 0.1);
+    animation: contact-step-in 0.25s ease;
+  }
+
+  .quote-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem 0.75rem;
+    background: var(--tier-color, #3d6bc1);
+  }
+
+  .quote-tier-badge {
+    display: inline-block;
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.01em;
+  }
+
+  .quote-tier-employees {
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.75);
+    margin-top: 0.15rem;
+  }
+
+  .quote-bank-info {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    color: rgba(255,255,255,0.85);
+    text-align: right;
+    max-width: 160px;
+    line-height: 1.4;
+  }
+
+  .quote-price-main {
+    padding: 1rem 1.25rem 0.75rem;
+    background: #fff;
+    text-align: center;
+    border-bottom: 1px solid rgba(61, 107, 193, 0.1);
+  }
+
+  .quote-price-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(26, 37, 69, 0.5);
+    margin-bottom: 0.25rem;
+  }
+
+  .quote-price-amount {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--tier-color, #3d6bc1);
+    line-height: 1;
+  }
+
+  .quote-price-period {
+    font-size: 0.8rem;
+    color: rgba(26, 37, 69, 0.5);
+    margin-top: 0.2rem;
+  }
+
+  .quote-breakdown {
+    background: #fff;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid rgba(61, 107, 193, 0.08);
+  }
+
+  .quote-breakdown-title,
+  .quote-annual-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(26, 37, 69, 0.45);
+    margin-bottom: 0.5rem;
+  }
+
+  .quote-breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: rgba(26, 37, 69, 0.75);
+    padding: 0.25rem 0;
+    border-bottom: 1px dashed rgba(61, 107, 193, 0.08);
+  }
+  .quote-breakdown-row:last-child { border-bottom: none; }
+
+  .quote-breakdown-price {
+    font-weight: 600;
+    color: #1a2545;
+    white-space: nowrap;
+    margin-left: 0.5rem;
+  }
+
+  .quote-breakdown-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--tier-color, #3d6bc1);
+    padding-top: 0.5rem;
+    margin-top: 0.25rem;
+    border-top: 2px solid var(--tier-color, #3d6bc1);
+  }
+
+  .quote-annual {
+    background: rgba(188, 152, 74, 0.06);
+    padding: 0.75rem 1.25rem;
+    border-top: 1px solid rgba(188, 152, 74, 0.2);
+  }
+
+  .quote-annual .quote-annual-title {
+    color: #a07f3a;
+  }
+
+  .quote-annual .quote-breakdown-row {
+    color: rgba(26, 37, 69, 0.7);
+    border-bottom-color: rgba(188, 152, 74, 0.12);
+  }
+
+  .quote-disclaimer {
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: rgba(26, 37, 69, 0.5);
+    line-height: 1.6;
+    padding: 0.6rem 0.75rem;
+    background: rgba(26, 37, 69, 0.04);
+    border-radius: 8px;
+    border-left: 3px solid rgba(26, 37, 69, 0.15);
+  }
+}
+
+

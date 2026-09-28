@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { FintoLogo } from '@/components/ui/FintoLogo'
 import { FintoIcon, type FintoIconName } from '@/components/ui/FintoIcon'
 import { BlogSection } from '@/components/blog/BlogSection'
+import { ContactFormModal } from '@/components/ui/ContactFormModal'
 
 import mockupHero from '@/assets/finto/images/mockup-hero.webp'
 import mockupPortal from '@/assets/finto/images/mockup-portal.webp'
@@ -28,17 +29,17 @@ const SERVICES = [
   },
   {
     img: imgController,
-    title: 'Controller financiero',
+    title: 'Control financiero y tesorería',
     desc: 'Convertimos tus números en decisiones: control de caja, presupuesto y proyecciones para anticiparte al futuro.',
   },
   {
     img: imgFacturacion,
-    title: 'Facturación y cartera',
+    title: 'Facturación, cobranza y datos',
     desc: 'Facturamos, hacemos seguimiento y aceleramos el recaudo para mantener saludable tu flujo de caja.',
   },
   {
     img: imgPersonal,
-    title: 'Gestión de personal y compras',
+    title: 'Gestión de personal y SG-SST',
     desc: 'Simplificamos la gestión de tu equipo y tus compras para que tu operación fluya sin complicaciones.',
   },
 ]
@@ -73,6 +74,7 @@ const STATS = [
 
 export function LandingPage() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [contactOpen, setContactOpen] = useState(false)
   // Giro 3D del mockup según el lado donde esté el mouse (0 = de frente)
   const [heroTilt, setHeroTilt] = useState(0)
   const TILT = 18 // grados de giro a cada lado
@@ -82,6 +84,7 @@ export function LandingPage() {
   const [activeStep, setActiveStep] = useState<string | null>(null)
 
   return (
+    <>
     <div className="min-h-screen bg-cream-50 font-sans text-navy-900">
 
       {/* ── Navbar ─────────────────────────────────────────────── */}
@@ -90,11 +93,23 @@ export function LandingPage() {
           <FintoLogo variant="navy" height={26} />
 
           <nav className="hidden md:flex items-center gap-7">
-            {NAV_LINKS.map(l => (
-              <a key={l.label} href={l.href} className="text-sm font-medium text-navy-900/70 hover:text-brand-600 transition-colors">
-                {l.label}
-              </a>
-            ))}
+            {NAV_LINKS.map(l =>
+              l.label === 'Contacto' ? (
+                <button
+                  key={l.label}
+                  type="button"
+                  id="nav-contacto-btn"
+                  onClick={() => setContactOpen(true)}
+                  className="text-sm font-medium text-navy-900/70 hover:text-brand-600 transition-colors"
+                >
+                  {l.label}
+                </button>
+              ) : (
+                <a key={l.label} href={l.href} className="text-sm font-medium text-navy-900/70 hover:text-brand-600 transition-colors">
+                  {l.label}
+                </a>
+              )
+            )}
           </nav>
 
           <div className="hidden md:flex items-center gap-2">
@@ -113,11 +128,22 @@ export function LandingPage() {
 
         {mobileOpen && (
           <div className="md:hidden bg-cream-50 border-t border-sand-300/40 px-6 py-4 space-y-3">
-            {NAV_LINKS.map(l => (
-              <a key={l.label} href={l.href} onClick={() => setMobileOpen(false)} className="block text-sm font-medium text-navy-900/70">
-                {l.label}
-              </a>
-            ))}
+            {NAV_LINKS.map(l =>
+              l.label === 'Contacto' ? (
+                <button
+                  key={l.label}
+                  type="button"
+                  onClick={() => { setMobileOpen(false); setContactOpen(true) }}
+                  className="block text-sm font-medium text-navy-900/70 text-left w-full"
+                >
+                  {l.label}
+                </button>
+              ) : (
+                <a key={l.label} href={l.href} onClick={() => setMobileOpen(false)} className="block text-sm font-medium text-navy-900/70">
+                  {l.label}
+                </a>
+              )
+            )}
             <div className="pt-2 flex flex-col gap-2 border-t border-sand-300/40">
               <Link to="/register" onClick={() => setMobileOpen(false)} className="text-sm font-medium text-navy-900/70">Registrarse</Link>
               <Link to="/login" onClick={() => setMobileOpen(false)} className="text-sm font-semibold text-brand-600">Acceder al Portal →</Link>
@@ -163,10 +189,13 @@ export function LandingPage() {
                 className="inline-flex items-center justify-center gap-2 font-display font-semibold text-cream-100 border border-cream-100/30 bg-white/5 px-6 py-3 rounded-full hover:bg-white/10 transition-colors">
                 Acceder al Portal
               </Link>
-              <Link to="/register"
+              <button
+                id="hero-cta-solicitar"
+                type="button"
+                onClick={() => setContactOpen(true)}
                 className="inline-flex items-center justify-center gap-2 font-display font-semibold bg-navy-950 text-cream-100 px-6 py-3 rounded-full ring-1 ring-white/10 hover:bg-navy-900 transition-colors">
                 Solicitar una propuesta <ArrowRight className="w-4 h-4" />
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -394,11 +423,18 @@ export function LandingPage() {
             Contáctenos y en menos de 48 horas tendrá una propuesta personalizada para su negocio.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link to="/register"
+            <button
+              id="cta-solicitar-propuesta"
+              type="button"
+              onClick={() => setContactOpen(true)}
               className="inline-flex items-center justify-center gap-2 font-display font-semibold border border-cream-100/40 text-cream-100 px-8 py-3.5 rounded-full hover:bg-white/10 transition-colors">
               Solicitar una propuesta
-            </Link>
-            <a href="#contacto"
+            </button>
+            <a
+              id="cta-hablar-asesor"
+              href="https://wa.me/573102170905"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 font-display font-semibold bg-cream-100 text-navy-900 px-8 py-3.5 rounded-full hover:bg-cream-50 transition-colors">
               Hablar con un asesor
             </a>
@@ -445,5 +481,9 @@ export function LandingPage() {
         </div>
       </footer>
     </div>
+
+    {/* ── Contact form modal ───────────────────────────────────────── */}
+    <ContactFormModal open={contactOpen} onClose={() => setContactOpen(false)} />
+    </>
   )
 }

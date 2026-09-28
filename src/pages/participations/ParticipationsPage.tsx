@@ -545,6 +545,108 @@ function UnlinkPaymentModal({
   )
 }
 
+function UnlinkEgressModal({
+  invoice,
+  onClose,
+  onSuccess,
+}: {
+  invoice: any
+  onClose: () => void
+  onSuccess: (newPaid: number) => void
+}) {
+  const qc = useQueryClient()
+  const paid = Number(invoice.egress_voucher_value ?? 0)
+  const vouchers = String(invoice.egress_voucher ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
+  const [selectedVoucher, setSelectedVoucher] = useState(vouchers[0] ?? '')
+  const [amount, setAmount] = useState<number>(paid)
+
+  const unlinkMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/api/participations/unlink-egress', {
+        invoice_id: invoice.id,
+        amount: Number(amount),
+        comprobante: selectedVoucher,
+      })
+      return data
+    },
+    onSuccess: (res: any) => {
+      toast.success('Pago al tercero desvinculado correctamente')
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      onSuccess(res.egress_voucher_value)
+      onClose()
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? 'Error al desvincular el pago')
+    },
+  })
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-rose-600 font-bold">
+            <Unlink className="w-5 h-5" />
+            <h3 className="text-base text-slate-900">Desvincular Pago al Tercero (RP)</h3>
+          </div>
+          <button onClick={onClose} className="p-1 text-slate-400 hover:bg-slate-100 rounded-lg"><X className="w-4 h-4" /></button>
+        </div>
+
+        <p className="text-xs text-slate-500">
+          Al desvincular este egreso, el valor se restará de la factura <b>{invoice.finto_invoice || invoice.purchase_order}</b> y el comprobante de pago quedará nuevamente libre en el sistema (Saldos) para poder asociarse a la factura correcta.
+        </p>
+
+        <div className="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Comprobante a desvincular</label>
+            {vouchers.length > 1 ? (
+              <select
+                value={selectedVoucher}
+                onChange={e => setSelectedVoucher(e.target.value)}
+                className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded-lg bg-white"
+              >
+                {vouchers.map((r: string) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={selectedVoucher}
+                onChange={e => setSelectedVoucher(e.target.value)}
+                className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded-lg bg-white"
+              />
+            )}
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Monto a retirar ($)</label>
+            <input
+              type="number"
+              min="0.01"
+              max={paid}
+              step="any"
+              value={amount || ''}
+              onChange={e => setAmount(Number(e.target.value) || 0)}
+              className="w-full text-xs font-semibold px-2 py-1.5 border border-slate-200 rounded-lg bg-white"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" size="sm" onClick={onClose}>Cancelar</Button>
+          <Button
+            size="sm"
+            variant="danger"
+            loading={unlinkMutation.isPending}
+            disabled={!selectedVoucher.trim() || amount <= 0 || amount > paid + 0.01}
+            onClick={() => unlinkMutation.mutate()}
+          >
+            Confirmar Desvinculación
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReallocatePaymentModal({
   fromInvoice,
   clientNit,
@@ -1079,6 +1181,7 @@ function ParticipationDetailModal({
   const [reallocateOpen, setReallocateOpen] = useState(false)
   const [linkOpen, setLinkOpen] = useState(false)
   const [unlinkOpen, setUnlinkOpen] = useState(false)
+  const [unlinkEgressOpen, setUnlinkEgressOpen] = useState(false)
   const [unlinkFvOpen, setUnlinkFvOpen] = useState(false)
 
   useEffect(() => {
@@ -1628,6 +1731,19 @@ function ParticipationDetailModal({
                 <DetailField label="Comprobante de egreso (RP)" value={item.egress_voucher ?? (paymentDone ? 'Registrado' : 'Pendiente')} mono />
                 <DetailField label="Fecha de pago (RP)" value={item.egress_voucher_date ?? (item.egress_voucher ? 'Sin fecha' : '—')} />
                 <DetailField label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
+
+                {/* Acción manual: desvincular el pago al tercero (RP) */}
+                {item.egress_voucher && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setUnlinkEgressOpen(true)}
+                      className="text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+                    >
+                      <Unlink className="w-3 h-3 text-rose-600" /> Desvincular pago (RP)
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </DetailStage>
@@ -1711,6 +1827,14 @@ function ParticipationDetailModal({
         />
       )}
 
+      {unlinkEgressOpen && (
+        <UnlinkEgressModal
+          invoice={item}
+          onClose={() => setUnlinkEgressOpen(false)}
+          onSuccess={() => reloadInvoice()}
+        />
+      )}
+
       {unlinkFvOpen && (
         <UnlinkSaleInvoiceModal
           item={item}
@@ -1725,7 +1849,11 @@ function ParticipationDetailModal({
 
 function BalanceDetailModal({ kind, row, onClose }: { kind: 'cxc' | 'cxp'; row: any; onClose: () => void }) {
   const isCxc = kind === 'cxc'
-  const items: any[] = row.items ?? []
+  const items: any[] = [...(row.items ?? [])].sort((a: any, b: any) => {
+    const pComp = String(a.period || '').localeCompare(String(b.period || ''))
+    if (pComp !== 0) return pComp
+    return String(a.purchase_order || '').localeCompare(String(b.purchase_order || ''))
+  })
   const headers = isCxc
     ? ['OC', 'Periodo', 'Factura', 'Facturado', 'Recaudado', 'Saldo']
     : ['OC', 'Periodo', 'Cliente', 'Factura', 'Causado', 'Disponible', 'Pagado', 'Por pagar']
@@ -2967,7 +3095,11 @@ function ThirdPartiesView({
         <div className="space-y-3">
           {thirdParties.map((tp: any) => {
             const isOpen = !!expanded[tp.id]
-            const invs: any[] = tp.invoices ?? []
+            const invs: any[] = [...(tp.invoices ?? [])].sort((a: any, b: any) => {
+              const pComp = String(a.period || '').localeCompare(String(b.period || ''))
+              if (pComp !== 0) return pComp
+              return String(a.purchase_order || '').localeCompare(String(b.purchase_order || ''))
+            })
             return (
               <div key={tp.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-slate-300 transition-colors">
                 {/* Cabecera del tercero */}
@@ -3251,7 +3383,11 @@ export function ParticipationsPage() {
     },
     placeholderData: (prev: any) => prev,
   })
-  const rows: any[] = data?.data ?? []
+  const rows: any[] = [...(data?.data ?? [])].sort((a: any, b: any) => {
+    const pComp = String(a.period || '').localeCompare(String(b.period || ''))
+    if (pComp !== 0) return pComp
+    return String(a.purchase_order || '').localeCompare(String(b.purchase_order || ''))
+  })
   const total: number = data?.total ?? 0
   const pages = Math.max(1, Math.ceil(total / 20))
 
