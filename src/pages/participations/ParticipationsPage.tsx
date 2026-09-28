@@ -1188,6 +1188,29 @@ function ParticipationDetailModal({
     setItem(initialItem)
   }, [initialItem])
 
+  // Validar contra el servidor al abrir: si la OC ya no existe (p. ej. la lista
+  // quedó en caché tras un import/limpieza que la regeneró o eliminó), avisar y
+  // cerrar en vez de dejar editar un id inexistente (que luego daría 404 al guardar).
+  useEffect(() => {
+    const idToCheck = initialItem?.id || initialItem?._raw?.id || initialItem?.invoice_id
+    if (!idToCheck) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await api.get(`/api/participations/invoices/${idToCheck}`)
+        if (!cancelled && data) setItem(data)
+      } catch (err: any) {
+        if (!cancelled && err?.response?.status === 404) {
+          toast.error('Esta OC ya no existe (la lista estaba desactualizada). Se actualizó; vuelve a abrirla.')
+          qc.invalidateQueries({ queryKey: ['participations'] })
+          onClose()
+        }
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialItem?.id])
+
   const clientNit = item.companies?.nit || item.client_nit || ''
   const clientName = item.companies?.name || item.client_name || ''
   const p = item.participation ?? {}
@@ -1225,6 +1248,12 @@ function ParticipationDetailModal({
       qc.invalidateQueries({ queryKey: ['participations'] })
     },
     onError: (err: any) => {
+      if (err?.response?.status === 404) {
+        toast.error('Esta OC ya no existe en el sistema (la lista estaba desactualizada). Se actualizó la lista; vuelve a abrir la OC correcta.')
+        qc.invalidateQueries({ queryKey: ['participations'] })
+        onClose()
+        return
+      }
       toast.error(err.response?.data?.error ?? err.message ?? 'Error al actualizar la etapa')
     },
   })
