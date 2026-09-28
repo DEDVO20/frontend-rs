@@ -2492,8 +2492,22 @@ function PaymentsView({
   })
 
   const items: any[] = data?.items ?? []
-  const s = data?.summary ?? { count: 0, rc_count: 0, rp_count: 0, rc_saldo: 0, rp_saldo: 0, total_saldo: 0 }
+  const s = data?.summary ?? {
+    count: 0,
+    fv_count: 0, fc_count: 0, rc_count: 0, rp_count: 0,
+    fv_saldo: 0, fc_saldo: 0, rc_saldo: 0, rp_saldo: 0,
+    client_saldo: 0, third_party_saldo: 0, total_saldo: 0,
+  }
   const options = data?.filter_options ?? { clients: [], third_parties: [], periods: [] }
+
+  // FV/RC son del lado del cliente (nos deben); FC/RP del lado del tercero (debemos).
+  const isClientSide = (t: string) => t === 'FV' || t === 'RC'
+  const TYPE_META: Record<string, { sub: string; badge: string; text: string }> = {
+    FV: { sub: 'Cartera',       badge: 'bg-indigo-100 text-indigo-800',   text: 'text-indigo-700' },
+    RC: { sub: 'Recaudo',       badge: 'bg-blue-100 text-blue-800',       text: 'text-blue-700' },
+    FC: { sub: 'Fact. tercero', badge: 'bg-violet-100 text-violet-800',   text: 'text-violet-700' },
+    RP: { sub: 'Egreso',        badge: 'bg-emerald-100 text-emerald-800', text: 'text-emerald-700' },
+  }
 
   const hasFilters = Boolean(period || docType || client || thirdParty || search)
 
@@ -2512,7 +2526,7 @@ function PaymentsView({
       r.doc_type,
       `"${(r.comprobante || '').replace(/"/g, '""')}"`,
       `"${(r.fv_ref || '').replace(/"/g, '""')}"`,
-      r.doc_type === 'RC' ? 'Cliente' : 'Tercero',
+      isClientSide(r.doc_type) ? 'Cliente' : 'Tercero',
       `"${(r.tercero_nit || '').replace(/"/g, '""')}"`,
       `"${(r.tercero_name || '').replace(/"/g, '""')}"`,
       r.period || '',
@@ -2526,7 +2540,7 @@ function PaymentsView({
     const encodedUri = encodeURI(csvContent)
     const link = document.createElement('a')
     link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `saldos_rc_rp_${period || 'todos'}_${new Date().toISOString().slice(0, 10)}.csv`)
+    link.setAttribute('download', `saldos_no_cruzados_${period || 'todos'}_${new Date().toISOString().slice(0, 10)}.csv`)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -2610,7 +2624,7 @@ function PaymentsView({
             }`}
           >
             <Wallet className="w-3.5 h-3.5" />
-            Saldos No Cruzados (RC / RP)
+            Saldos No Cruzados (FV / FC / RC / RP)
             <span className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
               subTab === 'uncrossed' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'
             }`}>
@@ -2671,31 +2685,31 @@ function PaymentsView({
               </p>
             </div>
 
-            {/* Saldo RC Clientes */}
+            {/* Lado cliente: FV (cartera) + RC (recaudo) → nos deben */}
             <div className="bg-blue-50/50 border border-blue-200/70 rounded-xl p-4 flex flex-col justify-between shadow-xs">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Saldo RC · Recaudos Clientes</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">Cliente · Nos deben (FV + RC)</span>
                 <span className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
                   <Receipt className="w-4 h-4" />
                 </span>
               </div>
-              <div className="text-xl font-bold text-blue-900">{fmtMoney(s.rc_saldo)}</div>
+              <div className="text-xl font-bold text-blue-900">{fmtMoney(s.client_saldo)}</div>
               <p className="text-[11px] text-blue-600/90 mt-1">
-                <b className="text-blue-900">{s.rc_count}</b> recibo{s.rc_count === 1 ? '' : 's'} pendiente{s.rc_count === 1 ? '' : 's'} por cruzar
+                <b className="text-indigo-900">{s.fv_count}</b> FV (cartera) · <b className="text-blue-900">{s.rc_count}</b> RC sin aplicar
               </p>
             </div>
 
-            {/* Saldo RP Terceros */}
+            {/* Lado tercero: FC (factura) + RP (egreso) → debemos */}
             <div className="bg-emerald-50/50 border border-emerald-200/70 rounded-xl p-4 flex flex-col justify-between shadow-xs">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Saldo RP · Pagos a Terceros</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Tercero · Debemos (FC + RP)</span>
                 <span className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
                   <CreditCard className="w-4 h-4" />
                 </span>
               </div>
-              <div className="text-xl font-bold text-emerald-900">{fmtMoney(s.rp_saldo)}</div>
+              <div className="text-xl font-bold text-emerald-900">{fmtMoney(s.third_party_saldo)}</div>
               <p className="text-[11px] text-emerald-600/90 mt-1">
-                <b className="text-emerald-900">{s.rp_count}</b> comprobante{s.rp_count === 1 ? '' : 's'} de egreso pendiente{s.rp_count === 1 ? '' : 's'}
+                <b className="text-violet-900">{s.fc_count}</b> FC sin conciliar · <b className="text-emerald-900">{s.rp_count}</b> RP sin aplicar
               </p>
             </div>
           </div>
@@ -2714,12 +2728,28 @@ function PaymentsView({
                   Todos ({s.count})
                 </button>
                 <button
+                  onClick={() => setDocType('FV')}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    docType === 'FV' ? 'bg-white text-indigo-700 font-semibold shadow-xs' : 'text-slate-500 hover:text-indigo-700'
+                  }`}
+                >
+                  FV Cartera ({s.fv_count})
+                </button>
+                <button
                   onClick={() => setDocType('RC')}
                   className={`px-3 py-1 rounded-md transition-all ${
                     docType === 'RC' ? 'bg-white text-blue-700 font-semibold shadow-xs' : 'text-slate-500 hover:text-blue-700'
                   }`}
                 >
                   RC Clientes ({s.rc_count})
+                </button>
+                <button
+                  onClick={() => setDocType('FC')}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    docType === 'FC' ? 'bg-white text-violet-700 font-semibold shadow-xs' : 'text-slate-500 hover:text-violet-700'
+                  }`}
+                >
+                  FC Terceros ({s.fc_count})
                 </button>
                 <button
                   onClick={() => setDocType('RP')}
@@ -2751,8 +2781,8 @@ function PaymentsView({
                 </select>
               </div>
 
-              {/* Filtro por Cliente (visible para Todos o RC) */}
-              {docType !== 'RP' && (
+              {/* Filtro por Cliente (visible para Todos, FV o RC) */}
+              {docType !== 'RP' && docType !== 'FC' && (
                 <div className="flex items-center gap-1.5 min-w-[200px] flex-1 sm:flex-initial">
                   <span className="text-xs font-semibold text-blue-700">Cliente:</span>
                   <select
@@ -2762,7 +2792,7 @@ function PaymentsView({
                       client ? 'border-blue-400 text-blue-800 font-medium' : 'border-slate-200 text-slate-600'
                     }`}
                   >
-                    <option value="">Todos los clientes (RC)</option>
+                    <option value="">Todos los clientes (FV / RC)</option>
                     {options.clients.map((c: any) => (
                       <option key={c.value} value={c.value}>{c.label}</option>
                     ))}
@@ -2770,8 +2800,8 @@ function PaymentsView({
                 </div>
               )}
 
-              {/* Filtro por Tercero (visible para Todos o RP) */}
-              {docType !== 'RC' && (
+              {/* Filtro por Tercero (visible para Todos, FC o RP) */}
+              {docType !== 'RC' && docType !== 'FV' && (
                 <div className="flex items-center gap-1.5 min-w-[200px] flex-1 sm:flex-initial">
                   <span className="text-xs font-semibold text-emerald-700">Tercero:</span>
                   <select
@@ -2781,7 +2811,7 @@ function PaymentsView({
                       thirdParty ? 'border-emerald-400 text-emerald-800 font-medium' : 'border-slate-200 text-slate-600'
                     }`}
                   >
-                    <option value="">Todos los terceros (RP)</option>
+                    <option value="">Todos los terceros (FC / RP)</option>
                     {options.third_parties.map((tp: any) => (
                       <option key={tp.value} value={tp.value}>{tp.label}</option>
                     ))}
@@ -2849,7 +2879,7 @@ function PaymentsView({
                       <td colSpan={11} className="px-4 py-12 text-center text-slate-400 text-sm">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-                          <p className="font-semibold text-slate-700">No hay saldos de RC o RP pendientes con los filtros seleccionados</p>
+                          <p className="font-semibold text-slate-700">No hay saldos de FV, FC, RC o RP pendientes con los filtros seleccionados</p>
                           <p className="text-xs text-slate-400">Todos los comprobantes correspondientes se encuentran debidamente cruzados.</p>
                           {hasFilters && (
                             <Button size="sm" variant="secondary" onClick={clearAllFilters} className="mt-2">
@@ -2861,18 +2891,17 @@ function PaymentsView({
                     </tr>
                   ) : (
                     items.map((r: any) => {
-                      const isRC = r.doc_type === 'RC'
+                      const clientSide = isClientSide(r.doc_type)
+                      const meta = TYPE_META[r.doc_type] ?? { sub: '', badge: 'bg-slate-100 text-slate-700', text: 'text-slate-700' }
                       const pctUncrossed = r.amount > 0 ? Math.round(((r.saldo ?? 0) / r.amount) * 100) : 100
                       const isPartial = (Number(r.applied ?? 0) > 0)
                       return (
                         <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="px-3.5 py-2.5 whitespace-nowrap">
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                              isRC ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
-                            }`}>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md ${meta.badge}`}>
                               {r.doc_type}
                               <span className="text-[9px] font-normal opacity-75">
-                                {isRC ? 'Recaudo' : 'Egreso'}
+                                {meta.sub}
                               </span>
                             </span>
                           </td>
@@ -2892,8 +2921,8 @@ function PaymentsView({
                                 {r.tercero_name || '—'}
                               </span>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className={`text-[10px] font-bold uppercase ${isRC ? 'text-blue-600' : 'text-emerald-600'}`}>
-                                  {isRC ? 'Cliente' : 'Tercero'}:
+                                <span className={`text-[10px] font-bold uppercase ${meta.text}`}>
+                                  {clientSide ? 'Cliente' : 'Tercero'}:
                                 </span>
                                 <span className="text-[11px] font-mono text-slate-400">
                                   {r.tercero_nit || 'Sin NIT'}
@@ -2915,7 +2944,7 @@ function PaymentsView({
                           </td>
                           <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
                             <div className="flex flex-col items-end">
-                              <span className={`text-xs font-bold ${isRC ? 'text-blue-700' : 'text-emerald-700'}`}>
+                              <span className={`text-xs font-bold ${meta.text}`}>
                                 {fmtMoney(Number(r.saldo ?? 0))}
                               </span>
                               <span className="text-[10px] text-slate-400">
@@ -2936,7 +2965,7 @@ function PaymentsView({
                             {r.note || '—'}
                           </td>
                           <td className="px-3.5 py-2.5 text-right whitespace-nowrap">
-                            {isRC && onApplyPayment && (
+                            {r.doc_type === 'RC' && onApplyPayment && (
                               <Button
                                 size="sm"
                                 variant="secondary"
