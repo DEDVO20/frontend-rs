@@ -2392,6 +2392,9 @@ function ReconciliationView({ period }: { period: string }) {
       const { data } = await api.get(`/api/participations/reconciliation?${p}`)
       return data
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
   const ocs: any[] = data?.ocs ?? []
   const available = data?.available ?? { RC: [], FC: [], RP: [] }
@@ -3328,6 +3331,9 @@ function ThirdPartiesView({
       const { data } = await api.get(`/api/participations/by-third-party?${p}`)
       return data
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
 
   const summary = data?.summary ?? {}
@@ -3711,6 +3717,10 @@ export function ParticipationsPage() {
       return data
     },
     placeholderData: (prev: any) => prev,
+    // Siempre fresco: evita mostrar OC ya inexistentes (ids viejos) por el caché de 5 min.
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   })
   const rows: any[] = [...(data?.data ?? [])].sort((a: any, b: any) => {
     const pComp = String(a.period || '').localeCompare(String(b.period || ''))
