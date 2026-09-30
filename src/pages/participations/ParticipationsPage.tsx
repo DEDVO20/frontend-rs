@@ -2566,7 +2566,7 @@ function ReconciliationView({ period }: { period: string }) {
                                             className="ml-auto w-24 text-right text-xs px-1.5 py-1 border border-slate-200 rounded" />
                                           <button
                                             disabled={assignMut.isPending || val <= 0}
-                                            onClick={() => assignMut.mutate({ source_doc_type: assignType, source_comprobante: d.comprobante, invoice_participation_id: oc.id, amount: val, source_nit: d.tercero_nit })}
+                                            onClick={() => assignMut.mutate({ source_doc_type: assignType, source_comprobante: d.comprobante, purchase_order: oc.purchase_order, amount: val, source_nit: d.tercero_nit })}
                                             className="text-[11px] font-bold text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 px-2 py-1 rounded">
                                             Asignar
                                           </button>
