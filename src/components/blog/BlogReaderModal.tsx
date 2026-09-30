@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Clock, Calendar, Share2, Check, ArrowRight, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
-import { Link } from 'react-router-dom'
 
 export interface BlogPostData {
   id: string
