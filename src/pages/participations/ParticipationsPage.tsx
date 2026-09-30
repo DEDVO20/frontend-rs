@@ -1260,14 +1260,39 @@ function ParticipationDetailModal({
     },
   })
 
+  // Vincula la FV por NÚMERO de OC (purchase_order), no por id interno. Así el
+  // servidor resuelve la OC actual y no falla aunque la lista tenga un id viejo.
+  const linkFvMutation = useMutation({
+    mutationFn: async (payload: { finto_invoice: string | null; finto_invoice_date: string | null; finto_invoice_value: number }) => {
+      const po = item?.purchase_order || initialItem?.purchase_order
+      if (!po) throw new Error('Número de OC no disponible')
+      const { data } = await api.post('/api/participations/link-sale-invoice', { purchase_order: po, ...payload })
+      return data
+    },
+    onSuccess: (updated: any) => {
+      setItem(updated)
+      setEditingStage(null)
+      toast.success('Factura de venta vinculada correctamente')
+      qc.removeQueries({ queryKey: ['participations'] })
+      qc.refetchQueries({ queryKey: ['participations'] })
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.error ?? err.message ?? 'Error al vincular la factura de venta')
+    },
+  })
+
   const handleSaveStage = () => {
-    const payload: Record<string, any> = {}
     if (editingStage === 2) {
       const fv = editForm.finto_invoice?.trim() || null
-      payload.finto_invoice = fv
-      payload.finto_invoice_date = fv ? (editForm.finto_invoice_date || null) : null
-      payload.finto_invoice_value = fv ? (Number(editForm.finto_invoice_value) || 0) : 0
-    } else if (editingStage === 3) {
+      linkFvMutation.mutate({
+        finto_invoice: fv,
+        finto_invoice_date: fv ? (editForm.finto_invoice_date || null) : null,
+        finto_invoice_value: fv ? (Number(editForm.finto_invoice_value) || 0) : 0,
+      })
+      return
+    }
+    const payload: Record<string, any> = {}
+    if (editingStage === 3) {
       if (editForm.cash_receipts !== undefined) payload.cash_receipts = editForm.cash_receipts.trim() || null
       if (editForm.cash_receipt_date !== undefined) payload.cash_receipt_date = editForm.cash_receipt_date || null
       if (editForm.collected !== undefined && editForm.collected !== '') {
@@ -1409,7 +1434,7 @@ function ParticipationDetailModal({
                 </div>
                 <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                   <Button size="sm" variant="secondary" onClick={() => setEditingStage(null)}>Cancelar</Button>
-                  <Button size="sm" loading={updateMutation.isPending} onClick={handleSaveStage}>Guardar cambios</Button>
+                  <Button size="sm" loading={updateMutation.isPending || linkFvMutation.isPending} onClick={handleSaveStage}>Guardar cambios</Button>
                 </div>
               </div>
             ) : (
