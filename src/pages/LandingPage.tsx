@@ -190,11 +190,11 @@ export function LandingPage() {
                 Acceder al Portal
               </Link>
               <button
-                id="hero-cta-solicitar"
+                id="hero-cta-cotiza"
                 type="button"
                 onClick={() => setContactOpen(true)}
                 className="inline-flex items-center justify-center gap-2 font-display font-semibold bg-navy-950 text-cream-100 px-6 py-3 rounded-full ring-1 ring-white/10 hover:bg-navy-900 transition-colors">
-                Solicitar una propuesta <ArrowRight className="w-4 h-4" />
+                Cotiza en línea <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -410,7 +410,7 @@ export function LandingPage() {
       </section>
 
       {/* ── Artículos y Publicaciones (Blog) ───────────────────── */}
-      <BlogSection />
+      <BlogSection onOpenContact={() => setContactOpen(true)} />
 
       {/* ── CTA ────────────────────────────────────────────────── */}
       <section id="contacto" className="relative overflow-hidden py-20 md:py-28 bg-gradient-to-br from-navy-900 to-brand-700">
@@ -424,11 +424,11 @@ export function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
-              id="cta-solicitar-propuesta"
+              id="cta-cotiza-en-linea"
               type="button"
               onClick={() => setContactOpen(true)}
               className="inline-flex items-center justify-center gap-2 font-display font-semibold border border-cream-100/40 text-cream-100 px-8 py-3.5 rounded-full hover:bg-white/10 transition-colors">
-              Solicitar una propuesta
+              Cotiza en línea
             </button>
             <a
               id="cta-hablar-asesor"

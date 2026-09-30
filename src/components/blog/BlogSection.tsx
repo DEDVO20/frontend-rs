@@ -13,7 +13,7 @@ export interface BlogCategoryData {
   post_count?: number
 }
 
-export function BlogSection() {
+export function BlogSection({ onOpenContact }: { onOpenContact?: () => void }) {
   const [selectedCategory, setSelectedCategory] = useState('Todas')
   const [selectedPost, setSelectedPost] = useState<BlogPostData | null>(null)
 
@@ -209,7 +209,7 @@ export function BlogSection() {
       </div>
 
       {/* Modal Lector Inmersivo */}
-      <BlogReaderModal post={selectedPost} onClose={() => setSelectedPost(null)} />
+      <BlogReaderModal post={selectedPost} onClose={() => setSelectedPost(null)} onOpenContact={onOpenContact} />
     </section>
   )
 }

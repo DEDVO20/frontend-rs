@@ -23,10 +23,11 @@ export interface BlogPostData {
 
 interface Props {
   post: BlogPostData | null
-  onClose: () => void
+  onClose:        () => void
+  onOpenContact?: () => void
 }
 
-export function BlogReaderModal({ post, onClose }: Props) {
+export function BlogReaderModal({ post, onClose, onOpenContact }: Props) {
   const [copied, setCopied] = useState(false)
 
   // Manejar tecla Escape para cerrar
@@ -332,13 +333,14 @@ export function BlogReaderModal({ post, onClose }: Props) {
               </p>
             </div>
             <div className="shrink-0 flex flex-col sm:flex-row gap-3">
-              <Link
-                to="/register"
-                onClick={onClose}
+              <button
+                type="button"
+                id="blog-cta-cotiza-btn"
+                onClick={() => { onClose(); onOpenContact?.() }}
                 className="inline-flex items-center justify-center gap-2 font-display font-semibold text-sm bg-gold-500 hover:bg-gold-400 text-navy-950 px-6 py-3 rounded-full transition-colors shadow-md"
               >
-                Solicitar Propuesta <ArrowRight className="w-4 h-4" />
-              </Link>
+                Cotiza en línea <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>

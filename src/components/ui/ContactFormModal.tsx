@@ -4,14 +4,12 @@ import { api } from '@/lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Service =
-  | 'facturacion' | 'cartera' | 'controller'
-  | 'contabilidad' | 'pagos' | 'nomina' | 'multiples'
+// Los 4 módulos de facturación que se muestran en las cards del landing
+type Service = 'control' | 'contabilidad' | 'facturacion' | 'nomina'
 
-type CompanySize = '1-3' | '4-10' | '11-24' | '25+'
+type CompanySize = '0-3' | '4-9' | '10-24' | '25+'
 type StartDate   = 'asap' | 'this-month' | 'next-month' | 'just-quoting'
-type PricingTier = 'emprendedor' | 'pequeña' | 'mediana'
-type BillingModule = 'controller' | 'contabilidad' | 'facturacion-cartera' | 'nomina'
+type PricingTier = 'emprendedor' | 'pequeña' | 'mediana' | 'custom'
 
 interface FormData {
   services:    Service[]
@@ -28,52 +26,43 @@ interface Props {
   onClose: () => void
 }
 
-// ── Pricing data ──────────────────────────────────────────────────────────────
+// ── Pricing data (fuente: hoja de cálculo Finto) ──────────────────────────────
 
 const SIZE_TO_TIER: Record<CompanySize, PricingTier> = {
-  '1-3':   'emprendedor',
-  '4-10':  'pequeña',
-  '11-24': 'pequeña',
-  '25+':   'mediana',
+  '0-3':   'emprendedor',
+  '4-9':   'pequeña',
+  '10-24': 'mediana',
+  '25+':   'custom',
 }
 
-const TIER_INFO: Record<PricingTier, { label: string; employees: string; color: string }> = {
-  emprendedor: { label: 'Emprendedor',     employees: '1–3 empleados',     color: '#3d6bc1' },
-  pequeña:     { label: 'Pequeña empresa', employees: '4–24 empleados',    color: '#315aa8' },
-  mediana:     { label: 'Mediana empresa', employees: '25+ empleados',     color: '#1a2545' },
+const TIER_INFO: Record<Exclude<PricingTier, 'custom'>, { label: string; employees: string; color: string }> = {
+  emprendedor: { label: 'Emprendedor',     employees: '0–3 empleados',  color: '#3d6bc1' },
+  pequeña:     { label: 'Pequeña empresa', employees: '4–9 empleados',  color: '#315aa8' },
+  mediana:     { label: 'Mediana empresa', employees: '10–24 empleados', color: '#1a2545' },
 }
 
-const BANK_ACCOUNTS: Record<PricingTier, string> = {
+const BANK_ACCOUNTS: Record<Exclude<PricingTier, 'custom'>, string> = {
   emprendedor: '1 cuenta bancaria (hasta 40 txn)',
   pequeña:     '2 cuentas bancarias (hasta 100 txn)',
   mediana:     '3 cuentas bancarias (hasta 500 txn)',
 }
 
-const SERVICE_TO_MODULE: Record<Service, BillingModule | 'multiples'> = {
-  facturacion:  'facturacion-cartera',
-  cartera:      'facturacion-cartera',
-  controller:   'controller',
-  pagos:        'controller',
-  contabilidad: 'contabilidad',
-  nomina:       'nomina',
-  multiples:    'multiples',
+// Precios por módulo y tier
+const MODULE_PRICES: Record<Service, Record<Exclude<PricingTier, 'custom'>, number>> = {
+  control:      { emprendedor: 1_750_905, pequeña: 3_501_810, mediana:  7_003_620 },
+  contabilidad: { emprendedor: 3_501_810, pequeña: 7_003_620, mediana: 14_007_240 },
+  facturacion:  { emprendedor: 1_750_905, pequeña: 3_501_810, mediana:  7_003_620 },
+  nomina:       { emprendedor: 1_750_905, pequeña: 3_501_810, mediana:  7_003_620 },
 }
 
-const MODULE_PRICES: Record<BillingModule, Record<PricingTier, number>> = {
-  'controller':          { emprendedor: 1_750_905, pequeña: 3_501_810, mediana:  7_003_620 },
-  'contabilidad':        { emprendedor: 3_501_810, pequeña: 7_003_620, mediana: 14_007_240 },
-  'facturacion-cartera': { emprendedor: 1_750_905, pequeña: 3_501_810, mediana:  7_003_620 },
-  'nomina':              { emprendedor: 1_750_905, pequeña: 3_501_810, mediana:  7_003_620 },
+const MODULE_LABELS: Record<Service, string> = {
+  control:      'Control financiero y tesorería',
+  contabilidad: 'Contabilidad e impuestos',
+  facturacion:  'Facturación, cobranza y datos',
+  nomina:       'Gestión de personal y SG-SST',
 }
 
-const MODULE_LABELS: Record<BillingModule, string> = {
-  'controller':          'Control financiero y tesorería',
-  'contabilidad':        'Contabilidad e impuestos',
-  'facturacion-cartera': 'Facturación, cobranza y datos',
-  'nomina':              'Gestión de personal y SG-SST',
-}
-
-const FULL_PACKAGE_PRICE: Record<PricingTier, number> = {
+const FULL_PACKAGE_PRICE: Record<Exclude<PricingTier, 'custom'>, number> = {
   emprendedor:  8_754_525,
   pequeña:     17_509_050,
   mediana:     35_018_100,
@@ -88,40 +77,26 @@ const ANNUAL_EXTRAS = [
 const formatCOP = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 
-function getActiveModules(services: Service[]): BillingModule[] {
-  if (services.includes('multiples')) return Object.keys(MODULE_PRICES) as BillingModule[]
-  const mods = services
-    .map(s => SERVICE_TO_MODULE[s])
-    .filter((m): m is BillingModule => m !== 'multiples')
-  return [...new Set(mods)]
+function calcMonthlyPrice(services: Service[], tier: Exclude<PricingTier, 'custom'>): number {
+  if (services.length === 4) return FULL_PACKAGE_PRICE[tier]
+  return services.reduce((sum, svc) => sum + MODULE_PRICES[svc][tier], 0)
 }
 
-function calcMonthlyPrice(services: Service[], tier: PricingTier): number {
-  if (services.includes('multiples')) return FULL_PACKAGE_PRICE[tier]
-  const modules = getActiveModules(services)
-  if (modules.length === 4) return FULL_PACKAGE_PRICE[tier]
-  return modules.reduce((sum, mod) => sum + MODULE_PRICES[mod][tier], 0)
-}
-
-const hasAnnualExtras = (services: Service[]) =>
-  services.includes('contabilidad') || services.includes('multiples')
+const hasAnnualExtras = (services: Service[]) => services.includes('contabilidad')
 
 // ── Step configs ──────────────────────────────────────────────────────────────
 
 const SERVICES: { value: Service; label: string; emoji: string }[] = [
-  { value: 'facturacion',  label: 'Facturación',                      emoji: '🧾' },
-  { value: 'cartera',      label: 'Cobro de cartera',                 emoji: '💰' },
-  { value: 'controller',   label: 'Control financiero y tesorería',   emoji: '📊' },
-  { value: 'contabilidad', label: 'Contabilidad e impuestos',         emoji: '📚' },
-  { value: 'pagos',        label: 'Pagos y tesorería',                emoji: '💳' },
-  { value: 'nomina',       label: 'Nómina y gestión administrativa',  emoji: '👥' },
-  { value: 'multiples',    label: 'Tercerizar varias áreas',          emoji: '🚀' },
+  { value: 'control',      label: 'Control financiero y tesorería',  emoji: '📊' },
+  { value: 'contabilidad', label: 'Contabilidad e impuestos',        emoji: '📚' },
+  { value: 'facturacion',  label: 'Facturación, cobranza y datos',   emoji: '🧾' },
+  { value: 'nomina',       label: 'Gestión de personal y SG-SST',    emoji: '👥' },
 ]
 
 const SIZES: { value: CompanySize; label: string }[] = [
-  { value: '1-3',   label: '1 a 3 empleados' },
-  { value: '4-10',  label: '4 a 10 empleados' },
-  { value: '11-24', label: '11 a 24 empleados' },
+  { value: '0-3',   label: '0 a 3 empleados' },
+  { value: '4-9',   label: '4 a 9 empleados' },
+  { value: '10-24', label: '10 a 24 empleados' },
   { value: '25+',   label: '25 o más empleados' },
 ]
 
@@ -164,14 +139,8 @@ export function ContactFormModal({ open, onClose }: Props) {
 
   const toggleService = (svc: Service) => {
     setForm(f => {
-      let next: Service[]
-      if (svc === 'multiples') {
-        next = f.services.includes('multiples') ? [] : ['multiples']
-      } else {
-        const without = f.services.filter(s => s !== 'multiples')
-        next = without.includes(svc) ? without.filter(s => s !== svc) : [...without, svc]
-      }
-      return { ...f, services: next }
+      const exists = f.services.includes(svc)
+      return { ...f, services: exists ? f.services.filter(s => s !== svc) : [...f.services, svc] }
     })
   }
 
@@ -185,7 +154,7 @@ export function ContactFormModal({ open, onClose }: Props) {
       form.phone.trim().length >= 7 &&
       /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)
     )
-    if (step === 5) return true  // cotizador — siempre puede enviar
+    if (step === 5) return true
     return false
   }
 
@@ -211,11 +180,13 @@ export function ContactFormModal({ open, onClose }: Props) {
 
   if (!open) return null
 
-  const tier          = form.companySize ? SIZE_TO_TIER[form.companySize as CompanySize] : null
-  const tierInfo      = tier ? TIER_INFO[tier] : null
-  const activeModules = getActiveModules(form.services)
-  const monthlyPrice  = (tier && form.services.length > 0) ? calcMonthlyPrice(form.services, tier) : 0
-  const isFullPackage = form.services.includes('multiples') || activeModules.length === 4
+  const tier         = form.companySize ? SIZE_TO_TIER[form.companySize as CompanySize] : null
+  const isCustomTier = tier === 'custom'
+  const tierInfo     = (tier && tier !== 'custom') ? TIER_INFO[tier] : null
+  const monthlyPrice = (tier && tier !== 'custom' && form.services.length > 0)
+    ? calcMonthlyPrice(form.services, tier)
+    : 0
+  const isFullPackage = form.services.length === 4
 
   const progress = ((step - 1) / (TOTAL_STEPS - 1)) * 100
 
@@ -239,8 +210,10 @@ export function ContactFormModal({ open, onClose }: Props) {
             </div>
             <h2 className="contact-success-title">¡Listo! Ya podemos preparar tu cotización</h2>
             <p className="contact-success-body">
-              En menos de <strong>48 horas</strong> recibirás una propuesta personalizada en tu correo.
-              También puedes escribirnos a <strong>finto@finto.la</strong>.
+              {isCustomTier
+                ? <>Un asesor de Finto se comunicará contigo para preparar una oferta ajustada a las necesidades de tu empresa.</>
+                : <>En menos de <strong>48 horas</strong> recibirás una propuesta personalizada en tu correo. También puedes escribirnos a <strong>finto@finto.la</strong>.</>
+              }
             </p>
             <button id="contact-modal-success-close" onClick={handleClose}
               className="contact-btn-primary w-full mt-2">
@@ -269,11 +242,10 @@ export function ContactFormModal({ open, onClose }: Props) {
                   <div className="contact-options-grid">
                     {SERVICES.map(s => {
                       const isSelected = form.services.includes(s.value)
-                      const isDisabled = s.value !== 'multiples' && form.services.includes('multiples')
                       return (
                         <button key={s.value} id={`service-opt-${s.value}`} type="button"
-                          onClick={() => toggleService(s.value)} disabled={isDisabled}
-                          className={`contact-option-card multi ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''}`}>
+                          onClick={() => toggleService(s.value)}
+                          className={`contact-option-card multi ${isSelected ? 'selected' : ''}`}>
                           {isSelected && (
                             <span className="contact-option-check">
                               <Check className="w-3 h-3" />
@@ -285,15 +257,18 @@ export function ContactFormModal({ open, onClose }: Props) {
                       )
                     })}
                   </div>
-                  {form.services.length > 0 && !form.services.includes('multiples') && (
+                  {form.services.length > 0 && (
                     <p className="contact-selection-count">
-                      {form.services.length} servicio{form.services.length > 1 ? 's' : ''} seleccionado{form.services.length > 1 ? 's' : ''}
+                      {form.services.length === 4
+                        ? '✅ Paquete completo seleccionado'
+                        : `${form.services.length} servicio${form.services.length > 1 ? 's' : ''} seleccionado${form.services.length > 1 ? 's' : ''}`
+                      }
                     </p>
                   )}
                 </div>
               )}
 
-              {/* ── Step 2: Tamaño (4 opciones) ── */}
+              {/* ── Step 2: Tamaño ── */}
               {step === 2 && (
                 <div className="contact-step-enter">
                   <h2 className="contact-question-title">¿Qué tan grande es tu operación?</h2>
@@ -363,76 +338,92 @@ export function ContactFormModal({ open, onClose }: Props) {
               )}
 
               {/* ── Step 5: Cotizador (ÚLTIMO — submit aquí) ── */}
-              {step === 5 && tier && (
+              {step === 5 && (
                 <div className="contact-step-enter">
                   <h2 className="contact-question-title">Tu estimado de inversión</h2>
-                  <p className="contact-question-sub">
-                    Basado en los datos que nos diste, este es el rango aproximado.
-                  </p>
 
-                  <div className="quote-card" style={{ '--tier-color': tierInfo!.color } as React.CSSProperties}>
-
-                    <div className="quote-card-header">
-                      <div>
-                        <span className="quote-tier-badge">{tierInfo!.label}</span>
-                        <p className="quote-tier-employees">{tierInfo!.employees}</p>
-                      </div>
-                      <div className="quote-bank-info">
-                        <span>🏦</span>
-                        <span>{BANK_ACCOUNTS[tier]}</span>
-                      </div>
-                    </div>
-
-                    <div className="quote-price-main">
-                      <p className="quote-price-label">Inversión mensual estimada</p>
-                      <p className="quote-price-amount">{formatCOP(monthlyPrice)}</p>
-                      <p className="quote-price-period">/ mes</p>
-                    </div>
-
-                    <div className="quote-breakdown">
-                      <p className="quote-breakdown-title">
-                        {isFullPackage ? 'Paquete completo incluye:' : 'Módulos seleccionados:'}
+                  {isCustomTier ? (
+                    /* Empresas de 25+ → mensaje de asesor */
+                    <div className="quote-custom-msg">
+                      <div className="quote-custom-icon">🤝</div>
+                      <h3 className="quote-custom-title">Oferta personalizada</h3>
+                      <p className="quote-custom-body">
+                        Para empresas de <strong>25 o más empleados</strong> preparamos propuestas a medida.
+                        Un asesor de Finto se comunicará contigo para entender tus necesidades
+                        y construir una oferta ajustada a la escala de tu operación.
                       </p>
-                      {(isFullPackage
-                        ? (Object.keys(MODULE_PRICES) as BillingModule[])
-                        : activeModules
-                      ).map(mod => (
-                        <div key={mod} className="quote-breakdown-row">
-                          <span>{MODULE_LABELS[mod]}</span>
-                          <span className="quote-breakdown-price">
-                            {formatCOP(MODULE_PRICES[mod][tier])}
-                          </span>
-                        </div>
-                      ))}
-                      {(isFullPackage || activeModules.length > 1) && (
-                        <div className="quote-breakdown-total">
-                          <span>Total mensual</span>
-                          <span>{formatCOP(monthlyPrice)}</span>
-                        </div>
-                      )}
+                      <p className="quote-custom-contact">
+                        📧 finto@finto.la &nbsp;·&nbsp; 📱 +57 310 2170905
+                      </p>
+                      {error && <p className="contact-error">{error}</p>}
                     </div>
+                  ) : tierInfo ? (
+                    /* Tiers con precio definido */
+                    <>
+                      <p className="contact-question-sub">
+                        Basado en los datos que nos diste, este es el rango aproximado.
+                      </p>
+                      <div className="quote-card" style={{ '--tier-color': tierInfo.color } as React.CSSProperties}>
 
-                    {hasAnnualExtras(form.services) && (
-                      <div className="quote-annual">
-                        <p className="quote-annual-title">Servicios anuales adicionales</p>
-                        {ANNUAL_EXTRAS.map(item => (
-                          <div key={item.label} className="quote-breakdown-row">
-                            <span>{item.label}</span>
-                            <span className="quote-breakdown-price">
-                              {formatCOP(item.prices[tier])}
-                            </span>
+                        <div className="quote-card-header">
+                          <div>
+                            <span className="quote-tier-badge">{tierInfo.label}</span>
+                            <p className="quote-tier-employees">{tierInfo.employees}</p>
                           </div>
-                        ))}
+                          <div className="quote-bank-info">
+                            <span>🏦</span>
+                            <span>{BANK_ACCOUNTS[tier as Exclude<PricingTier, 'custom'>]}</span>
+                          </div>
+                        </div>
+
+                        <div className="quote-price-main">
+                          <p className="quote-price-label">Inversión mensual estimada</p>
+                          <p className="quote-price-amount">{formatCOP(monthlyPrice)}</p>
+                          <p className="quote-price-period">/ mes</p>
+                        </div>
+
+                        <div className="quote-breakdown">
+                          <p className="quote-breakdown-title">
+                            {isFullPackage ? 'Paquete completo incluye:' : 'Módulos seleccionados:'}
+                          </p>
+                          {(isFullPackage ? SERVICES : SERVICES.filter(s => form.services.includes(s.value))).map(s => (
+                            <div key={s.value} className="quote-breakdown-row">
+                              <span>{MODULE_LABELS[s.value]}</span>
+                              <span className="quote-breakdown-price">
+                                {formatCOP(MODULE_PRICES[s.value][tier as Exclude<PricingTier, 'custom'>])}
+                              </span>
+                            </div>
+                          ))}
+                          {(isFullPackage || form.services.length > 1) && (
+                            <div className="quote-breakdown-total">
+                              <span>Total mensual</span>
+                              <span>{formatCOP(monthlyPrice)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {hasAnnualExtras(form.services) && (
+                          <div className="quote-annual">
+                            <p className="quote-annual-title">Servicios anuales adicionales</p>
+                            {ANNUAL_EXTRAS.map(item => (
+                              <div key={item.label} className="quote-breakdown-row">
+                                <span>{item.label}</span>
+                                <span className="quote-breakdown-price">
+                                  {formatCOP(item.prices[tier as Exclude<PricingTier, 'custom'>])}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
 
-                  <p className="quote-disclaimer">
-                    ⚠️ Estas tarifas están sujetas a verificación del volumen de transacciones.
-                    Un asesor te contactará para confirmar los detalles.
-                  </p>
-
-                  {error && <p className="contact-error">{error}</p>}
+                      <p className="quote-disclaimer">
+                        ⚠️ Estas tarifas están sujetas a verificación del volumen de transacciones.
+                        Un asesor te contactará para confirmar los detalles.
+                      </p>
+                      {error && <p className="contact-error">{error}</p>}
+                    </>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -460,7 +451,9 @@ export function ContactFormModal({ open, onClose }: Props) {
                   className="contact-btn-primary">
                   {loading
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</>
-                    : <>Solicitar mi cotización <ChevronRight className="w-4 h-4" /></>
+                    : isCustomTier
+                      ? <>Solicitar que me contacten <ChevronRight className="w-4 h-4" /></>
+                      : <>Solicitar mi cotización <ChevronRight className="w-4 h-4" /></>
                   }
                 </button>
               )}
