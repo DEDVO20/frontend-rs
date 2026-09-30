@@ -1202,7 +1202,8 @@ function ParticipationDetailModal({
       } catch (err: any) {
         if (!cancelled && err?.response?.status === 404) {
           toast.error('Esta OC ya no existe (la lista estaba desactualizada). Se actualizó; vuelve a abrirla.')
-          qc.invalidateQueries({ queryKey: ['participations'] })
+          qc.removeQueries({ queryKey: ['participations'] })
+          qc.refetchQueries({ queryKey: ['participations'] })
           onClose()
         }
       }
@@ -1250,7 +1251,8 @@ function ParticipationDetailModal({
     onError: (err: any) => {
       if (err?.response?.status === 404) {
         toast.error('Esta OC ya no existe en el sistema (la lista estaba desactualizada). Se actualizó la lista; vuelve a abrir la OC correcta.')
-        qc.invalidateQueries({ queryKey: ['participations'] })
+        qc.removeQueries({ queryKey: ['participations'] })
+        qc.refetchQueries({ queryKey: ['participations'] })
         onClose()
         return
       }
