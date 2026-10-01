@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Menu, X, Search, Settings2, FileText, BarChart3, User } from 'lucide-react'
-import { useState } from 'react'
+import { ArrowRight, ArrowUp, Menu, X, Search, Settings2, FileText, BarChart3, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { FintoLogo } from '@/components/ui/FintoLogo'
 import { FintoIcon, type FintoIconName } from '@/components/ui/FintoIcon'
 import { BlogSection } from '@/components/blog/BlogSection'
@@ -73,8 +73,9 @@ const STATS = [
 ]
 
 export function LandingPage() {
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [contactOpen, setContactOpen] = useState(false)
+  const [mobileOpen, setMobileOpen]   = useState(false)
+  const [contactOpen, setContactOpen]  = useState(false)
+  const [scrolled, setScrolled]        = useState(false)
   // Giro 3D del mockup según el lado donde esté el mouse (0 = de frente)
   const [heroTilt, setHeroTilt] = useState(0)
   const TILT = 18 // grados de giro a cada lado
@@ -83,6 +84,13 @@ export function LandingPage() {
   // Paso del proceso activado por toque (tablets sin hover)
   const [activeStep, setActiveStep] = useState<string | null>(null)
 
+  // Scroll tracker — muestra el botón después de 400px
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 400)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
     <>
     <div className="min-h-screen bg-cream-50 font-sans text-navy-900">
@@ -90,7 +98,9 @@ export function LandingPage() {
       {/* ── Navbar ─────────────────────────────────────────────── */}
       <header className="fixed top-0 inset-x-0 z-50 bg-cream-50/90 backdrop-blur border-b border-sand-300/40">
         <div className="max-w-6xl mx-auto px-5 md:px-6 h-16 flex items-center justify-between">
-          <FintoLogo variant="navy" height={26} />
+          <Link to="/" aria-label="Ir al inicio" className="flex items-center">
+            <FintoLogo variant="navy" height={42} />
+          </Link>
 
           <nav className="hidden md:flex items-center gap-7">
             {NAV_LINKS.map(l =>
@@ -447,30 +457,66 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between gap-10 mb-10">
             <div className="max-w-xs">
-              <FintoLogo variant="white" height={26} className="mb-4" />
+              <Link to="/" aria-label="Ir al inicio" className="inline-block mb-4">
+                <FintoLogo variant="white" height={36} />
+              </Link>
               <p className="text-sm leading-relaxed">
                 Soluciones integrales de back office para empresas colombianas. Confianza, precisión
                 y tecnología al servicio de su crecimiento.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-8 text-sm">
+            <div className="grid grid-cols-2 gap-10 sm:gap-16 text-sm">
               <div>
-                <p className="text-cream-100 font-semibold mb-3">Servicios</p>
-                {['Contabilidad', 'Tesorería', 'Facturación', 'Cartera', 'Gestión de Personal'].map(l => (
-                  <p key={l} className="mb-2 hover:text-cream-100 cursor-pointer transition-colors">{l}</p>
-                ))}
+                <p className="text-cream-100 font-semibold mb-4">Portal</p>
+                <div className="space-y-2.5">
+                  <Link
+                    to="/login"
+                    className="block text-cream-100/70 hover:text-cream-100 transition-colors"
+                  >
+                    Acceder al Portal
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="block text-cream-100/70 hover:text-cream-100 transition-colors"
+                  >
+                    Solicitar Acceso
+                  </Link>
+                  <a
+                    href="mailto:finto@finto.la"
+                    className="block text-cream-100/70 hover:text-cream-100 transition-colors"
+                  >
+                    Soporte técnico
+                  </a>
+                  <a
+                    href="/docs/manual-de-usuario.pdf"
+                    download="Manual-de-Usuario-Finto.pdf"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-cream-100/70 hover:text-cream-100 transition-colors"
+                  >
+                    Manual de Usuario
+                  </a>
+                </div>
               </div>
+
               <div>
-                <p className="text-cream-100 font-semibold mb-3">Portal</p>
-                {['Acceder', 'Solicitar acceso', 'Soporte técnico', 'Manual de usuario'].map(l => (
-                  <p key={l} className="mb-2 hover:text-cream-100 cursor-pointer transition-colors">{l}</p>
-                ))}
-              </div>
-              <div>
-                <p className="text-cream-100 font-semibold mb-3">Empresa</p>
-                {['Nosotros', 'Equipo', 'Contacto', 'Política de privacidad'].map(l => (
-                  <p key={l} className="mb-2 hover:text-cream-100 cursor-pointer transition-colors">{l}</p>
-                ))}
+                <p className="text-cream-100 font-semibold mb-4">Empresa</p>
+                <div className="space-y-2.5">
+                  <a
+                    href="https://wa.me/573102170905"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-cream-100/70 hover:text-cream-100 transition-colors"
+                  >
+                    Contacto
+                  </a>
+                  <Link
+                    to="/politica-tratamiento-datos"
+                    className="block text-cream-100/70 hover:text-cream-100 transition-colors"
+                  >
+                    Política de Tratamiento de Datos Personales
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
@@ -484,6 +530,37 @@ export function LandingPage() {
 
     {/* ── Contact form modal ───────────────────────────────────────── */}
     <ContactFormModal open={contactOpen} onClose={() => setContactOpen(false)} />
+
+    {/* ── Scroll-to-top button ─────────────────────────────────────── */}
+    <button
+      id="scroll-to-top-btn"
+      type="button"
+      aria-label="Volver arriba"
+      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      style={{
+        position: 'fixed',
+        bottom: '1.75rem',
+        right: '1.75rem',
+        zIndex: 50,
+        width: '2.75rem',
+        height: '2.75rem',
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #1a2545 0%, #3d6bc1 100%)',
+        color: '#fff',
+        border: 'none',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 4px 20px rgba(26,37,69,0.3)',
+        opacity: scrolled ? 1 : 0,
+        transform: scrolled ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.85)',
+        pointerEvents: scrolled ? 'auto' : 'none',
+        transition: 'opacity 0.25s ease, transform 0.25s ease',
+      }}
+    >
+      <ArrowUp className="w-5 h-5" />
+    </button>
     </>
   )
 }

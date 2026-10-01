@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   LayoutDashboard, Building2, UserCheck, ClipboardList,
   FileText, MessageSquareMore, Landmark, BarChart3, Repeat,
-  Users, Settings, Globe, LogOut, X, Calculator, Handshake, ShieldCheck, Percent, Contact, BookOpen,
+  Users, Settings, Globe, LogOut, X, Calculator, Handshake, ShieldCheck, Percent, Contact, BookOpen, Users2,
 } from 'lucide-react'
 
 type NavItem = {
@@ -52,8 +52,9 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { to: '/app/task-templates', label: 'Tareas recurrentes', icon: Repeat, adminOnly: true },
       { to: '/app/profiles', label: 'Usuarios', icon: Users, adminOnly: true },
       { to: '/app/roles', label: 'Roles y permisos', icon: ShieldCheck, adminOnly: true, module: 'roles' },
-      { to: '/app/blog', label: 'Blog y Artículos', icon: BookOpen, adminOnly: true },
-      { to: '/app/settings', label: 'Configuración', icon: Settings, adminOnly: true },
+      { to: '/app/blog',   label: 'Blog y Artículos',  icon: BookOpen,  adminOnly: true, module: 'blog' },
+      { to: '/app/leads',  label: 'Leads cotizador',    icon: Users2,    adminOnly: true, module: 'leads' },
+      { to: '/app/settings', label: 'Configuración',   icon: Settings,  adminOnly: true },
       { to: '/', label: 'Ver sitio web', icon: Globe },
     ],
   },
@@ -128,7 +129,7 @@ export function Sidebar({ onClose }: Props) {
           const visibleItems = section.items.filter(item => {
             if (item.adminOnly && !isAdmin) return false
             if (item.clientOnly && isAdmin) return false
-            if (item.module && !user?.modules?.includes(item.module)) return false
+            if (item.module && user?.role !== 'admin' && !user?.modules?.includes(item.module)) return false
             return true
           })
           if (!visibleItems.length) return null
