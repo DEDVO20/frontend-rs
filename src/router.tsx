@@ -31,7 +31,9 @@ import { TaxProfilesPage } from '@/pages/tax/TaxProfilesPage'
 import { ThirdPartiesPage } from '@/pages/tax/ThirdPartiesPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
 import { BlogAdminPage } from '@/pages/admin/BlogAdminPage'
-import { NotFoundPage } from '@/pages/NotFoundPage'
+import { LeadsPage }     from '@/pages/LeadsPage'
+import { DataPolicyPage } from '@/pages/DataPolicyPage'
+import { NotFoundPage }  from '@/pages/NotFoundPage'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff']
 
@@ -74,6 +76,8 @@ export const router = createBrowserRouter([
   { path: '/login',                      element: <LoginPage /> },
   { path: '/forgot-password',            element: <ForgotPasswordPage /> },
   { path: '/register',                   element: <RegisterCompanyPage /> },
+  { path: '/politica-tratamiento-datos', element: <DataPolicyPage /> },
+  { path: '/politica-privacidad',        element: <Navigate to="/politica-tratamiento-datos" replace /> },
   { path: '/invitations/accept',         element: <AcceptInvitationPage /> },
   { path: '/reset-password',             element: <ResetPasswordPage /> },
   {
@@ -98,6 +102,7 @@ export const router = createBrowserRouter([
       { path: 'profiles',     element: <ProfilesPage /> },
       { path: 'roles',        element: <RolesPage /> },
       { path: 'blog',         element: <BlogAdminPage /> },
+      { path: 'leads',        element: <LeadsPage /> },
       { path: 'audit',        element: <AuditPage /> },
       { path: 'settings',     element: <SettingsPage /> },
       { path: '*',            element: <NotFoundPage /> },
