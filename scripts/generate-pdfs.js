@@ -658,9 +658,61 @@ async function generateDataPolicy() {
   console.log('✅ Generated public/docs/politica-tratamiento-datos-personales-finto.pdf')
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BUILDER 3: Términos y Condiciones (contenido compartido con TermsPage.tsx)
+// ─────────────────────────────────────────────────────────────────────────────
+async function generateTerms() {
+  const terms = JSON.parse(fs.readFileSync(path.resolve('src', 'content', 'terms.json'), 'utf8'))
+
+  const pdfDoc = await PDFDocument.create()
+  const doc = new DocBuilder('Términos y Condiciones · Servicios empresariales de back office · Finto', 'Términos y Condiciones')
+  await doc.init(pdfDoc)
+
+  doc.addTitleBanner(
+    'Términos y Condiciones',
+    'Servicios empresariales de back office',
+    {
+      'Proveedor:': 'RAD Services S.A.S., NIT 901.954.048-5, que opera bajo la marca Finto',
+      'Domicilio:': 'Bogotá D.C., Colombia',
+      'Versión:': terms.effectiveDate
+        ? `${terms.version} · Fecha de entrada en vigor: ${terms.effectiveDate}`
+        : terms.version,
+      'Publicación:': 'https://www.finto.la/terminos-y-condiciones',
+    }
+  )
+
+  doc.addCallout('Importante', terms.important)
+  doc.addParagraph(`Arquitectura contractual: ${terms.architecture}`, true)
+  doc.addParagraph(terms.intro)
+
+  for (const clause of terms.clauses) {
+    doc.addSection(clause.number, clause.title)
+    for (const text of clause.paragraphs) doc.addParagraph(text)
+    for (const item of clause.list ?? []) doc.addBullet(item.text, item.label)
+    for (const text of clause.after ?? []) doc.addParagraph(text)
+  }
+
+  doc.addSection('', 'Catálogo de Anexos de Servicio')
+  doc.addParagraph(terms.annexes.intro)
+  for (const service of terms.annexes.services) {
+    doc.addBullet(service.content, `${service.code} · ${service.name}:`)
+  }
+  doc.addSubSection('Anexo transversal')
+  doc.addParagraph(`${terms.annexes.transversal.title}. ${terms.annexes.transversal.text}`)
+  doc.addSubSection('Contenido mínimo de cada Anexo de Servicio')
+  for (const item of terms.annexes.minimumContent) doc.addBullet(item)
+
+  doc.finalizeFooters()
+
+  const pdfBytes = await pdfDoc.save()
+  fs.writeFileSync(path.join(PUBLIC_DOCS, 'terminos-y-condiciones-servicios-finto.pdf'), pdfBytes)
+  console.log('✅ Generated public/docs/terminos-y-condiciones-servicios-finto.pdf')
+}
+
 async function run() {
   await generateUserManual()
   await generateDataPolicy()
+  await generateTerms()
 }
 
 run().catch(console.error)

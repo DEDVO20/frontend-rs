@@ -33,6 +33,7 @@ import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
 import { BlogAdminPage } from '@/pages/admin/BlogAdminPage'
 import { LeadsPage }     from '@/pages/LeadsPage'
 import { DataPolicyPage } from '@/pages/DataPolicyPage'
+import { TermsPage }     from '@/pages/TermsPage'
 import { NotFoundPage }  from '@/pages/NotFoundPage'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff']
@@ -78,7 +79,8 @@ export const router = createBrowserRouter([
   { path: '/register',                   element: <RegisterCompanyPage /> },
   { path: '/politica-tratamiento-datos', element: <DataPolicyPage /> },
   { path: '/politica-privacidad',        element: <Navigate to="/politica-tratamiento-datos" replace /> },
-  { path: '/invitations/accept',         element: <AcceptInvitationPage /> },
+  { path: '/terminos-y-condiciones',     element: <TermsPage /> },
+  { path: '/invitations/accept',        element: <AcceptInvitationPage /> },
   { path: '/reset-password',             element: <ResetPasswordPage /> },
   {
     path: '/app',

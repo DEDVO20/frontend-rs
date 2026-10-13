@@ -1,0 +1,254 @@
+{
+  "version": "1.0",
+  "effectiveDate": null,
+  "important": "Estas condiciones están diseñadas para clientes empresariales. Forman un contrato por adhesión únicamente cuando el Cliente las acepta de forma expresa y se integran con la Orden de Servicio y los anexos aplicables.",
+  "architecture": "Orden de Servicio + Anexo(s) de Servicio + Anexo de Tratamiento de Datos, cuando aplique + estos Términos Generales.",
+  "intro": "Al aceptar estos Términos, la persona que actúa por el Cliente declara que cuenta con facultades suficientes para vincularlo. RAD Services S.A.S. y el Cliente serán denominados individualmente una “Parte” y conjuntamente las “Partes”.",
+  "clauses": [
+    {
+      "number": "1",
+      "title": "Identificación, finalidad y ámbito",
+      "paragraphs": [
+        "Estos Términos regulan la contratación y prestación de servicios empresariales de back office por parte de RAD Services S.A.S. —Finto— a personas jurídicas, comerciantes y demás clientes que actúen en desarrollo de su actividad económica.",
+        "No sustituyen la Orden de Servicio ni el anexo técnico correspondiente. Si el Cliente reúne la calidad legal de consumidor en una relación concreta, las normas imperativas de protección al consumidor prevalecerán en lo que resulte aplicable."
+      ]
+    },
+    {
+      "number": "2",
+      "title": "Aceptación y formación del contrato",
+      "paragraphs": [
+        "El contrato se perfecciona cuando el Cliente: (i) firma una Orden de Servicio; (ii) marca una casilla no preseleccionada y confirma electrónicamente su aceptación; o (iii) utiliza otro mecanismo verificable que manifieste de manera inequívoca su consentimiento. El silencio, la inactividad o una casilla premarcada no constituyen aceptación.",
+        "La aceptación comprende la versión de estos Términos, la Orden de Servicio, los anexos allí identificados y, cuando corresponda, el Anexo de Tratamiento de Datos. Finto conservará evidencia razonable de la identidad del aceptante, fecha y hora, versión aceptada, dirección IP o registro equivalente y documentos puestos a disposición, y entregará o permitirá descargar una copia durable."
+      ]
+    },
+    {
+      "number": "3",
+      "title": "Documentos contractuales y orden de prevalencia",
+      "paragraphs": [
+        "El contrato está compuesto por los documentos siguientes. En caso de contradicción, prevalecerán en este orden y únicamente respecto del asunto regulado específicamente:"
+      ],
+      "list": [
+        { "label": "a. Orden de Servicio:", "text": "identifica al Cliente, servicios elegidos, precio, vigencia, volúmenes, entidades, usuarios, fechas, supuestos y condiciones comerciales particulares." },
+        { "label": "b. Anexo de Servicio aplicable:", "text": "define actividades incluidas, entregables, calendario, niveles de servicio, dependencias, exclusiones y matriz de responsabilidades." },
+        { "label": "c. Anexo de Tratamiento de Datos:", "text": "prevalece exclusivamente en asuntos de tratamiento de datos personales por encargo." },
+        { "label": "d. Estos Términos:", "text": "regulan las condiciones generales de la relación." },
+        { "label": "e. Política de Tratamiento de Datos:", "text": "aplica al tratamiento realizado por Finto como responsable de información propia de prospectos, contactos, usuarios del sitio y canales de Finto." }
+      ],
+      "after": [
+        "Una propuesta, correo, orden de compra o política interna del Cliente no modifica el contrato, salvo aceptación expresa y escrita de Finto."
+      ]
+    },
+    {
+      "number": "4",
+      "title": "Servicios y naturaleza de las obligaciones",
+      "paragraphs": [
+        "Finto prestará únicamente los servicios seleccionados en la Orden de Servicio y descritos en sus anexos. Salvo compromiso expreso de resultado, sus obligaciones son de medio: Finto aplicará diligencia profesional, controles razonables y el personal apropiado, sin garantizar resultados financieros, tributarios, laborales, comerciales, de recaudo o de autoridad pública que dependan de información, decisiones o terceros.",
+        "Las recomendaciones de Finto no reemplazan decisiones de administración, representación legal, revisoría fiscal, auditoría independiente, asesoría jurídica especializada ni funciones indelegables del Cliente."
+      ]
+    },
+    {
+      "number": "5",
+      "title": "Inicio, transición y dependencias",
+      "paragraphs": [
+        "El inicio operativo depende de la entrega completa y válida de accesos, saldos, bases maestras, contratos, políticas, calendarios, responsables, históricos y demás insumos previstos en la Orden y el anexo. Los plazos comenzarán cuando Finto confirme su recepción y suficiencia.",
+        "Durante el diagnóstico o transición, Finto podrá identificar inconsistencias heredadas. Su corrección, reconstrucción o saneamiento no se entiende incluido, salvo que el anexo lo indique; podrá cotizarse como servicio adicional. Los retrasos atribuibles al Cliente o a terceros desplazarán razonablemente los cronogramas sin generar incumplimiento de Finto."
+      ]
+    },
+    {
+      "number": "6",
+      "title": "Obligaciones de Finto",
+      "paragraphs": [
+        "Finto se obliga a: (i) asignar personal con competencias razonables; (ii) ejecutar el alcance contratado con diligencia; (iii) mantener trazabilidad y controles acordes con el servicio; (iv) informar bloqueos o desviaciones relevantes; (v) custodiar los soportes a su cargo; (vi) utilizar los canales autorizados; (vii) proteger la confidencialidad y los datos personales; y (viii) mantener revisión humana razonable sobre automatizaciones que produzcan entregables materiales."
+      ]
+    },
+    {
+      "number": "7",
+      "title": "Obligaciones del Cliente",
+      "paragraphs": [
+        "El Cliente se obliga a: (i) entregar información exacta, íntegra y oportuna; (ii) designar interlocutores y aprobadores con autoridad; (iii) revisar y aprobar pagos, declaraciones, nómina, facturas, reportes y decisiones dentro de los cortes; (iv) mantener licencias, registros, cuentas, accesos y autorizaciones; (v) verificar que las instrucciones sean lícitas; (vi) proteger credenciales; y (vii) pagar oportunamente.",
+        "El Cliente conserva la dirección, control y responsabilidad legal de su negocio, de sus libros, obligaciones, trabajadores, proveedores, clientes, tributos, pagos, sistemas de gestión y decisiones. Toda información o aprobación enviada por un usuario autorizado podrá ser considerada válida por Finto, salvo aviso previo de revocación."
+      ]
+    },
+    {
+      "number": "8",
+      "title": "Gobierno, cambios y servicios adicionales",
+      "paragraphs": [
+        "Las Partes operarán mediante los responsables y canales definidos en la Orden. Cualquier cambio de alcance, entidad, país, volumen, software, periodicidad, complejidad, fecha, integración o nivel de servicio requerirá una orden de cambio o nueva Orden de Servicio. Finto podrá ajustar cronogramas y tarifas antes de iniciar el cambio.",
+        "Las actividades no previstas, reprocesos causados por información tardía o incorrecta, requerimientos extraordinarios, atención de fiscalizaciones, migraciones, reconstrucciones, implementaciones y trabajo fuera de horario se cotizarán por separado, salvo inclusión expresa."
+      ]
+    },
+    {
+      "number": "9",
+      "title": "Tarifas, facturación, impuestos y gastos",
+      "paragraphs": [
+        "El Cliente pagará los valores definidos en la Orden de Servicio, más IVA y demás impuestos aplicables. Las facturas vencerán en el plazo allí previsto o, en ausencia de estipulación, dentro de los treinta (30) días calendario siguientes a su expedición. La mora causará intereses a la tasa máxima legal permitida.",
+        "Licencias, firmas digitales, certificados, bancos, pasarelas, operadores, mensajería, viajes, tasas, trámites y demás costos de terceros no están incluidos, salvo indicación expresa. Los incrementos por cambio material de volumen o complejidad se gestionarán conforme a la cláusula 8."
+      ]
+    },
+    {
+      "number": "10",
+      "title": "Vigencia, renovación y terminación",
+      "paragraphs": [
+        "La vigencia será la indicada en la Orden. Si no se fija, será de doce (12) meses desde el inicio operativo y se renovará por periodos mensuales. Cualquiera de las Partes podrá impedir la renovación mediante aviso escrito con treinta (30) días calendario de anticipación.",
+        "Una Parte podrá terminar por incumplimiento material no subsanado dentro de diez (10) días hábiles desde el requerimiento escrito; de inmediato por fraude, corrupción, violación grave de confidencialidad, uso ilícito o insolvencia que comprometa la ejecución; o en los demás casos previstos en la ley. La terminación no extingue valores causados, obligaciones de entrega, confidencialidad, propiedad intelectual, protección de datos, no captación, responsabilidad y solución de controversias.",
+        "Con el pago de los valores pendientes, Finto entregará razonablemente la información del Cliente en su poder y prestará asistencia ordinaria de salida durante el periodo contratado. La migración, transformación o soporte extraordinario se cotizará por separado."
+      ]
+    },
+    {
+      "number": "11",
+      "title": "Suspensión",
+      "paragraphs": [
+        "Finto podrá suspender total o parcialmente el servicio, previa notificación cuando sea razonable, si existe mora superior a quince (15) días, falta persistente de información o aprobaciones, riesgo de seguridad, instrucción presuntamente ilícita, fraude, abuso de cuentas o peligro para sistemas o terceros. La suspensión se limitará a lo necesario y cesará al corregirse la causa; no libera del pago de valores causados."
+      ]
+    },
+    {
+      "number": "12",
+      "title": "Confidencialidad",
+      "paragraphs": [
+        "Cada Parte protegerá la información no pública recibida de la otra y la usará únicamente para ejecutar el contrato. Solo podrá revelarla a personal, asesores y subcontratistas que necesiten conocerla y estén sujetos a obligaciones equivalentes, o cuando lo exija la ley, procurando informar previamente si es legalmente posible.",
+        "No será confidencial la información que sea pública sin incumplimiento, ya estuviera legítimamente en poder del receptor, sea recibida lícitamente de un tercero o se desarrolle de manera independiente. La obligación subsistirá por cinco (5) años tras la terminación y, respecto de secretos empresariales, mientras conserven tal carácter."
+      ]
+    },
+    {
+      "number": "13",
+      "title": "Datos personales y seguridad",
+      "paragraphs": [
+        "Cuando Finto trate datos por cuenta del Cliente para prestar los servicios, el Cliente actúa como Responsable y Finto como Encargado. Las instrucciones, finalidades, categorías, titulares, medidas, subencargados, transferencias, incidentes, devolución y eliminación se regirán por el Anexo de Tratamiento de Datos. El Cliente garantiza que cuenta con bases jurídicas, avisos, autorizaciones y facultades para comunicar los datos e instruir su tratamiento.",
+        "Cuando Finto trate datos como Responsable —por ejemplo, datos de contacto, prospectos, usuarios del sitio y administración de su relación comercial— aplicará la Política de Tratamiento de Datos disponible en https://www.finto.la/politica-tratamiento-datos. Dicha política no reemplaza el Anexo de Tratamiento de Datos cuando Finto actúe como Encargado.",
+        "Cada Parte aplicará medidas técnicas, humanas y administrativas razonables. La Parte que detecte un incidente que pueda afectar datos o sistemas de la otra lo comunicará sin demora injustificada, colaborará en su análisis y evitará declaraciones a titulares o autoridades sin coordinación, salvo obligación legal."
+      ]
+    },
+    {
+      "number": "14",
+      "title": "Portal, cuentas y ciberseguridad",
+      "paragraphs": [
+        "Los usuarios deben ser nominativos, mantener credenciales confidenciales y usar autenticación reforzada cuando esté disponible. El Cliente administrará altas, bajas y permisos, informará accesos no autorizados y verificará instrucciones sensibles por los controles acordados. Finto podrá bloquear temporalmente cuentas ante riesgo razonable.",
+        "El Cliente no intentará eludir controles, introducir código malicioso, probar vulnerabilidades sin autorización, acceder a datos ajenos ni usar el portal para fines ilícitos. La disponibilidad podrá afectarse por mantenimiento, proveedores, conectividad o fuerza mayor; los compromisos específicos constarán en el anexo aplicable."
+      ]
+    },
+    {
+      "number": "15",
+      "title": "Automatización e inteligencia artificial",
+      "paragraphs": [
+        "Finto podrá utilizar automatización y herramientas de inteligencia artificial como apoyo operativo, sujetas a controles de acceso, confidencialidad, seguridad y revisión humana proporcional al riesgo. Finto no utilizará información confidencial ni datos personales del Cliente para entrenar modelos de propósito general para terceros, salvo autorización escrita y base jurídica aplicable.",
+        "Los resultados automatizados pueden contener errores y deben someterse a las validaciones previstas. Ninguna automatización desplaza las aprobaciones, juicios profesionales o responsabilidades que correspondan al Cliente."
+      ]
+    },
+    {
+      "number": "16",
+      "title": "Propiedad intelectual y datos",
+      "paragraphs": [
+        "El Cliente conserva la titularidad de sus datos, marcas y materiales. Una vez pagados, serán del Cliente los entregables creados exclusivamente para él e identificados como tales, sin incluir herramientas preexistentes o reutilizables de Finto.",
+        "Finto conserva sus metodologías, plantillas, flujos, software, modelos, conectores, conocimientos, mejoras y componentes genéricos. Otorga al Cliente una licencia no exclusiva, no transferible y durante la vigencia para usar los componentes de Finto incorporados en el servicio. Finto podrá usar información agregada y anonimizada que no permita identificar al Cliente ni a personas para métricas, seguridad y mejora."
+      ]
+    },
+    {
+      "number": "17",
+      "title": "Subcontratación y terceros",
+      "paragraphs": [
+        "Finto podrá contratar proveedores especializados y subencargados para infraestructura, software, comunicaciones o partes del servicio, manteniendo responsabilidad por el alcance que delegue y exigiendo obligaciones razonablemente equivalentes de confidencialidad, seguridad y protección de datos. Los terceros elegidos directamente por el Cliente se regirán por sus propios términos y riesgos."
+      ]
+    },
+    {
+      "number": "18",
+      "title": "Cumplimiento e integridad",
+      "paragraphs": [
+        "Cada Parte cumplirá las normas aplicables de anticorrupción, soborno, lavado de activos, financiación del terrorismo, sanciones, protección de datos, laborales, tributarias y de seguridad y salud. Ninguna Parte deberá ejecutar instrucciones ilegales ni efectuar pagos indebidos. La Parte que identifique una alerta relevante podrá solicitar información razonable, abstenerse de actuar o terminar conforme a la cláusula 10."
+      ]
+    },
+    {
+      "number": "19",
+      "title": "Independencia y ausencia de representación",
+      "paragraphs": [
+        "Las Partes son contratistas independientes. El contrato no crea sociedad, agencia, mandato, relación laboral, joint venture ni representación, excepto poderes específicos otorgados por escrito. El personal de cada Parte permanece bajo su exclusiva subordinación y responsabilidad. Finto no podrá disponer fondos ni obligar al Cliente sin autorización verificable."
+      ]
+    },
+    {
+      "number": "20",
+      "title": "No captación de personal",
+      "paragraphs": [
+        "Durante la vigencia y por doce (12) meses después de su terminación, ninguna Parte solicitará activamente, inducirá ni contratará, directamente o por interpuesta persona, a empleados o contratistas de la otra Parte que hayan participado materialmente en los servicios durante los seis (6) meses anteriores.",
+        "No habrá incumplimiento si la vinculación resulta de una convocatoria pública general no dirigida, una postulación espontánea sin gestión previa, la participación de una firma de selección sin instrucción de captar personal de la otra Parte, o si la persona dejó de estar vinculada al menos seis (6) meses antes. Las Partes podrán autorizar por escrito una excepción. Si una Parte contrata en contravención, pagará a la otra una suma equivalente a seis (6) remuneraciones mensuales brutas de la persona, como estimación anticipada y razonable de costos de reemplazo, sin perjuicio del derecho a solicitar judicialmente su reducción cuando corresponda."
+      ]
+    },
+    {
+      "number": "21",
+      "title": "Responsabilidad",
+      "paragraphs": [
+        "Cada Parte responderá por daños directos, ciertos y demostrados causados por su incumplimiento. En la máxima medida permitida, ninguna responderá por lucro cesante, pérdida de oportunidad, daño reputacional ni daños indirectos o consecuenciales.",
+        "Salvo dolo, culpa grave, violación de confidencialidad, infracción de propiedad intelectual, obligaciones de protección de datos, pagos debidos o responsabilidades que la ley no permita limitar, la responsabilidad total acumulada de cada Parte no excederá las tarifas efectivamente pagadas o pagaderas por el Cliente durante los seis (6) meses anteriores al hecho que originó la reclamación. Si el servicio hubiera durado menos, se tomará lo pagado o pagadero durante ese periodo.",
+        "Finto no responderá por errores derivados de información incompleta o incorrecta, decisiones o demoras del Cliente, fuerza mayor, fallas de autoridades, bancos, plataformas, operadores o terceros fuera de su control razonable, siempre que haya actuado con diligencia y mitigado razonablemente el impacto."
+      ]
+    },
+    {
+      "number": "22",
+      "title": "Fuerza mayor",
+      "paragraphs": [
+        "Ninguna Parte incurrirá en incumplimiento por eventos imprevisibles o irresistibles fuera de su control razonable. La Parte afectada informará oportunamente, acreditará el evento, adoptará medidas de mitigación y reanudará la ejecución cuando sea posible. Si el evento impide sustancialmente el servicio durante más de treinta (30) días, cualquiera podrá terminar el servicio afectado sin penalidad, pagando lo ejecutado."
+      ]
+    },
+    {
+      "number": "23",
+      "title": "Notificaciones",
+      "paragraphs": [
+        "Las notificaciones contractuales se enviarán a los correos indicados en la Orden de Servicio y se entenderán recibidas cuando exista constancia de envío, salvo mensaje de rechazo. Terminaciones, incumplimientos, incidentes y cambios de datos de contacto deberán enviarse además por el canal contractual designado. Las comunicaciones operativas podrán cursarse por el portal u otros canales autorizados."
+      ]
+    },
+    {
+      "number": "24",
+      "title": "Modificaciones de estos Términos",
+      "paragraphs": [
+        "Finto podrá actualizar estos Términos por cambios legales, regulatorios, tecnológicos, de seguridad o de funcionamiento. Publicará la nueva versión y notificará al Cliente con al menos treinta (30) días calendario de anticipación cuando el cambio sea material.",
+        "Las modificaciones que reduzcan materialmente derechos o aumenten obligaciones económicas durante una vigencia en curso requerirán aceptación expresa o se aplicarán a la siguiente renovación, salvo que sean necesarias para cumplir una norma imperativa o atender un riesgo urgente de seguridad. Los cambios no materiales podrán regir desde la fecha informada. La versión aplicable quedará registrada con la aceptación u Orden de Servicio."
+      ]
+    },
+    {
+      "number": "25",
+      "title": "Cesión",
+      "paragraphs": [
+        "Ninguna Parte podrá ceder íntegramente el contrato sin consentimiento escrito de la otra, que no será negado sin razón objetiva. Finto podrá cederlo a una afiliada o sucesor por reorganización, fusión o venta sustancial del negocio, siempre que el cesionario asuma las obligaciones y se informe al Cliente. La subcontratación se rige por la cláusula 17."
+      ]
+    },
+    {
+      "number": "26",
+      "title": "Ley aplicable y controversias",
+      "paragraphs": [
+        "El contrato se rige por las leyes de la República de Colombia. Antes de acudir a la jurisdicción, las Partes intentarán resolver la controversia mediante negociación directa entre representantes autorizados durante quince (15) días hábiles desde la notificación escrita.",
+        "Si no hay acuerdo, la controversia será sometida a los jueces competentes de Bogotá D.C., sin perjuicio de mecanismos imperativos o derechos del consumidor que resulten aplicables. Las Partes podrán pactar arbitraje expresamente en la Orden de Servicio."
+      ]
+    },
+    {
+      "number": "27",
+      "title": "Disposiciones finales",
+      "paragraphs": [
+        "La nulidad o ineficacia de una disposición no afectará las demás; se reemplazará por una válida que se aproxime a su finalidad. La tolerancia no constituye renuncia. Los títulos facilitan la lectura y no limitan el contenido. El contrato constituye el acuerdo íntegro sobre su objeto y sustituye entendimientos anteriores.",
+        "Los mensajes de datos, firmas electrónicas y copias digitales tendrán la eficacia reconocida por la ley. La versión en español prevalecerá. Las cláusulas que por su naturaleza deban subsistir continuarán vigentes después de la terminación."
+      ]
+    }
+  ],
+  "annexes": {
+    "intro": "La Orden de Servicio debe marcar expresamente cada anexo contratado. Un anexo no marcado no hace parte del contrato.",
+    "services": [
+      { "code": "AS-01", "name": "Contabilidad e impuestos", "content": "Ciclo contable, cierres, reportes, obligaciones tributarias y soportes." },
+      { "code": "AS-02", "name": "Delegado de pagos", "content": "Programación, validación, preparación y carga de pagos; gestión de aprobaciones, comprobantes, incidencias y trazabilidad, sin custodia ni disposición autónoma de fondos." },
+      { "code": "AS-03", "name": "Controller financiero y tesorería", "content": "Planeación, control, flujo de caja, programación y control de pagos." },
+      { "code": "AS-04", "name": "Nómina", "content": "Novedades, liquidación, seguridad social, comprobantes y archivos de pago." },
+      { "code": "AS-05", "name": "Gestión de personal y SG-SST", "content": "Administración laboral, documentación, novedades, manejo de cajas menores y apoyo al sistema de SST." },
+      { "code": "AS-06", "name": "Facturación y cobranza", "content": "Facturación, cartera, recaudo, conciliación y reportes de cobranza." }
+    ],
+    "transversal": {
+      "title": "ATD-01 · Anexo de Tratamiento de Datos Personales",
+      "text": "Debe incorporarse cuando Finto trate datos personales por cuenta del Cliente; es especialmente relevante para nómina, gestión de personal, facturación y cualquier acceso a bases con información de personas naturales."
+    },
+    "minimumContent": [
+      "alcance detallado y actividades incluidas;",
+      "entregables, fechas de corte, calendario y canales;",
+      "matriz de responsabilidades, dependencias y aprobaciones;",
+      "volúmenes, entidades, países, sistemas, usuarios y supuestos;",
+      "niveles de servicio, medición, exclusiones y periodos de estabilización;",
+      "actividades excluidas y tarifas por adicionales;",
+      "datos tratados, roles de privacidad y medidas particulares;",
+      "criterios de aceptación, escalamiento y salida."
+    ]
+  }
+}

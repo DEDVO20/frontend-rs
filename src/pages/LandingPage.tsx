@@ -516,6 +516,12 @@ export function LandingPage() {
                   >
                     Política de Tratamiento de Datos Personales
                   </Link>
+                  <Link
+                    to="/terminos-y-condiciones"
+                    className="block text-cream-100/70 hover:text-cream-100 transition-colors"
+                  >
+                    Términos y Condiciones
+                  </Link>
                 </div>
               </div>
             </div>
