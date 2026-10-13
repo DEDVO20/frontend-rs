@@ -5,6 +5,8 @@ import { TopBar } from '@/components/layout/TopBar'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
+import { EmailListInput } from '@/components/ui/EmailListInput'
+import { useEmailList } from '@/lib/useEmailList'
 import { formatCurrency } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
@@ -103,6 +105,16 @@ function MasivoPanel({ companyId }: { companyId: string }) {
   const [selected, setSelected] = useState<string[]>([])
   const [sending, setSending] = useState(false)
   const [histPage, setHistPage] = useState(1)
+  // Copias ocultas de la campaña — solo aplican al canal Email
+  const bcc = useEmailList()
+
+  // ¿El proveedor de correo actual admite copias ocultas? (solo Resend)
+  const { data: emailOptions } = useQuery<{ bccSupported: boolean }>({
+    queryKey: ['collection-email-options'],
+    queryFn: async () => (await api.get('/api/collection/email-options')).data,
+    staleTime: 60_000,
+  })
+  const bccSupported = emailOptions?.bccSupported ?? false
 
   const { data, isLoading } = useQuery({
     queryKey: ['debtors-masivo', companyId],
@@ -200,6 +212,9 @@ function MasivoPanel({ companyId }: { companyId: string }) {
     if (needsZavuTpl) { toast.error('Para WhatsApp debes seleccionar una plantilla aprobada por Meta — el texto libre rebota fuera de la ventana de 24 horas'); return }
     if (!contactable.length) { toast.error(`Ningún deudor tiene ${channel === 'email' ? 'email' : 'teléfono'} registrado`); return }
     if (!companyId) { toast.error('Selecciona una empresa antes de enviar'); return }
+    // Incluye lo escrito sin confirmar; si hay un correo inválido no se envía
+    const bccList = channel === 'email' && bccSupported ? bcc.commit() : []
+    if (!bccList) { toast.error('Revisa los correos en copia oculta'); return }
     setSending(true)
     try {
       const { data } = await api.post('/api/collection/campaigns', {
@@ -208,6 +223,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
         message_template: message,
         ...(channel === 'whatsapp' && isZavuTpl && { zavu_template_id: selectedTpl.zavu_id }),
         ...(channel === 'email' && selectedTpl?.image_url && { image_url: selectedTpl.image_url }),
+        ...(bccList.length > 0 && { bcc: bccList }),
         debtor_ids: targets.map(d => d.id),
         company_id: companyId,
       })
@@ -382,6 +398,26 @@ function MasivoPanel({ companyId }: { companyId: string }) {
             <p className="text-xs text-slate-400 text-right mt-1">{message.length} caracteres</p>
           </div>
 
+          {channel === 'email' && (
+            <div>
+              <label htmlFor="campaign-bcc" className="block text-sm font-semibold text-slate-700 mb-1">
+                Copias ocultas (CCO)
+              </label>
+              <EmailListInput
+                id="campaign-bcc"
+                state={bcc}
+                disabled={!bccSupported}
+                placeholder="copias@tudominio.com"
+                hint="Opcional. Reciben una copia oculta de cada correo de esta campaña. Escribe un correo y presiona Enter."
+              />
+              {emailOptions && !bccSupported && (
+                <p className="text-xs text-amber-600 mt-1">
+                  ⚠️ El proveedor de correo actual (Zavu) no admite copias ocultas. Cámbialo a Resend en Configuración para usarlas.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Preview */}
           <div className="border border-slate-200 rounded-xl p-4 bg-slate-50">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
@@ -459,6 +495,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
                       {chIcon} {h.channel} · {recipients} destinatario{recipients === 1 ? '' : 's'}
                       {!companyId && h.companies?.name ? ` · ${h.companies.name}` : ''}
                       {h.zavu_template_id ? ' · ⚡ plantilla Meta' : ''}
+                      {h.bcc?.length ? ` · ${h.bcc.length} en copia oculta` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">

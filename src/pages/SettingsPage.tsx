@@ -1,6 +1,7 @@
 import { useAuthStore } from '@/stores/authStore'
 import { TopBar } from '@/components/layout/TopBar'
 import { Card, CardBody } from '@/components/ui/Card'
+import { EmailSettingsCard } from '@/components/settings/EmailSettingsCard'
 import { User, Bell, Shield, Palette } from 'lucide-react'
 
 const sections = [
@@ -51,6 +52,8 @@ export function SettingsPage() {
             </div>
           </CardBody>
         </Card>
+
+        <EmailSettingsCard />
 
         {/* Settings grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
