@@ -101,6 +101,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
   const [message, setMessage] = useState('')
   const [tramo, setTramo] = useState('')
   const [statusF, setStatusF] = useState('')
+  const [socioF, setSocioF] = useState('')
   const [plantilla, setPlantilla] = useState('')
   const [selected, setSelected] = useState<string[]>([])
   const [sending, setSending] = useState(false)
@@ -137,6 +138,18 @@ function MasivoPanel({ companyId }: { companyId: string }) {
     },
   })
 
+  // Socios de la empresa (columna "Socio" de SIIGO) para filtrar el envío
+  const { data: socios } = useQuery({
+    queryKey: ['debtors-socios', companyId],
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (companyId) params.set('company_id', companyId)
+      const { data } = await api.get(`/api/collection/debtors/socios?${params}`)
+      return data as string[]
+    },
+    staleTime: 300_000,
+  })
+
   const HIST_PAGE_SIZE = 5
   const { data: historyData } = useQuery({
     queryKey: ['collection-campaigns', companyId, histPage],
@@ -167,6 +180,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
 
   const filtered = allDebtors.filter(d => {
     if (statusF && d.status !== statusF) return false
+    if (socioF && (d.socio ?? '').trim() !== socioF) return false
     if (tramo) {
       const t = getMaxTramo(d)
       if (tramo === '1-30' && !(t >= 1 && t <= 30)) return false
@@ -244,7 +258,15 @@ function MasivoPanel({ companyId }: { companyId: string }) {
     <div className="p-4 md:p-5 space-y-5">
 
       {/* ── Filtros ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1">Filtrar por socio</label>
+          <select value={socioF} onChange={e => setSocioF(e.target.value)}
+            className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option value="">Todos los socios</option>
+            {(socios ?? []).map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">Filtrar por tramo</label>
           <select value={tramo} onChange={e => setTramo(e.target.value)}
@@ -284,7 +306,7 @@ function MasivoPanel({ companyId }: { companyId: string }) {
               ))}
           </select>
         </div>
-        <div>
+        <div className="col-span-2 sm:col-span-1 lg:col-span-2">
           <label className="block text-xs font-medium text-slate-500 mb-1">Canal de envío</label>
           <div className="flex gap-1.5">
             {([
