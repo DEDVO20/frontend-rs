@@ -5,6 +5,8 @@ import { TopBar } from '@/components/layout/TopBar'
 import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { SearchSelect } from '@/components/ui/SearchSelect'
+import { CompanyTaxCalendar } from './CompanyTaxCalendar'
+import { PERIODICITY_LABELS } from './taxCalendar'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useAuthStore } from '@/stores/authStore'
 import { toast } from 'sonner'
@@ -25,10 +27,12 @@ function MasterItemModal({ item, onClose }: { item: any | null; onClose: () => v
   const [description, setDescription] = useState(item?.description ?? '')
   const [isMandatory, setIsMandatory] = useState<boolean>(item?.is_mandatory ?? true)
   const [noticeDays, setNoticeDays] = useState<number>(item?.notice_days ?? 5)
+  const [entity, setEntity] = useState(item?.entity ?? '')
+  const [periodicity, setPeriodicity] = useState<string>(item?.periodicity ?? 'anual')
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      const body = { title: title.trim(), description: description.trim() || undefined, is_mandatory: isMandatory, notice_days: noticeDays }
+      const body = { title: title.trim(), description: description.trim() || undefined, is_mandatory: isMandatory, notice_days: noticeDays, entity: entity.trim() || null, periodicity }
       if (item) await api.patch(`/api/accounting/master/${item.id}`, body)
       else      await api.post('/api/accounting/master', body)
     },
@@ -61,6 +65,30 @@ function MasterItemModal({ item, onClose }: { item: any | null; onClose: () => v
             <input value={description} onChange={e => setDescription(e.target.value)}
               placeholder="Opcional"
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Entidad</label>
+            <input value={entity} onChange={e => setEntity(e.target.value)}
+              placeholder="Ej: DIAN, Seguridad Social (PILA), Secretaría de Hacienda"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+          </div>
+
+          {/* Periodicidad: cuántos vencimientos tiene la obligación en el año */}
+          <div>
+            <p className="text-xs font-medium text-slate-600 mb-2">Periodicidad</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {Object.entries(PERIODICITY_LABELS).map(([k, l]) => (
+                <button key={k} type="button" onClick={() => setPeriodicity(k)}
+                  className={`px-2 py-1.5 rounded-lg border text-sm font-medium transition-colors ${periodicity === k ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1">Cada período tendrá su propia fecha de vencimiento por cliente. Cada empresa puede cambiarla (ej. IVA bimestral).</p>
+            {item && item.periodicity !== periodicity && (
+              <p className="text-[11px] text-amber-600 mt-1">Al cambiarla se regeneran los períodos desde este año en los clientes que usan la periodicidad por defecto.</p>
+            )}
           </div>
 
           {/* ¿Obligatoria u opcional? (punto 2.c del spec) */}
@@ -125,6 +153,8 @@ export function AccountingPage() {
 
   const [tab, setTab] = useState<Tab>('dashboard')
   const [selectedCompany, setSelectedCompany] = useState('')
+  const currentYear = new Date().getFullYear()
+  const [year, setYear] = useState(currentYear)
   const [analysisFilter, setAnalysisFilter] = useState<'all' | 'complete' | 'incomplete'>('all')
   const [masterModal, setMasterModal] = useState<{ open: boolean; item: any | null }>({ open: false, item: null })
 
@@ -136,18 +166,11 @@ export function AccountingPage() {
   })
 
   const { data: companiesData } = useQuery({
-    queryKey: ['accounting', 'companies'],
-    queryFn: async () => { const { data } = await api.get('/api/accounting/companies'); return data },
+    queryKey: ['accounting', 'companies', year],
+    queryFn: async () => { const { data } = await api.get('/api/accounting/companies', { params: { year } }); return data },
     staleTime: 60_000,
   })
   const companies: any[] = companiesData ?? []
-
-  const { data: calendar, isLoading: calendarLoading } = useQuery({
-    queryKey: ['accounting', 'calendar', selectedCompany],
-    queryFn: async () => { const { data } = await api.get(`/api/accounting/companies/${selectedCompany}`); return data },
-    enabled: !!selectedCompany,
-  })
-  const entries: any[] = calendar ?? []
 
   const { data: masterData, isLoading: masterLoading } = useQuery({
     queryKey: ['accounting', 'master'],
@@ -158,14 +181,6 @@ export function AccountingPage() {
 
   // ── Mutations ──
   const invalidateAll = () => qc.invalidateQueries({ queryKey: ['accounting'] })
-
-  const entryMut = useMutation({
-    mutationFn: async ({ id, due_date }: { id: string; due_date: string | null }) => {
-      await api.patch(`/api/accounting/entries/${id}`, { due_date })
-    },
-    onSuccess: () => { toast.success('Fecha actualizada'); invalidateAll() },
-    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar la fecha'),
-  })
 
   const deleteMasterMut = useMutation({
     mutationFn: async (id: string) => { await api.delete(`/api/accounting/master/${id}`) },
@@ -272,13 +287,13 @@ export function AccountingPage() {
                       {stats.companies.incomplete} empresa{stats.companies.incomplete === 1 ? '' : 's'} sin calendario tributario completo
                     </h3>
                   </div>
-                  <p className="text-xs text-amber-700 mb-3">Tienen tareas obligatorias sin fecha diligenciada:</p>
+                  <p className="text-xs text-amber-700 mb-3">Tienen períodos de obligaciones obligatorias de {currentYear} sin fecha diligenciada:</p>
                   <div className="flex flex-wrap gap-2">
                     {stats.companies.incomplete_list?.map((c: any) => (
                       <button key={c.id}
-                        onClick={() => { setSelectedCompany(c.id); setTab('clients') }}
+                        onClick={() => { setSelectedCompany(c.id); setYear(currentYear); setTab('clients') }}
                         className="text-xs bg-white border border-amber-300 text-amber-800 px-3 py-1.5 rounded-full font-medium hover:bg-amber-100 transition-colors">
-                        {c.name} · {c.mandatory_without_date} sin fecha
+                        {c.name} · {c.mandatory_without_date} fecha(s) pendiente(s)
                       </button>
                     ))}
                   </div>
@@ -288,10 +303,49 @@ export function AccountingPage() {
                   <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />
                   <div>
                     <p className="text-sm font-semibold text-emerald-800">Todos los calendarios están completos</p>
-                    <p className="text-xs text-emerald-600">{stats?.companies?.total ?? 0} empresas con servicio contable tienen sus tareas obligatorias con fecha.</p>
+                    <p className="text-xs text-emerald-600">{stats?.companies?.total ?? 0} empresas con servicio contable tienen todos los períodos obligatorios de {currentYear} con fecha.</p>
                   </div>
                 </div>
               )}
+
+              {/* Próximos vencimientos de todas las empresas */}
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-900">Próximos vencimientos (30 días)</h3>
+                </div>
+                {stats?.upcoming?.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          {['Fecha límite', 'Empresa', 'Entidad', 'Obligación', 'Período'].map(h => (
+                            <th key={h} className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50">
+                        {stats.upcoming.map((u: any) => (
+                          <tr key={u.id} className="hover:bg-slate-50 transition-colors cursor-pointer"
+                            onClick={() => { setSelectedCompany(u.company_id); setTab('clients') }}>
+                            <td className="px-4 py-2.5 whitespace-nowrap">
+                              <span className="font-medium text-slate-900">{u.due_date.split('-').reverse().join('/')}</span>
+                              <span className={`ml-2 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${u.days <= 3 ? 'bg-red-100 text-red-700' : u.days <= 7 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                                {u.days === 0 ? 'hoy' : `${u.days}d`}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-slate-900">{u.company}</td>
+                            <td className="px-4 py-2.5 text-slate-500">{u.entity ?? '—'}</td>
+                            <td className="px-4 py-2.5">{u.title}</td>
+                            <td className="px-4 py-2.5 text-slate-500">{u.period_label}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="px-4 py-8 text-center text-slate-400 text-sm">Sin vencimientos diligenciados en los próximos 30 días</p>
+                )}
+              </div>
 
               {/* Resumen de empresas */}
               <div className="grid grid-cols-3 gap-4">
@@ -316,20 +370,29 @@ export function AccountingPage() {
         {tab === 'clients' && (
           <div className="space-y-4">
             <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="w-full sm:w-96">
-                <SearchSelect
-                  label="Cliente"
-                  value={selectedCompany}
-                  onChange={setSelectedCompany}
-                  placeholder="Buscar empresa…"
-                  options={companies.map(c => ({ value: c.id, label: c.name, color: c.complete ? 'bg-emerald-500' : 'bg-amber-500' }))}
-                />
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+                <div className="w-full sm:w-96">
+                  <SearchSelect
+                    label="Cliente"
+                    value={selectedCompany}
+                    onChange={setSelectedCompany}
+                    placeholder="Buscar empresa…"
+                    options={companies.map(c => ({ value: c.id, label: c.name, color: c.complete ? 'bg-emerald-500' : 'bg-amber-500' }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Año</label>
+                  <select value={year} onChange={e => setYear(Number(e.target.value))}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    {[currentYear - 1, currentYear, currentYear + 1].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
               </div>
               {selectedInfo && (
                 <p className={`text-xs mt-2 ${selectedInfo.complete ? 'text-emerald-600' : 'text-amber-600'}`}>
                   {selectedInfo.complete
-                    ? '✓ Calendario completo — todas las obligatorias tienen fecha'
-                    : `⚠ ${selectedInfo.mandatory_without_date} tarea(s) obligatoria(s) sin fecha`}
+                    ? `✓ Calendario ${year} completo — todos los períodos obligatorios tienen fecha`
+                    : `⚠ ${selectedInfo.mandatory_without_date} de ${selectedInfo.mandatory_total} fecha(s) obligatoria(s) de ${year} sin diligenciar`}
                 </p>
               )}
             </div>
@@ -339,54 +402,8 @@ export function AccountingPage() {
                 <CalendarDays className="w-10 h-10 mx-auto mb-3 text-slate-300" />
                 <p className="text-sm">Selecciona un cliente para ver y editar su calendario tributario</p>
               </div>
-            ) : calendarLoading ? (
-              <div className="py-10"><PageLoader /></div>
             ) : (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Obligación</th>
-                      <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tipo</th>
-                      <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fecha de vencimiento</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {entries.map((e: any) => (
-                      <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="font-medium text-slate-900">{e.master?.title ?? '—'}</p>
-                          {e.master?.description && <p className="text-xs text-slate-400">{e.master.description}</p>}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`text-xs font-medium px-2 py-1 rounded-full ${e.is_mandatory ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                            {e.is_mandatory ? 'Obligatoria' : 'Opcional'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="date"
-                              defaultValue={e.due_date ?? ''}
-                              key={e.id + (e.due_date ?? '')}
-                              onChange={ev => entryMut.mutate({ id: e.id, due_date: ev.target.value || null })}
-                              className={`text-sm border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                                !e.due_date && e.is_mandatory ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
-                              }`}
-                            />
-                            {!e.due_date && e.is_mandatory && (
-                              <span className="text-xs text-amber-600 font-medium">Sin diligenciar</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!entries.length && (
-                  <p className="px-4 py-12 text-center text-slate-400 text-sm">La plantilla maestra está vacía</p>
-                )}
-              </div>
+              <CompanyTaxCalendar companyId={selectedCompany} year={year} />
             )}
           </div>
         )}
@@ -395,7 +412,7 @@ export function AccountingPage() {
         {tab === 'analysis' && (
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-900">Estado de calendarios por empresa</h3>
+              <h3 className="text-sm font-bold text-slate-900">Estado de calendarios por empresa · {year}</h3>
               <div className="flex gap-1.5">
                 {([['all', 'Todas'], ['complete', 'Completas'], ['incomplete', 'Incompletas']] as const).map(([k, l]) => (
                   <button key={k} onClick={() => setAnalysisFilter(k)}
@@ -412,10 +429,10 @@ export function AccountingPage() {
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-100">
                     <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Empresa</th>
-                    <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Obligatorias con fecha</th>
-                    <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Obligatorias sin fecha</th>
-                    <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opcionales con fecha</th>
-                    <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opcionales sin fecha</th>
+                    <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fechas obligatorias diligenciadas</th>
+                    <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fechas obligatorias pendientes</th>
+                    <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fechas opcionales diligenciadas</th>
+                    <th className="text-center px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Fechas opcionales pendientes</th>
                     <th className="text-left px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Estado</th>
                   </tr>
                 </thead>
@@ -424,9 +441,9 @@ export function AccountingPage() {
                     <tr key={c.id} className="hover:bg-slate-50 transition-colors cursor-pointer"
                       onClick={() => { setSelectedCompany(c.id); setTab('clients') }}>
                       <td className="px-4 py-3 font-medium text-slate-900">{c.name}</td>
-                      <td className="px-4 py-3 text-center text-emerald-600 font-semibold">{c.mandatory_with_date}</td>
+                      <td className="px-4 py-3 text-center text-emerald-600 font-semibold">{c.mandatory_with_date}/{c.mandatory_total}</td>
                       <td className={`px-4 py-3 text-center font-semibold ${c.mandatory_without_date ? 'text-red-600' : 'text-slate-400'}`}>{c.mandatory_without_date}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{c.optional_with_date}</td>
+                      <td className="px-4 py-3 text-center text-slate-600">{c.optional_with_date}/{c.optional_total}</td>
                       <td className="px-4 py-3 text-center text-slate-400">{c.optional_without_date}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium px-2 py-1 rounded-full ${c.complete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -467,8 +484,11 @@ export function AccountingPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900">{m.title}</p>
-                      {m.description && <p className="text-xs text-slate-400 truncate">{m.description}</p>}
+                      {(m.entity || m.description) && <p className="text-xs text-slate-400 truncate">{[m.entity, m.description].filter(Boolean).join(' · ')}</p>}
                     </div>
+                    <span className="text-xs font-medium text-primary-700 bg-primary-50 px-2 py-1 rounded-full shrink-0" title="Periodicidad por defecto">
+                      {PERIODICITY_LABELS[m.periodicity] ?? 'Anual'}
+                    </span>
                     <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full shrink-0" title="Anticipación con la que se crea la tarea y arrancan los recordatorios">
                       ⏱ {m.notice_days ?? 5}d
                     </span>
