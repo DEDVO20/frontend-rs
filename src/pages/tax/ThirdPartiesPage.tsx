@@ -116,12 +116,14 @@ function CalcDrawer({ party, profile, onClose }: { party: ThirdParty; profile: T
   const [draft, setDraft] = useState('')
   useEffect(() => { if (settings && draft === '') { setDraft(String(settings.default_invoice_value)); setValue(settings.default_invoice_value) } }, [settings]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data, isFetching, error } = useQuery<{ result: OperationResult }>({
+  const { data, isFetching, error } = useQuery<{ result: OperationResult; contract_type: 'servicio' | 'mandato' }>({
     queryKey: ['tax-compute', party.id, value],
     enabled: value != null && !!party.tax_profile_id,
     queryFn: async () => (await api.post('/api/tax/compute', { invoice_value: value, third_party_id: party.id })).data,
   })
   const r = data?.result
+  // Solo los contratos de mandato llevan comisión de la firma.
+  const isMandate = data?.contract_type === 'mandato'
 
   const apply = () => {
     const v = Number(draft.replace(/[^\d.]/g, ''))
@@ -184,15 +186,21 @@ function CalcDrawer({ party, profile, onClose }: { party: ThirdParty; profile: T
                     <Row label="Pago factura" v={r.invoicePayment} strong />
                   </section>
 
-                  <section className="bg-slate-50 rounded-xl p-4">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Comisión</p>
-                    <Row label="Comisión" v={r.commission} />
-                    <Row label="IVA comisión" v={r.commissionIva} />
-                    <Row label="Total comisión" v={r.commissionTotal} strong />
-                    <Row label="Retefuente comisión" v={r.commissionIncomeWithholding.amount} neg />
-                    <Row label="ReteICA comisión" v={r.commissionIcaWithholding.amount} neg />
-                    <Row label="Comisión neta" v={r.commissionNet} strong />
-                  </section>
+                  {isMandate ? (
+                    <section className="bg-slate-50 rounded-xl p-4">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Comisión (mandato)</p>
+                      <Row label="Comisión" v={r.commission} />
+                      <Row label="IVA comisión" v={r.commissionIva} />
+                      <Row label="Total comisión" v={r.commissionTotal} strong />
+                      <Row label="Retefuente comisión" v={r.commissionIncomeWithholding.amount} neg />
+                      <Row label="ReteICA comisión" v={r.commissionIcaWithholding.amount} neg />
+                      <Row label="Comisión neta" v={r.commissionNet} strong />
+                    </section>
+                  ) : (
+                    <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+                      Contrato de servicio: no lleva comisión. Solo los contratos de mandato la cobran.
+                    </p>
+                  )}
 
                   <section className="border border-primary-200 rounded-xl overflow-hidden">
                     <div className="px-4 py-2 bg-primary-50">

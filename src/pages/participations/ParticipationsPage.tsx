@@ -95,6 +95,24 @@ function fmtMoney(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n ?? 0)
 }
 
+/** Impuestos que el cliente retuvo en el recaudo (líneas 1355 del RC). */
+type CollectionTaxes = { income: number; ica: number; iva: number; total: number }
+
+function RcTaxesLine({ taxes }: { taxes?: CollectionTaxes | null }) {
+  if (!taxes || !(taxes.total > 0)) return null
+  const parts = [
+    taxes.income > 0 && `Ret. fte ${fmtMoney(taxes.income)}`,
+    taxes.ica > 0 && `ReteICA ${fmtMoney(taxes.ica)}`,
+    taxes.iva > 0 && `ReteIVA ${fmtMoney(taxes.iva)}`,
+  ].filter(Boolean)
+  return (
+    <div className="text-[10px] text-amber-700" title={parts.join(' · ')}>
+      Imp. retenidos {fmtMoney(taxes.total)}
+      <span className="text-slate-400"> ({parts.join(' · ')})</span>
+    </div>
+  )
+}
+
 // Estados de la relación (spec §15)
 const INV_STATUS: Record<string, { label: string; cls: string }> = {
   pending_invoice:       { label: 'Pendiente de factura',     cls: 'bg-slate-100 text-slate-500' },
@@ -217,7 +235,10 @@ function MovimientoImportModal({ onClose }: { onClose: () => void }) {
                 ))}
               </div>
               <p className="text-[11px] text-slate-400">
-                En el informe: recaudos (RC) <b className="text-slate-600">{s.collections ?? 0}</b> · notas crédito (NC) <b className="text-slate-600">{s.credit_notes ?? 0}</b> · facturas del tercero (FC) <b className="text-slate-600">{s.third_invoices ?? 0}</b> · pagos (RP) <b className="text-slate-600">{s.payments ?? 0}</b>. Se aplican los que cruzan con un cliente/tercero configurado.
+                En el informe: recaudos (RC) <b className="text-slate-600">{s.collections ?? 0}</b>
+                {Number(s.collection_taxes?.total ?? 0) > 0 && (
+                  <> (impuestos retenidos <b className="text-amber-700">{fmtMoney(s.collection_taxes.total)}</b>: ret. fte {fmtMoney(s.collection_taxes.income)} · reteICA {fmtMoney(s.collection_taxes.ica)} · reteIVA {fmtMoney(s.collection_taxes.iva)})</>
+                )} · notas crédito (NC) <b className="text-slate-600">{s.credit_notes ?? 0}</b> · facturas del tercero (FC) <b className="text-slate-600">{s.third_invoices ?? 0}</b> · pagos (RP) <b className="text-slate-600">{s.payments ?? 0}</b>. Se aplican los que cruzan con un cliente/tercero configurado.
               </p>
 
               <div className="border border-slate-200 rounded-xl overflow-hidden">
@@ -1567,6 +1588,14 @@ function ParticipationDetailModal({
                 <DetailField label="Recibo de caja (RC)" value={item.cash_receipts ?? 'Pendiente'} mono />
                 <DetailField label="Fecha de recaudo (RC)" value={item.cash_receipt_date ?? (item.cash_receipts ? 'Sin fecha' : '—')} />
                 <DetailField label="Recaudado" value={`${fmtMoney(collected)}${inv > 0 ? ` · ${pct}%` : ''}`} />
+                {Number(item.collection_taxes?.total ?? 0) > 0 && (
+                  <>
+                    <DetailField label="Retefuente (RC)" value={fmtMoney(Number(item.collection_taxes.income ?? 0))} />
+                    <DetailField label="ReteICA (RC)" value={fmtMoney(Number(item.collection_taxes.ica ?? 0))} />
+                    <DetailField label="ReteIVA (RC)" value={fmtMoney(Number(item.collection_taxes.iva ?? 0))} />
+                    <DetailField label="Impuestos retenidos (RC)" value={fmtMoney(Number(item.collection_taxes.total ?? 0))} />
+                  </>
+                )}
                 <DetailField label="Disponible para el tercero" value={fmtMoney(Number(item.available_for_payment ?? 0))} />
 
                 {/* Acciones manuales de recaudo */}
@@ -1836,7 +1865,9 @@ function ParticipationDetailModal({
                   <DetailField label="Retención fuente" value={fmtMoney(item.tax_partition.breakdown.incomeWithholding.amount)} />
                   <DetailField label="Retención ICA" value={fmtMoney(item.tax_partition.breakdown.icaWithholding.amount)} />
                   <DetailField label="Retención IVA" value={fmtMoney(item.tax_partition.breakdown.ivaWithholding.amount)} />
-                  <DetailField label="Comisión + IVA" value={fmtMoney(item.tax_partition.breakdown.commissionTotal)} />
+                  {item.contract_type === 'mandato' && (
+                    <DetailField label="Comisión + IVA" value={fmtMoney(item.tax_partition.breakdown.commissionTotal)} />
+                  )}
                   <DetailField label="Giro final (100% recaudo)" value={fmtMoney(item.tax_partition.breakdown.finalTotal)} />
                 </div>
               )}
@@ -3601,6 +3632,7 @@ function ThirdPartiesView({
                                       {inv.cash_receipt_date && <span className="text-slate-500 font-normal"> ({inv.cash_receipt_date})</span>}
                                     </div>
                                   )}
+                                  <RcTaxesLine taxes={inv.collection_taxes} />
                                   <div className="text-[10px] text-slate-500">Disp. bruto {fmtMoney(Number(inv.available_for_payment ?? 0))}</div>
                                 </td>
 
@@ -3934,6 +3966,7 @@ export function ParticipationsPage() {
                           ) : (
                             <div className="text-[10px] text-slate-400 italic">Sin recaudo</div>
                           )}
+                          <RcTaxesLine taxes={r.collection_taxes} />
                         </td>
                         <td className={`px-3 py-2.5 whitespace-nowrap font-semibold ${Math.max(0, inv - collected) > 0 ? 'text-blue-700' : 'text-slate-400'}`}>
                           {fmtMoney(Math.max(0, inv - collected))}
