@@ -1068,13 +1068,18 @@ function AvailableDocumentsPicker({
   const [pickId, setPickId] = useState<string | null>(null)
   const [amount, setAmount] = useState('')
   const allocMutation = useMutation({
-    mutationFn: async (vars: { doc: any; amount: number }) => (await api.post('/api/participations/allocations', {
+    mutationFn: async (vars: { doc: any; amount: number; avail: number }) => (await api.post('/api/participations/allocations', {
       source_doc_type: docType, source_comprobante: vars.doc.comprobante,
       purchase_order: allocate!.purchaseOrder, amount: vars.amount,
       source_nit: vars.doc.tercero_nit || undefined,
     })).data,
-    onSuccess: (res: any) => {
-      toast.success(`Asignado ${fmtMoney(Number(res?.applied ?? 0))}`)
+    onSuccess: (res: any, vars) => {
+      const applied = Number(res?.applied ?? 0)
+      const left = Math.max(0, Math.round((vars.avail - applied) * 100) / 100)
+      toast.success(
+        `Asignado ${fmtMoney(applied)} de ${vars.doc.comprobante}`,
+        { description: left > 0.01 ? `Quedan ${fmtMoney(left)} disponibles para otra OC.` : 'El documento quedó sin saldo disponible.', duration: 6000 },
+      )
       setPickId(null)
       qc.invalidateQueries({ queryKey: ['participations'] })
       allocate?.onDone()
@@ -1169,7 +1174,7 @@ function AvailableDocumentsPicker({
                       const v = Number(amount)
                       if (!(v > 0)) { toast.error('Monto inválido'); return }
                       if (v > avail + 0.01) { toast.error(`Supera el disponible (${fmtMoney(avail)})`); return }
-                      allocMutation.mutate({ doc: d, amount: v })
+                      allocMutation.mutate({ doc: d, amount: v, avail })
                     }}>
                     Confirmar
                   </Button>
@@ -1183,6 +1188,39 @@ function AvailableDocumentsPicker({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/** Saldo que le queda libre a cada documento (RC/FC/RP) asignado a la OC, para
+ *  saber cuánto se puede aplicar todavía a otras OC. */
+function AssignedDocsBalance({ docType, nit, comprobantes }: { docType: 'RC' | 'FC' | 'RP'; nit: string; comprobantes?: string | null }) {
+  const norm = (s: string) => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const list = String(comprobantes ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  const { data: docs } = useQuery({
+    queryKey: ['participations', 'available-documents', docType, nit],
+    enabled: !!nit && list.length > 0,
+    queryFn: async () => ((await api.get(`/api/participations/available-documents?doc_type=${docType}&nit=${encodeURIComponent(nit)}`)).data ?? []) as any[],
+  })
+  if (!list.length || !docs) return null
+  const wanted = new Set(list.map(norm))
+  const mine = docs.filter((d: any) => wanted.has(norm(d.comprobante)))
+  if (!mine.length) return null
+  return (
+    <div className="mt-1 rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-1.5 space-y-0.5">
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Saldo libre para otras OC</p>
+      {mine.map((d: any) => {
+        const total = Number(d.amount ?? 0)
+        const avail = Number(d.available ?? 0)
+        return (
+          <div key={d.id} className="flex justify-between gap-3 text-[11px]">
+            <span className="font-mono font-semibold text-slate-700">{d.comprobante}</span>
+            <span className={avail > 0.01 ? 'font-semibold text-emerald-700' : 'text-slate-400'}>
+              {avail > 0.01 ? `${fmtMoney(avail)} de ${fmtMoney(total)}` : `sin saldo (${fmtMoney(total)} asignado)`}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1313,14 +1351,18 @@ function ParticipationDetailModal({
   const currentInvoiceId = item?.id || item?._raw?.id || item?.invoice_id || initialItem?.id || initialItem?._raw?.id
   const purchaseOrder = item?.purchase_order || initialItem?.purchase_order || ''
 
-  // Tras asignar un documento (RC/FC/RP) se relee la OC: sus valores salen de las asignaciones.
+  // Tras asignar un documento (RC/FC/RP) se relee la OC: sus valores salen de las
+  // asignaciones. La etapa sigue abierta para ver el saldo que quedó en el selector.
   const reloadItem = async () => {
     if (!currentInvoiceId) return
     try {
       const { data } = await api.get(`/api/participations/invoices/${currentInvoiceId}`)
-      if (data) setItem(data)
+      if (data) {
+        setItem(data)
+        // Refresca los campos abiertos con lo asignado, para que "Guardar" no lo pise con valores viejos
+        setEditForm(prev => Object.fromEntries(Object.keys(prev).map(k => [k, data[k] ?? ''])))
+      }
     } catch { /* la lista ya se invalidó; el detalle se refresca al reabrir */ }
-    setEditingStage(null)
   }
   const partValue = Number(item.participation_value ?? 0)
   const allocateProps = (pending: number) =>
@@ -1657,6 +1699,7 @@ function ParticipationDetailModal({
             ) : (
               <div className="space-y-2">
                 <DetailField label="Recibo de caja (RC)" value={item.cash_receipts ?? 'Pendiente'} mono />
+                <AssignedDocsBalance docType="RC" nit={clientNit} comprobantes={item.cash_receipts} />
                 <DetailField label="Fecha de recaudo (RC)" value={item.cash_receipt_date ?? (item.cash_receipts ? 'Sin fecha' : '—')} />
                 <DetailField label="Recaudado" value={`${fmtMoney(collected)}${inv > 0 ? ` · ${pct}%` : ''}`} />
                 {Number(item.collection_taxes?.total ?? 0) > 0 && (
@@ -1817,6 +1860,7 @@ function ParticipationDetailModal({
             ) : (
               <>
                 <DetailField label="Factura del tercero" value={item.third_party_invoice ?? (purchaseDone ? 'No registrada (pago directo)' : 'Pendiente')} />
+                <AssignedDocsBalance docType="FC" nit={thirdPartyNit} comprobantes={item.third_party_invoice} />
                 <DetailField label="Fecha factura tercero" value={item.third_party_invoice_date ?? (item.third_party_invoice ? 'Sin fecha' : '—')} />
                 <DetailField label="Valor" value={item.third_party_invoice_value != null ? fmtMoney(Number(item.third_party_invoice_value)) : '—'} />
                 <DetailField label="Orden de pago" value={item.payment_order ?? '—'} mono />
@@ -1901,6 +1945,7 @@ function ParticipationDetailModal({
             ) : (
               <>
                 <DetailField label="Comprobante de egreso (RP)" value={item.egress_voucher ?? (paymentDone ? 'Registrado' : 'Pendiente')} mono />
+                <AssignedDocsBalance docType="RP" nit={thirdPartyNit} comprobantes={item.egress_voucher} />
                 <DetailField label="Fecha de pago (RP)" value={item.egress_voucher_date ?? (item.egress_voucher ? 'Sin fecha' : '—')} />
                 <DetailField label="Valor pagado" value={item.egress_voucher_value != null ? fmtMoney(Number(item.egress_voucher_value)) : '—'} />
 

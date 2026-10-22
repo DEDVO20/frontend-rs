@@ -682,9 +682,14 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const [hasThird, setHasThird] = useState<boolean>(row.has_third_party)
   const [thirdId, setThirdId] = useState<string>(row.third_party?.id ?? '')
   const [ctype, setCtype] = useState<'servicio' | 'mandato'>(row.participation?.contract_type ?? 'servicio')
-  const [ptype, setPtype] = useState<'percentage' | 'fixed'>(row.participation?.participation_type ?? 'percentage')
-  const [pct, setPct] = useState<string>(row.participation?.percentage != null ? String(row.participation.percentage) : '')
-  const [fixedValue, setFixedValue] = useState<string>(row.participation?.fixed_value != null ? String(row.participation.fixed_value) : '')
+  // Solo porcentaje. Si la configuración era de valor fijo (antiguo), se avisa.
+  const legacyFixed = row.participation?.participation_type === 'fixed' ? Number(row.participation?.fixed_value ?? 0) : null
+  const savedPct = row.participation?.participation_type === 'fixed' ? null
+    : row.participation?.percentage != null ? Number(row.participation.percentage) : null
+  const [pct, setPct] = useState<string>(savedPct != null ? String(savedPct) : '')
+  // Mes desde el que rige el % nuevo (solo cuando cambia en una participación existente)
+  const [rateFrom, setRateFrom] = useState<string>(new Date().toISOString().slice(0, 7))
+  const rates: { percentage: number; valid_from: string }[] = row.participation?.rates ?? []
   const [startDate, setStartDate] = useState<string>(row.participation?.start_date ?? row.start_date ?? '')
   const [endDate, setEndDate] = useState<string>(row.participation?.end_date ?? row.end_date ?? '')
   const [billingDay, setBillingDay] = useState<1 | 15>(row.participation?.billing_day === 15 ? 15 : 1)
@@ -694,10 +699,11 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const selectedTercero = terceros.find((t: any) => t.id === thirdId)
   const valueNum = Number(value) || 0
   const pctNum = Number(pct) || 0
-  const fixedNum = Number(fixedValue) || 0
   const isMandate = ctype === 'mandato'
+  // ¿Cambió el % de una participación que ya existía? → pedir desde qué mes rige.
+  const pctChanged = !!row.participation?.id && pct !== '' && savedPct != null && pctNum !== savedPct
   // En mandato el monto lo aporta SIIGO (cuenta 28150601), no se calcula aquí.
-  const preview = isMandate ? 0 : (ptype === 'fixed' ? fixedNum : Math.round(valueNum * (pctNum / 100) * 100) / 100)
+  const preview = isMandate ? 0 : Math.round(valueNum * (pctNum / 100) * 100) / 100
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -707,10 +713,13 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         has_third_party:    hasThird,
         third_party_id:     hasThird ? thirdId : null,
         contract_type:      ctype,
-        // Mandato: participación fija no aplica; el % es la comisión (informativa).
-        participation_type: isMandate ? 'percentage' : ptype,
-        percentage:         hasThird && (isMandate || ptype === 'percentage') ? pctNum : undefined,
-        fixed_value:        hasThird && !isMandate && ptype === 'fixed' ? fixedNum : undefined,
+        // Solo porcentaje. En mandato el % es la comisión (informativa).
+        participation_type: 'percentage',
+        percentage:         hasThird ? pctNum : undefined,
+        // Cambio de % → desde el mes elegido. Conversión de valor fijo → desde el inicio.
+        rate_valid_from:    !hasThird ? undefined
+          : pctChanged ? `${rateFrom}-01`
+          : legacyFixed != null && startDate ? `${startDate.slice(0, 7)}-01` : undefined,
         start_date:         hasThird ? (startDate || undefined) : undefined,
         end_date:           hasThird ? (endDate || null) : undefined,
         billing_day:        billingDay,
@@ -722,9 +731,16 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
   })
 
-  // En mandato no se exige % ni valor fijo (el monto viene del reporte SIIGO).
-  const valueOk = isMandate ? true : (ptype === 'fixed' ? fixedNum > 0 : pct !== '')
-  const canSave = value !== '' && (!hasThird || (thirdId && valueOk && startDate))
+  // En mandato no se exige % (el monto viene del reporte SIIGO).
+  const valueOk = isMandate ? true : pct !== ''
+  const missingStart = hasThird && !startDate
+  const canSave = value !== '' && (!hasThird || (thirdId && valueOk && startDate && (!pctChanged || !!rateFrom)))
+  const missing = [
+    value === '' && 'el valor del servicio',
+    hasThird && !thirdId && 'el tercero',
+    hasThird && !valueOk && 'el porcentaje',
+    missingStart && 'la fecha de inicio',
+  ].filter(Boolean) as string[]
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4">
@@ -797,30 +813,29 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
 
           {!isMandate ? (
             <>
+              {legacyFixed != null && (
+                <div className="sm:col-span-2 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-[11px] text-amber-700">
+                  <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>Esta participación estaba como <b>valor fijo ({fmtMoney(legacyFixed)})</b>. Ya solo se maneja porcentaje: indica el % y guarda.</span>
+                </div>
+              )}
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Tipo de participación</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button type="button" onClick={() => setPtype('percentage')}
-                    className={`py-2 rounded-lg border text-xs font-medium transition-colors ${ptype === 'percentage' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                    Porcentaje (%)
-                  </button>
-                  <button type="button" onClick={() => setPtype('fixed')}
-                    className={`py-2 rounded-lg border text-xs font-medium transition-colors ${ptype === 'fixed' ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                    Valor fijo
-                  </button>
-                </div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Porcentaje de participación (%)</label>
+                <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${pct === '' ? 'border-amber-300' : 'border-slate-200'}`} />
               </div>
-              {ptype === 'percentage' ? (
+              {pctChanged ? (
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Porcentaje de participación (%)</label>
-                  <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">El {pctNum}% rige desde el mes</label>
+                  <input type="month" value={rateFrom} onChange={e => setRateFrom(e.target.value)}
+                    className="w-full border border-primary-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  <p className="mt-1 text-[10px] text-slate-400">Los meses anteriores conservan el {savedPct}%.</p>
                 </div>
-              ) : (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor fijo del tercero</label>
-                  <input type="number" min={0} value={fixedValue} onChange={e => setFixedValue(e.target.value)} placeholder="0"
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              ) : <div className="hidden sm:block" />}
+              {rates.length > 1 && (
+                <div className="sm:col-span-2 text-[11px] text-slate-500">
+                  <span className="font-semibold text-slate-600">Historial del %:</span>{' '}
+                  {rates.map(r => `${Number(r.percentage)}% desde ${String(r.valid_from).slice(0, 7)}`).join(' · ')}
                 </div>
               )}
             </>
@@ -838,9 +853,12 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
             </>
           )}
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha de inicio</label>
-            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha de inicio <span className="text-red-500">*</span></label>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} required
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${missingStart ? 'border-red-400 bg-red-50/40' : 'border-slate-200'}`} />
+            {missingStart && (
+              <p className="mt-1 text-[11px] font-medium text-red-600">Indica la fecha de inicio: desde ahí se generan las OC del tercero.</p>
+            )}
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha fin (vigencia · opcional)</label>
@@ -883,7 +901,10 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         </div>
       )}
 
-      <div className="flex justify-end mt-3">
+      <div className="flex items-center justify-end gap-3 mt-3">
+        {!canSave && missing.length > 0 && (
+          <p className="text-[11px] text-amber-700">Falta {missing.join(', ')}.</p>
+        )}
         <Button size="sm" loading={saveMut.isPending} disabled={!canSave} onClick={() => saveMut.mutate()}>Guardar</Button>
       </div>
     </div>

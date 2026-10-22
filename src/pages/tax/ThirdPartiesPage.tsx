@@ -116,13 +116,22 @@ function CalcDrawer({ party, profile, onClose }: { party: ThirdParty; profile: T
   const [draft, setDraft] = useState('')
   useEffect(() => { if (settings && draft === '') { setDraft(String(settings.default_invoice_value)); setValue(settings.default_invoice_value) } }, [settings]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Comisión: por defecto la decide el contrato del tercero (solo mandato la
+  // lleva); el check permite forzarla o quitarla para simular. null = automático.
+  const [withCommission, setWithCommission] = useState<boolean | null>(null)
+  const [autoType, setAutoType] = useState<'servicio' | 'mandato' | null>(null)
+
   const { data, isFetching, error } = useQuery<{ result: OperationResult; contract_type: 'servicio' | 'mandato' }>({
-    queryKey: ['tax-compute', party.id, value],
+    queryKey: ['tax-compute', party.id, value, withCommission],
     enabled: value != null && !!party.tax_profile_id,
-    queryFn: async () => (await api.post('/api/tax/compute', { invoice_value: value, third_party_id: party.id })).data,
+    queryFn: async () => (await api.post('/api/tax/compute', {
+      invoice_value: value, third_party_id: party.id,
+      ...(withCommission === null ? {} : { contract_type: withCommission ? 'mandato' : 'servicio' }),
+    })).data,
   })
+  useEffect(() => { if (withCommission === null && data?.contract_type) setAutoType(data.contract_type) }, [data, withCommission])
   const r = data?.result
-  // Solo los contratos de mandato llevan comisión de la firma.
+  // Solo los contratos de mandato llevan comisión de la firma (o si se marca el check).
   const isMandate = data?.contract_type === 'mandato'
 
   const apply = () => {
@@ -168,6 +177,20 @@ function CalcDrawer({ party, profile, onClose }: { party: ThirdParty; profile: T
                     className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500" />
                   <Button size="sm" onClick={apply}>Calcular</Button>
                 </div>
+                <label className="mt-3 flex items-start gap-2 cursor-pointer select-none">
+                  <input type="checkbox" className="mt-0.5 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                    checked={withCommission ?? isMandate}
+                    onChange={e => setWithCommission(e.target.checked)} />
+                  <span className="text-sm text-slate-700">
+                    Calcular comisión
+                    <span className="block text-[11px] text-slate-400">
+                      {autoType && `Por contrato: ${autoType === 'mandato' ? 'mandato (con comisión)' : 'servicio (sin comisión)'}`}
+                      {withCommission !== null && (
+                        <> · <button type="button" onClick={e => { e.preventDefault(); setWithCommission(null) }} className="text-primary-600 hover:text-primary-700 font-medium">usar el del contrato</button></>
+                      )}
+                    </span>
+                  </span>
+                </label>
               </div>
 
               {error && <p className="text-sm text-red-600">No se pudo calcular.</p>}
@@ -198,7 +221,7 @@ function CalcDrawer({ party, profile, onClose }: { party: ThirdParty; profile: T
                     </section>
                   ) : (
                     <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
-                      Contrato de servicio: no lleva comisión. Solo los contratos de mandato la cobran.
+                      Sin comisión. Por defecto solo los contratos de mandato la cobran; marca "Calcular comisión" para incluirla.
                     </p>
                   )}
 
