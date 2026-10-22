@@ -169,6 +169,7 @@ function MovimientoImportModal({ onClose }: { onClose: () => void }) {
     onSuccess: (d: any) => {
       const s = d.summary ?? {}
       const extra = [
+        s.unchanged ? `${s.unchanged} sin cambios` : '',
         s.recaudo_updated ? `${s.recaudo_updated} con recaudo` : '',
         s.third_invoice_matched ? `${s.third_invoice_matched} factura tercero` : '',
         s.paid_matched ? `${s.paid_matched} pagada(s)` : '',
@@ -221,6 +222,13 @@ function MovimientoImportModal({ onClose }: { onClose: () => void }) {
           </div>
           {s && (
             <>
+              {report?.already_imported && (
+                <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  Este mismo archivo ya se aplicó el <b>{new Date(report.already_imported.imported_at).toLocaleString('es-CO')}</b>
+                  {report.already_imported.imported_by && <> por <b>{report.already_imported.imported_by}</b></>}.
+                  Si lo aplicas de nuevo no se duplica nada: las facturas que no cambiaron se dejan igual (con sus correcciones manuales).
+                </div>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
                   { label: 'Ventas', value: s.sales, cls: 'text-slate-700' },
@@ -1046,12 +1054,34 @@ function AvailableDocumentsPicker({
   nit,
   title,
   onSelect,
+  allocate,
 }: {
   docType: 'FV' | 'RC' | 'FC' | 'RP'
   nit: string
   title: string
-  onSelect: (doc: any) => void
+  onSelect?: (doc: any) => void
+  /** RC/FC/RP: asigna una parte (o todo) del documento a la OC y deja el resto
+   *  disponible para otras. `pending` = lo que le falta a esta OC. */
+  allocate?: { purchaseOrder: string; pending: number; onDone: () => void }
 }) {
+  const qc = useQueryClient()
+  const [pickId, setPickId] = useState<string | null>(null)
+  const [amount, setAmount] = useState('')
+  const allocMutation = useMutation({
+    mutationFn: async (vars: { doc: any; amount: number }) => (await api.post('/api/participations/allocations', {
+      source_doc_type: docType, source_comprobante: vars.doc.comprobante,
+      purchase_order: allocate!.purchaseOrder, amount: vars.amount,
+      source_nit: vars.doc.tercero_nit || undefined,
+    })).data,
+    onSuccess: (res: any) => {
+      toast.success(`Asignado ${fmtMoney(Number(res?.applied ?? 0))}`)
+      setPickId(null)
+      qc.invalidateQueries({ queryKey: ['participations'] })
+      allocate?.onDone()
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudo asignar el documento'),
+  })
+
   const { data: docs, isLoading } = useQuery({
     queryKey: ['participations', 'available-documents', docType, nit],
     enabled: !!nit,
@@ -1087,46 +1117,71 @@ function AvailableDocumentsPicker({
         <span className="text-[11px] font-bold text-slate-700">{title}</span>
         <span className="text-[10px] text-slate-400 font-medium">{docs.length} encontrado(s) en SIIGO</span>
       </div>
-      <div className="border border-slate-200 rounded-lg overflow-hidden max-h-36 overflow-y-auto scrollbar-slim bg-white">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase sticky top-0 border-b border-slate-100">
-            <tr>
-              <th className="px-2.5 py-1.5 text-left">Comprobante</th>
-              <th className="px-2.5 py-1.5 text-left">Fecha</th>
-              <th className="px-2.5 py-1.5 text-right">Valor</th>
-              <th className="px-2.5 py-1.5 text-center">Estado</th>
-              <th className="px-2.5 py-1.5 text-right">Acción</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {docs.map((d: any) => {
-              const val = d.doc_type === 'RC' || d.doc_type === 'RP' ? Number(d.saldo ?? d.amount ?? 0) : Number(d.amount ?? 0)
-              return (
-                <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-2.5 py-1 font-mono font-bold text-slate-800 whitespace-nowrap">{d.comprobante}</td>
-                  <td className="px-2.5 py-1 text-slate-500 whitespace-nowrap">{d.doc_date || d.period || '—'}</td>
-                  <td className="px-2.5 py-1 text-right font-semibold text-slate-700 whitespace-nowrap">{fmtMoney(val)}</td>
-                  <td className="px-2.5 py-1 text-center whitespace-nowrap">
-                    {d.matched ? (
-                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Cruzado</span>
-                    ) : (
-                      <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">Disponible</span>
-                    )}
-                  </td>
-                  <td className="px-2.5 py-1 text-right whitespace-nowrap">
-                    <button
-                      type="button"
-                      onClick={() => onSelect(d)}
-                      className="text-[10px] font-bold text-primary-600 hover:text-primary-700 px-2 py-0.5 rounded bg-primary-50 hover:bg-primary-100 transition-colors"
-                    >
-                      Asignar
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      {/* Lista compacta (sin tabla ancha) para que el botón Asignar siempre quede visible */}
+      <div className="border border-slate-200 rounded-lg max-h-56 overflow-y-auto overflow-x-hidden scrollbar-slim bg-white divide-y divide-slate-100">
+        {docs.map((d: any) => {
+          const isMoney = d.doc_type === 'RC' || d.doc_type === 'FC' || d.doc_type === 'RP'
+          const total = Number(d.amount ?? 0)
+          const avail = isMoney ? Number(d.available ?? d.saldo ?? total) : total
+          const noBalance = isMoney && avail <= 0.01
+          const picking = pickId === d.id
+          return (
+            <div key={d.id} className="px-2.5 py-1.5 hover:bg-slate-50/70 transition-colors">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <div className="font-mono font-bold text-xs text-slate-800 truncate">{d.comprobante}</div>
+                  <div className="text-[10px] text-slate-400">{d.doc_date || d.period || '—'}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  {isMoney ? (
+                    <>
+                      <div className={`text-xs font-semibold ${noBalance ? 'text-slate-400' : 'text-emerald-700'}`}>Disp. {fmtMoney(avail)}</div>
+                      {avail + 0.01 < total && <div className="text-[10px] text-slate-400">de {fmtMoney(total)}</div>}
+                    </>
+                  ) : (
+                    <div className="text-xs font-semibold text-slate-700">{fmtMoney(total)}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  disabled={noBalance}
+                  onClick={() => {
+                    if (allocate && isMoney) {
+                      setPickId(picking ? null : d.id)
+                      const suggested = allocate.pending > 0 ? Math.min(avail, allocate.pending) : avail
+                      setAmount(String(Math.round(suggested * 100) / 100))
+                    } else onSelect?.(d)
+                  }}
+                  className="shrink-0 text-[10px] font-bold text-primary-600 hover:text-primary-700 px-2 py-1 rounded bg-primary-50 hover:bg-primary-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {noBalance ? 'Sin saldo' : 'Asignar'}
+                </button>
+              </div>
+              {picking && allocate && (
+                <div className="mt-1.5 flex items-center gap-1.5">
+                  <input
+                    type="number" step="any" min="0" value={amount} autoFocus
+                    onChange={e => setAmount(e.target.value)}
+                    className="flex-1 min-w-0 text-xs font-semibold px-2 py-1 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                  <Button size="sm" loading={allocMutation.isPending}
+                    onClick={() => {
+                      const v = Number(amount)
+                      if (!(v > 0)) { toast.error('Monto inválido'); return }
+                      if (v > avail + 0.01) { toast.error(`Supera el disponible (${fmtMoney(avail)})`); return }
+                      allocMutation.mutate({ doc: d, amount: v })
+                    }}>
+                    Confirmar
+                  </Button>
+                  <button type="button" onClick={() => setPickId(null)} className="text-[11px] text-slate-500 hover:text-slate-700 px-1">Cancelar</button>
+                </div>
+              )}
+              {picking && allocate && Number(amount) > 0 && Number(amount) < avail && (
+                <div className="mt-1 text-[10px] text-slate-500">Quedarán {fmtMoney(Math.round((avail - Number(amount)) * 100) / 100)} disponibles para otra OC.</div>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -1256,6 +1311,20 @@ function ParticipationDetailModal({
 
 
   const currentInvoiceId = item?.id || item?._raw?.id || item?.invoice_id || initialItem?.id || initialItem?._raw?.id
+  const purchaseOrder = item?.purchase_order || initialItem?.purchase_order || ''
+
+  // Tras asignar un documento (RC/FC/RP) se relee la OC: sus valores salen de las asignaciones.
+  const reloadItem = async () => {
+    if (!currentInvoiceId) return
+    try {
+      const { data } = await api.get(`/api/participations/invoices/${currentInvoiceId}`)
+      if (data) setItem(data)
+    } catch { /* la lista ya se invalidó; el detalle se refresca al reabrir */ }
+    setEditingStage(null)
+  }
+  const partValue = Number(item.participation_value ?? 0)
+  const allocateProps = (pending: number) =>
+    purchaseOrder ? { purchaseOrder, pending: Math.max(0, Math.round(pending * 100) / 100), onDone: reloadItem } : undefined
 
   const updateMutation = useMutation({
     mutationFn: async (payload: any) => {
@@ -1326,6 +1395,7 @@ function ParticipationDetailModal({
         payload.third_party_invoice_value = editForm.third_party_invoice_value !== '' ? Number(editForm.third_party_invoice_value) : null
       }
       if (editForm.payment_order !== undefined) payload.payment_order = editForm.payment_order.trim() || null
+      if (editForm.payment_order_date !== undefined) payload.payment_order_date = editForm.payment_order_date || null
     } else if (editingStage === 5) {
       if (editForm.egress_voucher !== undefined) payload.egress_voucher = editForm.egress_voucher.trim() || null
       if (editForm.egress_voucher_date !== undefined) payload.egress_voucher_date = editForm.egress_voucher_date || null
@@ -1503,6 +1573,7 @@ function ParticipationDetailModal({
                   docType="RC"
                   nit={clientNit}
                   title="Recibos de caja de este cliente en SIIGO:"
+                  allocate={allocateProps(inv - collected)}
                   onSelect={(doc) => {
                     const invVal = Number(item.finto_invoice_value ?? 0)
                     const curColl = Number(item.collected ?? 0)
@@ -1660,6 +1731,7 @@ function ParticipationDetailModal({
                   third_party_invoice_date: item.third_party_invoice_date ?? '',
                   third_party_invoice_value: item.third_party_invoice_value ?? '',
                   payment_order: item.payment_order ?? '',
+                  payment_order_date: item.payment_order_date ?? '',
                 })
                 setEditingStage(4)
               }
@@ -1671,6 +1743,7 @@ function ParticipationDetailModal({
                   docType="FC"
                   nit={thirdPartyNit}
                   title="Facturas de compra del tercero en SIIGO:"
+                  allocate={allocateProps(partValue - Number(item.third_party_invoice_value ?? 0))}
                   onSelect={(doc) => {
                     setEditForm(f => ({
                       ...f,
@@ -1725,6 +1798,17 @@ function ParticipationDetailModal({
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="col-start-2">
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha orden de pago</label>
+                    <input
+                      type="date"
+                      value={editForm.payment_order_date ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, payment_order_date: e.target.value }))}
+                      className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
                 <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                   <Button size="sm" variant="secondary" onClick={() => setEditingStage(null)}>Cancelar</Button>
                   <Button size="sm" loading={updateMutation.isPending} onClick={handleSaveStage}>Guardar cambios</Button>
@@ -1733,8 +1817,10 @@ function ParticipationDetailModal({
             ) : (
               <>
                 <DetailField label="Factura del tercero" value={item.third_party_invoice ?? (purchaseDone ? 'No registrada (pago directo)' : 'Pendiente')} />
+                <DetailField label="Fecha factura tercero" value={item.third_party_invoice_date ?? (item.third_party_invoice ? 'Sin fecha' : '—')} />
                 <DetailField label="Valor" value={item.third_party_invoice_value != null ? fmtMoney(Number(item.third_party_invoice_value)) : '—'} />
                 <DetailField label="Orden de pago" value={item.payment_order ?? '—'} mono />
+                <DetailField label="Fecha orden de pago" value={item.payment_order_date ?? (item.payment_order ? 'Sin fecha' : '—')} />
               </>
             )}
           </DetailStage>
@@ -1764,6 +1850,7 @@ function ParticipationDetailModal({
                   docType="RP"
                   nit={thirdPartyNit}
                   title="Comprobantes de egreso / pagos en SIIGO:"
+                  allocate={allocateProps(Number(item.tax_partition?.payThirdParty ?? partValue) - Number(item.egress_voucher_value ?? 0))}
                   onSelect={(doc) => {
                     setEditForm(f => ({
                       ...f,
