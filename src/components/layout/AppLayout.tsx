@@ -9,7 +9,9 @@ export function AppLayout() {
 
   return (
     <ConfirmProvider>
-      <div className="flex h-screen bg-slate-50 overflow-hidden">
+      {/* La app interna no tiene modo oscuro: se fuerza claro aunque <html> tenga data-theme="dark"
+          (el tema del portal o la preferencia del sistema), para que las variantes dark: no apliquen aquí */}
+      <div data-theme="light" style={{ colorScheme: 'light' }} className="flex h-screen bg-slate-50 overflow-hidden">
         {/* Mobile overlay */}
         {sidebarOpen && (
           <div

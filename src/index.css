@@ -1,8 +1,9 @@
 @import "tailwindcss";
 
 /* Modo oscuro manual: la variante `dark:` responde a [data-theme="dark"] en <html>
-   (no solo a la preferencia del sistema), para poder alternarlo con el toggle. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+   (no solo a la preferencia del sistema), para poder alternarlo con el toggle.
+   Un contenedor con data-theme="light" (la app interna) anula el oscuro en su interior. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *):not(:where([data-theme="light"], [data-theme="light"] *)));
 
 @theme {
   /* ===== Finto — paleta de marca =====

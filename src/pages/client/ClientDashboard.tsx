@@ -229,6 +229,14 @@ export function ClientDashboard() {
             <p className="text-sm text-navy-900/50 dark:text-cream-100/50 max-w-sm">
               Esta sección estará disponible próximamente con sus indicadores y gráficas.
             </p>
+            {tab === 'facturacion' && (
+              <button
+                onClick={() => nav('/app/siigo')}
+                className="mt-5 px-4 py-2.5 rounded-xl bg-gold-500 text-cream-100 text-sm font-semibold font-display hover:opacity-90 transition-opacity"
+              >
+                Ver consulta de facturación Siigo →
+              </button>
+            )}
           </Card>
         )}
       </div>

@@ -22,8 +22,9 @@ const GROUPS: Group[] = [
   {
     title: 'Principal',
     items: [
-      { to: '/app/dashboard',   label: 'Dashboard',      icon: 'dashboard' },
-      { to: '/app/my-company',  label: 'Perfil empresa', icon: 'perfil-empresa' },
+      { to: '/app/dashboard',   label: 'Dashboard',         icon: 'dashboard' },
+      { to: '/app/siigo',       label: 'Facturación Siigo', icon: 'facturacion' },
+      { to: '/app/my-company',  label: 'Perfil empresa',    icon: 'perfil-empresa' },
       { to: '/app/tasks',       label: 'Tareas',         icon: 'tareas',      badgeKey: 'overdueTasks' },
       { to: '/app/documents',   label: 'Documentos',     icon: 'documentos' },
       { to: '/app/requests',    label: 'Solicitudes',    icon: 'solicitudes', badgeKey: 'openRequests' },
