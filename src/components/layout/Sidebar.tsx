@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   LayoutDashboard, Building2, UserCheck, ClipboardList,
   FileText, MessageSquareMore, Landmark, BarChart3, Repeat,
-  Users, Settings, Globe, LogOut, X, Calculator, Handshake, ShieldCheck, Percent, Contact, BookOpen, Users2,
+  Users, Settings, Globe, LogOut, X, Calculator, Handshake, ShieldCheck, Percent, Contact, BookOpen, Users2, LineChart,
 } from 'lucide-react'
 
 type NavItem = {
@@ -42,6 +42,7 @@ const SECTIONS: { title: string; items: NavItem[] }[] = [
       { to: '/app/accounting', label: 'Contabilidad', icon: Calculator, module: 'accounting' },
       { to: '/app/participations', label: 'Participaciones', icon: Handshake, module: 'participations' },
       { to: '/app/siigo', label: 'Consultas Siigo', icon: FileText },
+      { to: '/app/siigo-graficas', label: 'Gráficas Siigo', icon: LineChart },
       { to: '/app/third-parties', label: 'Terceros', icon: Contact, module: 'participations' },
       { to: '/app/tax-profiles', label: 'Perfiles tributarios', icon: Percent, module: 'participations' },
       { to: '/app/dashboards-bi', label: 'Dashboards BI', icon: BarChart3 },

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { ConfirmProvider } from '../ui/ConfirmDialog'
+import { SiigoSyncWatcher } from './SiigoSyncWatcher'
 import { Menu } from 'lucide-react'
 
 export function AppLayout() {
@@ -9,6 +10,7 @@ export function AppLayout() {
 
   return (
     <ConfirmProvider>
+      <SiigoSyncWatcher />
       {/* La app interna no tiene modo oscuro: se fuerza claro aunque <html> tenga data-theme="dark"
           (el tema del portal o la preferencia del sistema), para que las variantes dark: no apliquen aquí */}
       <div data-theme="light" style={{ colorScheme: 'light' }} className="flex h-screen bg-slate-50 overflow-hidden">

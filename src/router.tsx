@@ -28,6 +28,9 @@ import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
 import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { SiigoConsultationPage } from '@/pages/siigo/SiigoConsultationPage'
+import { SiigoCollectionsPage, SiigoLayout, SIIGO_INTERNAL_ROLES } from '@/pages/siigo/SiigoLayout'
+import { SiigoTrialBalancePage } from '@/pages/siigo/SiigoTrialBalancePage'
+import { SiigoChartsPage } from '@/pages/siigo/SiigoChartsPage'
 import { TaxProfilesPage } from '@/pages/tax/TaxProfilesPage'
 import { ThirdPartiesPage } from '@/pages/tax/ThirdPartiesPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
@@ -49,6 +52,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function RoleLayout() {
   const role = useAuthStore(s => s.user?.role ?? '')
   return INTERNAL_ROLES.includes(role) ? <AppLayout /> : <PortalLayout />
+}
+
+/** Rutas de Siigo solo para roles internos; los clientes vuelven a `fallback` */
+function InternalOnly({ children, fallback }: { children: React.ReactNode; fallback: string }) {
+  const role = useAuthStore(s => s.user?.role ?? '')
+  return SIIGO_INTERNAL_ROLES.includes(role) ? <>{children}</> : <Navigate to={fallback} replace />
 }
 
 function SmartDashboard() {
@@ -93,7 +102,17 @@ export const router = createBrowserRouter([
       { path: 'collection',   element: <CollectionPage /> },
       { path: 'accounting',   element: <AccountingPage /> },
       { path: 'participations', element: <ParticipationsPage /> },
-      { path: 'siigo',        element: <SiigoConsultationPage /> },
+      {
+        path: 'siigo',
+        element: <SiigoLayout />,
+        children: [
+          { index: true,         element: <Navigate to="facturacion" replace /> },
+          { path: 'facturacion', element: <SiigoConsultationPage /> },
+          { path: 'recaudo',     element: <InternalOnly fallback="/app/siigo/facturacion"><SiigoCollectionsPage /></InternalOnly> },
+          { path: 'balance',     element: <InternalOnly fallback="/app/siigo/facturacion"><SiigoTrialBalancePage /></InternalOnly> },
+        ],
+      },
+      { path: 'siigo-graficas', element: <SiigoChartsPage /> },
       { path: 'tax-profiles', element: <TaxProfilesPage /> },
       { path: 'third-parties', element: <ThirdPartiesPage /> },
       { path: 'onboarding',   element: <OnboardingPage /> },

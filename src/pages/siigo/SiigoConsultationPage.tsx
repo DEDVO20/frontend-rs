@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
-import { TopBar } from '@/components/layout/TopBar'
 import { PortalTopBar } from '@/components/layout/PortalTopBar'
 import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
+import { useSiigoSyncStore } from '@/stores/siigoSyncStore'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
@@ -186,6 +186,8 @@ export function SiigoConsultationPage() {
       return res.data
     },
     staleTime: 30_000,
+    // Mientras corre una sincronización en segundo plano se refresca el estado
+    refetchInterval: q => (q.state.data?.isSyncRunning ? 10_000 : false),
   })
 
   const handleResetFilters = () => {
@@ -250,13 +252,9 @@ export function SiigoConsultationPage() {
   const hasFilters = Boolean(companyId || customerNit || startDate || endDate || docType || productCode || search)
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {isInternal ? (
-        <TopBar
-          title="Consultas de Facturación Siigo"
-          subtitle="Desglose ítem por ítem de facturas de venta y notas crédito sincronizadas desde Siigo"
-        />
-      ) : (
+    <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
+      {/* Para roles internos el encabezado y las pestañas los pone SiigoLayout */}
+      {!isInternal && (
         <PortalTopBar
           title="Facturación Siigo"
           subtitle="Consulta detallada de facturas, servicios facturados y estados de cuenta de tu empresa"
@@ -296,7 +294,12 @@ export function SiigoConsultationPage() {
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-cream-100/60 mt-0.5">
-                {data?.lastSync ? (
+                {data?.isSyncRunning ? (
+                  <span className="inline-flex items-center gap-1.5 font-medium text-primary-600">
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                    Sincronización con Siigo en curso (segundo plano)…
+                  </span>
+                ) : data?.lastSync ? (
                   <>
                     Última sincronización: <span className="font-medium">{new Date(data.lastSync.started_at).toLocaleString('es-CO')}</span>
                     {' · '}Periodo: {data.lastSync.start_date} a {data.lastSync.end_date}
@@ -325,9 +328,10 @@ export function SiigoConsultationPage() {
                 variant="secondary"
                 size="sm"
                 onClick={() => setShowSyncModal(true)}
+                disabled={data?.isSyncRunning}
               >
-                <RefreshCw className="w-4 h-4 text-primary-600" />
-                Sincronizar con Siigo API
+                <RefreshCw className={cn('w-4 h-4 text-primary-600', data?.isSyncRunning && 'animate-spin')} />
+                {data?.isSyncRunning ? 'Sincronizando…' : 'Sincronizar con Siigo API'}
               </Button>
             )}
 
@@ -994,6 +998,7 @@ function SyncSiigoModal({
   const [startDate, setStartDate] = useState<string>(new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().slice(0, 10))
   const [sellerFilter, setSellerFilter] = useState<string>('689')
+  const startWatching = useSiigoSyncStore(s => s.start)
 
   const syncMut = useMutation({
     mutationFn: async () => {
@@ -1007,10 +1012,10 @@ function SyncSiigoModal({
       })
       return data
     },
-    onSuccess: (res) => {
-      toast.success(
-        `Sincronización completada: ${res.invoices_count} facturas y ${res.credit_notes_count} notas crédito (${res.lines_count} líneas) en ${res.duration_sec}s`,
-      )
+    onSuccess: () => {
+      // La sincronización sigue en el servidor; SiigoSyncWatcher avisa cuando termine
+      startWatching('sales')
+      toast.info('Sincronización iniciada en segundo plano. Puedes seguir trabajando: te avisaremos cuando termine.')
       qc.invalidateQueries({ queryKey: ['siigo-sales'] })
       onSynced()
       onClose()
@@ -1165,7 +1170,7 @@ function SyncSiigoModal({
           </Button>
           <Button onClick={() => syncMut.mutate()} loading={syncMut.isPending}>
             <RefreshCw className="w-4 h-4" />
-            {syncMut.isPending ? 'Sincronizando con Siigo…' : 'Iniciar sincronización'}
+            {syncMut.isPending ? 'Iniciando…' : 'Iniciar sincronización'}
           </Button>
         </div>
       </div>
