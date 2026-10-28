@@ -254,7 +254,7 @@ function MovimientoImportModal({ onClose }: { onClose: () => void }) {
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-slate-50">
                       <tr className="border-b border-slate-100">
-                        {['Factura', 'Cliente', 'Tercero', 'Tipo', 'Neto', 'Participación', 'Recaudado', 'Resultado'].map(h => (
+                        {['Factura', 'Cliente', 'Tercero', 'Tipo', 'Neto', 'Participación', 'A cobrar', 'Resultado'].map(h => (
                           <th key={h} className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -278,7 +278,17 @@ function MovimientoImportModal({ onClose }: { onClose: () => void }) {
                               {hasNote && <span className="text-[10px] text-amber-600"> {(r.credit_note ?? 0) > 0 && `−${fmtMoney(r.credit_note)}`}{(r.debit_note ?? 0) > 0 && ` +${fmtMoney(r.debit_note)}`}</span>}
                             </td>
                             <td className="px-3 py-2 text-slate-700 font-medium whitespace-nowrap">{r.participation_value != null ? fmtMoney(r.participation_value) : '—'}</td>
-                            <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{r.collected ? fmtMoney(r.collected) : '—'}</td>
+                            {/* Lo que debe pagar el cliente: base + IVA − retenciones (contra esto se mide el recaudo) */}
+                            <td className="px-3 py-2 whitespace-nowrap" title="Base + IVA − retenciones del cliente">
+                              <div className="text-slate-700 font-medium">{r.net_receivable ? fmtMoney(r.net_receivable) : '—'}</div>
+                              {((r.iva ?? 0) > 0 || (r.withholdings ?? 0) > 0) && (
+                                <div className="text-[10px] text-slate-400">
+                                  {(r.iva ?? 0) > 0 && <span className="text-emerald-600">+IVA {fmtMoney(r.iva)}</span>}
+                                  {(r.iva ?? 0) > 0 && (r.withholdings ?? 0) > 0 && ' '}
+                                  {(r.withholdings ?? 0) > 0 && <span className="text-red-500">−Ret. {fmtMoney(r.withholdings)}</span>}
+                                </div>
+                              )}
+                            </td>
                             <td className="px-3 py-2">
                               <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${o.cls}`}>{o.label}</span>
                               {r.note && <p className="text-[10px] text-amber-600 mt-0.5">{r.note}</p>}
