@@ -1146,9 +1146,10 @@ function AvailableDocumentsPicker({
           const isMoney = d.doc_type === 'RC' || d.doc_type === 'FC' || d.doc_type === 'RP' || d.doc_type === 'FV'
           const total = Number(d.amount ?? 0)
           const avail = isMoney ? Number(d.available ?? d.saldo ?? total) : total
-          // Recaudo (RC): tope = el menor entre el saldo del recibo y lo que falta
-          // por recaudar de la factura de esta OC.
-          const capByInvoice = docType === 'RC' && !!allocate
+          // Recaudo (RC) y pago (RP): tope = el menor entre el saldo del documento y
+          // lo que le falta a esta OC (por recaudar de la factura / por pagarle al tercero).
+          const isPay = docType === 'RP'
+          const capByInvoice = (docType === 'RC' || isPay) && !!allocate
           const invoicePending = capByInvoice ? Math.max(0, allocate!.pending) : Infinity
           const maxAllowed = Math.round(Math.min(avail, invoicePending) * 100) / 100
           const invoiceFull = capByInvoice && invoicePending <= 0.01
@@ -1204,7 +1205,7 @@ function AvailableDocumentsPicker({
                   }}
                   className="shrink-0 text-[10px] font-bold text-primary-600 hover:text-primary-700 px-2 py-1 rounded bg-primary-50 hover:bg-primary-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {invoiceFull ? 'Factura recaudada' : noBalance ? 'Sin saldo' : 'Asignar'}
+                  {invoiceFull ? (isPay ? 'Tercero pagado' : 'Factura recaudada') : noBalance ? 'Sin saldo' : 'Asignar'}
                 </button>
               </div>
               {picking && allocate && (
@@ -1218,8 +1219,11 @@ function AvailableDocumentsPicker({
                     onClick={() => {
                       const v = Number(amount)
                       if (!(v > 0)) { toast.error('Monto inválido'); return }
-                      if (v > avail + 0.01) { toast.error(`Supera el saldo disponible del recibo (${fmtMoney(avail)})`); return }
-                      if (capByInvoice && v > invoicePending + 0.01) { toast.error(`Supera lo que falta por recaudar de la factura (${fmtMoney(invoicePending)})`); return }
+                      if (v > avail + 0.01) { toast.error(`Supera el saldo disponible del ${isPay ? 'pago' : 'recibo'} (${fmtMoney(avail)})`); return }
+                      if (capByInvoice && v > invoicePending + 0.01) {
+                        toast.error(isPay ? `Supera lo que se le debe al tercero (${fmtMoney(invoicePending)})` : `Supera lo que falta por recaudar de la factura (${fmtMoney(invoicePending)})`)
+                        return
+                      }
                       allocMutation.mutate({ doc: d, amount: v, avail })
                     }}>
                     Confirmar
@@ -1229,7 +1233,9 @@ function AvailableDocumentsPicker({
               )}
               {picking && capByInvoice && (
                 <div className="mt-1 text-[10px] text-slate-500">
-                  Máximo: <b>{fmtMoney(maxAllowed)}</b> (saldo del recibo {fmtMoney(avail)} · falta por recaudar de la factura {fmtMoney(invoicePending)})
+                  Máximo: <b>{fmtMoney(maxAllowed)}</b> ({isPay
+                    ? <>saldo del pago {fmtMoney(avail)} · se le debe al tercero {fmtMoney(invoicePending)}</>
+                    : <>saldo del recibo {fmtMoney(avail)} · falta por recaudar de la factura {fmtMoney(invoicePending)}</>})
                 </div>
               )}
               {picking && allocate && Number(amount) > 0 && Number(amount) < avail && (
@@ -1960,7 +1966,10 @@ function ParticipationDetailModal({
                   docType="RP"
                   nit={thirdPartyNit}
                   title="Comprobantes de egreso / pagos en SIIGO:"
-                  allocate={allocateProps(Number(item.tax_partition?.payThirdParty ?? partValue) - Number(item.egress_voucher_value ?? 0))}
+                  // Tope: lo que se le debe al tercero (giro neto total − pagado), calculado en el servidor
+                  allocate={allocateProps(item.pay_pending != null
+                    ? Number(item.pay_pending)
+                    : Number(item.tax_partition?.breakdown?.finalTotal ?? partValue) - Number(item.egress_voucher_value ?? 0))}
                   onSelect={(doc) => {
                     setEditForm(f => ({
                       ...f,
