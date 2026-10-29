@@ -1078,14 +1078,19 @@ function AvailableDocumentsPicker({
   const [pickId, setPickId] = useState<string | null>(null)
   const [amount, setAmount] = useState('')
   const allocMutation = useMutation({
-    mutationFn: async (vars: { doc: any; amount: number; avail: number }) => (await api.post('/api/participations/allocations', {
-      source_doc_type: docType, source_comprobante: vars.doc.comprobante,
-      purchase_order: allocate!.purchaseOrder, amount: vars.amount,
-      source_nit: vars.doc.tercero_nit || undefined,
-    })).data,
+    // FV: se reparte entre OC (assign-sale-invoice); RC/FC/RP: asignaciones de dinero.
+    mutationFn: async (vars: { doc: any; amount: number; avail: number }) => (docType === 'FV'
+      ? await api.post('/api/participations/assign-sale-invoice', {
+          purchase_order: allocate!.purchaseOrder, finto_invoice: vars.doc.comprobante, amount: vars.amount,
+        })
+      : await api.post('/api/participations/allocations', {
+          source_doc_type: docType, source_comprobante: vars.doc.comprobante,
+          purchase_order: allocate!.purchaseOrder, amount: vars.amount,
+          source_nit: vars.doc.tercero_nit || undefined,
+        })).data,
     onSuccess: (res: any, vars) => {
       const applied = Number(res?.applied ?? 0)
-      const left = Math.max(0, Math.round((vars.avail - applied) * 100) / 100)
+      const left = res?.remaining != null ? Number(res.remaining) : Math.max(0, Math.round((vars.avail - applied) * 100) / 100)
       toast.success(
         `Asignado ${fmtMoney(applied)} de ${vars.doc.comprobante}`,
         { description: left > 0.01 ? `Quedan ${fmtMoney(left)} disponibles para otra OC.` : 'El documento quedó sin saldo disponible.', duration: 6000 },
@@ -1135,17 +1140,28 @@ function AvailableDocumentsPicker({
       {/* Lista compacta (sin tabla ancha) para que el botón Asignar siempre quede visible */}
       <div className="border border-slate-200 rounded-lg max-h-56 overflow-y-auto overflow-x-hidden scrollbar-slim bg-white divide-y divide-slate-100">
         {docs.map((d: any) => {
-          const isMoney = d.doc_type === 'RC' || d.doc_type === 'FC' || d.doc_type === 'RP'
+          // Con saldo por asignar: RC/FC/RP y también la FV (se reparte entre OC)
+          const isMoney = d.doc_type === 'RC' || d.doc_type === 'FC' || d.doc_type === 'RP' || d.doc_type === 'FV'
           const total = Number(d.amount ?? 0)
           const avail = isMoney ? Number(d.available ?? d.saldo ?? total) : total
           const noBalance = isMoney && avail <= 0.01
           const picking = pickId === d.id
+          // Desglose de la FV: base + IVA − retenciones = valor (lo que paga el cliente)
+          const fvRet = Number(d.tax_income_withholding ?? 0) + Number(d.tax_ica_withholding ?? 0) + Number(d.tax_iva_withholding ?? 0)
+          const fvBreak = d.doc_type === 'FV' && (Number(d.vat_amount ?? 0) > 0 || fvRet > 0)
           return (
             <div key={d.id} className="px-2.5 py-1.5 hover:bg-slate-50/70 transition-colors">
               <div className="flex items-center gap-2 min-w-0">
                 <div className="min-w-0 flex-1">
                   <div className="font-mono font-bold text-xs text-slate-800 truncate">{d.comprobante}</div>
                   <div className="text-[10px] text-slate-400">{d.doc_date || d.period || '—'}</div>
+                  {fvBreak && (
+                    <div className="text-[10px] text-slate-400 truncate" title="Base + IVA − retenciones = lo que paga el cliente">
+                      Base {fmtMoney(Number(d.base_amount ?? 0))}
+                      {Number(d.vat_amount ?? 0) > 0 && <span className="text-emerald-600"> +IVA {fmtMoney(Number(d.vat_amount))}</span>}
+                      {fvRet > 0 && <span className="text-red-500"> −Ret. {fmtMoney(fvRet)}</span>}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right shrink-0">
                   {isMoney ? (
@@ -1204,7 +1220,7 @@ function AvailableDocumentsPicker({
 
 /** Saldo que le queda libre a cada documento (RC/FC/RP) asignado a la OC, para
  *  saber cuánto se puede aplicar todavía a otras OC. */
-function AssignedDocsBalance({ docType, nit, comprobantes }: { docType: 'RC' | 'FC' | 'RP'; nit: string; comprobantes?: string | null }) {
+function AssignedDocsBalance({ docType, nit, comprobantes }: { docType: 'FV' | 'RC' | 'FC' | 'RP'; nit: string; comprobantes?: string | null }) {
   const norm = (s: string) => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
   const list = String(comprobantes ?? '').split(',').map(s => s.trim()).filter(Boolean)
   const { data: docs } = useQuery({
@@ -1515,6 +1531,9 @@ function ParticipationDetailModal({
                   docType="FV"
                   nit={clientNit}
                   title="Facturas de venta de este cliente en SIIGO:"
+                  // Una FV puede repartirse entre varias OC: se asigna una parte y el
+                  // resto queda disponible para las demás.
+                  allocate={allocateProps(0)}
                   onSelect={(doc) => {
                     setEditForm(f => ({
                       ...f,
@@ -1583,6 +1602,7 @@ function ParticipationDetailModal({
             ) : (
               <>
                 <DetailField label="Factura de venta" value={item.finto_invoice ?? 'Pendiente'} />
+                <AssignedDocsBalance docType="FV" nit={clientNit} comprobantes={item.finto_invoice} />
                 <DetailField label="Fecha" value={item.finto_invoice_date ?? '—'} />
                 <DetailField label="Valor factura" value={fmtMoney(inv)} />
                 {item.finto_invoice && (
