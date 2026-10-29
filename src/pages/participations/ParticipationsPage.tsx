@@ -1380,7 +1380,7 @@ function ParticipationDetailModal({
     ;(async () => {
       try {
         const { data } = await api.get(`/api/participations/invoices/${idToCheck}`)
-        if (!cancelled && data) setItem(data)
+        if (!cancelled && data) setItem((prev: any) => ({ ...prev, ...data }))
       } catch (err: any) {
         if (!cancelled && err?.response?.status === 404) {
           toast.error('Esta OC ya no existe (la lista estaba desactualizada). Se actualizó; vuelve a abrirla.')
@@ -1426,7 +1426,7 @@ function ParticipationDetailModal({
     try {
       const { data } = await api.get(`/api/participations/invoices/${currentInvoiceId}`)
       if (data) {
-        setItem(data)
+        setItem((prev: any) => ({ ...prev, ...data }))
         // Refresca los campos abiertos con lo asignado, para que "Guardar" no lo pise con valores viejos
         setEditForm(prev => Object.fromEntries(Object.keys(prev).map(k => [k, data[k] ?? ''])))
       }
@@ -1520,7 +1520,7 @@ function ParticipationDetailModal({
     if (!currentInvoiceId) return
     try {
       const { data } = await api.get(`/api/participations/invoices/${currentInvoiceId}`)
-      if (data) setItem(data)
+      if (data) setItem((prev: any) => ({ ...prev, ...data }))
     } catch { /* ignore */ }
   }
 
