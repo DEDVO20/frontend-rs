@@ -170,6 +170,7 @@ function MovimientoImportModal({ onClose }: { onClose: () => void }) {
       const s = d.summary ?? {}
       const extra = [
         s.unchanged ? `${s.unchanged} sin cambios` : '',
+        s.existing_oc ? `${s.existing_oc} FV registrada(s) sin crear OC (ya había OC ese mes)` : '',
         s.recaudo_updated ? `${s.recaudo_updated} con recaudo` : '',
         s.third_invoice_matched ? `${s.third_invoice_matched} factura tercero` : '',
         s.paid_matched ? `${s.paid_matched} pagada(s)` : '',
@@ -185,6 +186,7 @@ function MovimientoImportModal({ onClose }: { onClose: () => void }) {
     matched:   { label: 'Con participación', cls: 'bg-emerald-100 text-emerald-700' },
     ambiguous: { label: 'Ambigua',           cls: 'bg-amber-100 text-amber-700' },
     no_amount: { label: 'Sin monto',         cls: 'bg-amber-100 text-amber-700' },
+    existing_oc: { label: 'OC ya existe',    cls: 'bg-blue-100 text-blue-700' },
     no_config: { label: 'Sin config',        cls: 'bg-slate-100 text-slate-500' },
   }
   const canApply = !!report && ((s?.matched ?? 0) > 0 || (s?.collections ?? 0) > 0 || (s?.third_invoices ?? 0) > 0 || (s?.payments ?? 0) > 0)
@@ -1144,7 +1146,13 @@ function AvailableDocumentsPicker({
           const isMoney = d.doc_type === 'RC' || d.doc_type === 'FC' || d.doc_type === 'RP' || d.doc_type === 'FV'
           const total = Number(d.amount ?? 0)
           const avail = isMoney ? Number(d.available ?? d.saldo ?? total) : total
-          const noBalance = isMoney && avail <= 0.01
+          // Recaudo (RC): tope = el menor entre el saldo del recibo y lo que falta
+          // por recaudar de la factura de esta OC.
+          const capByInvoice = docType === 'RC' && !!allocate
+          const invoicePending = capByInvoice ? Math.max(0, allocate!.pending) : Infinity
+          const maxAllowed = Math.round(Math.min(avail, invoicePending) * 100) / 100
+          const invoiceFull = capByInvoice && invoicePending <= 0.01
+          const noBalance = (isMoney && avail <= 0.01) || invoiceFull
           const picking = pickId === d.id
           // Desglose de la FV: base + IVA − retenciones = valor (lo que paga el cliente)
           const fvRet = Number(d.tax_income_withholding ?? 0) + Number(d.tax_ica_withholding ?? 0) + Number(d.tax_iva_withholding ?? 0)
@@ -1160,6 +1168,17 @@ function AvailableDocumentsPicker({
                       Base {fmtMoney(Number(d.base_amount ?? 0))}
                       {Number(d.vat_amount ?? 0) > 0 && <span className="text-emerald-600"> +IVA {fmtMoney(Number(d.vat_amount))}</span>}
                       {fvRet > 0 && <span className="text-red-500"> −Ret. {fmtMoney(fvRet)}</span>}
+                    </div>
+                  )}
+                  {/* A qué OC está asignado (OC sin FV en ámbar: posible recibo "pegado") */}
+                  {(d.holders ?? []).length > 0 && (
+                    <div className="text-[10px] text-slate-400 leading-snug">
+                      Asignado a:{' '}
+                      {(d.holders as any[]).map((h, i) => (
+                        <span key={i} className={h.finto_invoice ? '' : 'text-amber-700 font-medium'}>
+                          {i > 0 && ' · '}{h.purchase_order} ({h.finto_invoice ?? 'sin FV'}) {fmtMoney(Number(h.amount))}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1179,13 +1198,13 @@ function AvailableDocumentsPicker({
                   onClick={() => {
                     if (allocate && isMoney) {
                       setPickId(picking ? null : d.id)
-                      const suggested = allocate.pending > 0 ? Math.min(avail, allocate.pending) : avail
+                      const suggested = capByInvoice ? maxAllowed : (allocate.pending > 0 ? Math.min(avail, allocate.pending) : avail)
                       setAmount(String(Math.round(suggested * 100) / 100))
                     } else onSelect?.(d)
                   }}
                   className="shrink-0 text-[10px] font-bold text-primary-600 hover:text-primary-700 px-2 py-1 rounded bg-primary-50 hover:bg-primary-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {noBalance ? 'Sin saldo' : 'Asignar'}
+                  {invoiceFull ? 'Factura recaudada' : noBalance ? 'Sin saldo' : 'Asignar'}
                 </button>
               </div>
               {picking && allocate && (
@@ -1199,12 +1218,18 @@ function AvailableDocumentsPicker({
                     onClick={() => {
                       const v = Number(amount)
                       if (!(v > 0)) { toast.error('Monto inválido'); return }
-                      if (v > avail + 0.01) { toast.error(`Supera el disponible (${fmtMoney(avail)})`); return }
+                      if (v > avail + 0.01) { toast.error(`Supera el saldo disponible del recibo (${fmtMoney(avail)})`); return }
+                      if (capByInvoice && v > invoicePending + 0.01) { toast.error(`Supera lo que falta por recaudar de la factura (${fmtMoney(invoicePending)})`); return }
                       allocMutation.mutate({ doc: d, amount: v, avail })
                     }}>
                     Confirmar
                   </Button>
                   <button type="button" onClick={() => setPickId(null)} className="text-[11px] text-slate-500 hover:text-slate-700 px-1">Cancelar</button>
+                </div>
+              )}
+              {picking && capByInvoice && (
+                <div className="mt-1 text-[10px] text-slate-500">
+                  Máximo: <b>{fmtMoney(maxAllowed)}</b> (saldo del recibo {fmtMoney(avail)} · falta por recaudar de la factura {fmtMoney(invoicePending)})
                 </div>
               )}
               {picking && allocate && Number(amount) > 0 && Number(amount) < avail && (
@@ -1239,11 +1264,22 @@ function AssignedDocsBalance({ docType, nit, comprobantes }: { docType: 'FV' | '
         const total = Number(d.amount ?? 0)
         const avail = Number(d.available ?? 0)
         return (
-          <div key={d.id} className="flex justify-between gap-3 text-[11px]">
-            <span className="font-mono font-semibold text-slate-700">{d.comprobante}</span>
-            <span className={avail > 0.01 ? 'font-semibold text-emerald-700' : 'text-slate-400'}>
-              {avail > 0.01 ? `${fmtMoney(avail)} de ${fmtMoney(total)}` : `sin saldo (${fmtMoney(total)} asignado)`}
-            </span>
+          <div key={d.id}>
+            <div className="flex justify-between gap-3 text-[11px]">
+              <span className="font-mono font-semibold text-slate-700">{d.comprobante}</span>
+              <span className={avail > 0.01 ? 'font-semibold text-emerald-700' : 'text-slate-400'}>
+                {avail > 0.01 ? `${fmtMoney(avail)} de ${fmtMoney(total)}` : `sin saldo (${fmtMoney(total)} asignado)`}
+              </span>
+            </div>
+            {(d.holders ?? []).length > 1 && (
+              <div className="text-[10px] text-slate-400 leading-snug">
+                {(d.holders as any[]).map((h, i) => (
+                  <span key={i} className={h.finto_invoice ? '' : 'text-amber-700 font-medium'}>
+                    {i > 0 && ' · '}{h.purchase_order} ({h.finto_invoice ?? 'sin FV'}) {fmtMoney(Number(h.amount))}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )
       })}
@@ -1604,7 +1640,7 @@ function ParticipationDetailModal({
                 <DetailField label="Factura de venta" value={item.finto_invoice ?? 'Pendiente'} />
                 <AssignedDocsBalance docType="FV" nit={clientNit} comprobantes={item.finto_invoice} />
                 <DetailField label="Fecha" value={item.finto_invoice_date ?? '—'} />
-                <DetailField label="Valor factura" value={fmtMoney(inv)} />
+                <DetailField label="Valor factura" value={item.finto_invoice ? fmtMoney(inv) : "—"} />
                 {item.finto_invoice && (
                   <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100">
                     <button
@@ -2804,10 +2840,38 @@ function CruceView({ period, onApplyPayment }: { period: string; onApplyPayment?
   const alerts: any[] = data?.alerts ?? []
   const by = data?.summary?.by_type ?? {}
 
+  // Reparar saldos de RC/FC/RP: primero vista previa, luego confirmar
+  const qc = useQueryClient()
+  const canRepair = ['admin', 'rs_admin'].includes(useAuthStore(s => s.user?.role ?? ''))
+  const repairMut = useMutation({
+    mutationFn: async (apply: boolean) => (await api.post('/api/participations/repair-money-docs', { apply })).data,
+    onSuccess: (res: any, apply) => {
+      const n = (res?.changes?.length ?? 0) + (res?.adopted?.length ?? 0)
+      if (!apply) {
+        if (!n) { toast.success('Los saldos de RC/FC/RP ya cuadran con sus asignaciones'); return }
+        const lines = [
+          ...(res.adopted ?? []).slice(0, 8).map((a: any) => `• ${a.purchase_order}: ${a.doc_type} ${a.comprobante} ${fmtMoney(a.amount)} (registro manual → asignación)`),
+          ...(res.changes ?? []).slice(0, 8).map((c: any) => `• ${c.doc_type} ${c.comprobante}: aplicado ${fmtMoney(c.applied_before)} → ${fmtMoney(c.applied_after)}`),
+        ]
+        if (window.confirm(`Se corregirán ${n} registro(s):\n\n${lines.join('\n')}${n > 16 ? '\n…' : ''}\n\n¿Aplicar?`)) repairMut.mutate(true)
+        return
+      }
+      toast.success(`Saldos reparados: ${res.changes?.length ?? 0} documento(s), ${res.adopted?.length ?? 0} registro(s) manual(es) convertidos`)
+      qc.invalidateQueries({ queryKey: ['participations'] })
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudieron reparar los saldos'),
+  })
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <DocTypeFilter value={docType} onChange={setDocType} options={['FV', 'RC', 'NC', 'ND', 'FC', 'RP']} />
+        <DocTypeFilter value={docType} onChange={setDocType} options={['FV', 'RC', 'ND', 'FC', 'RP']} />
+        {canRepair && (
+          <Button size="sm" variant="secondary" loading={repairMut.isPending} onClick={() => repairMut.mutate(false)}
+            title="Recalcula lo aplicado de cada RC/FC/RP desde sus asignaciones y libera saldos sin OC">
+            <RotateCcw className="w-3 h-3" /> Reparar saldos
+          </Button>
+        )}
         <input value={nit} onChange={e => setNit(e.target.value)} placeholder="NIT cliente/tercero…"
           className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500" />
         <span className="ml-auto text-xs text-slate-400">
