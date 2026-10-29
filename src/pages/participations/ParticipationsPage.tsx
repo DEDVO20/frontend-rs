@@ -1443,7 +1443,7 @@ function ParticipationDetailModal({
       return data
     },
     onSuccess: (updated: any) => {
-      setItem(updated)
+      setItem((prev: any) => ({ ...prev, ...updated }))
       setEditingStage(null)
       toast.success('Etapa actualizada correctamente')
       qc.invalidateQueries({ queryKey: ['participations'] })
@@ -1492,7 +1492,14 @@ function ParticipationDetailModal({
       return
     }
     const payload: Record<string, any> = {}
-    if (editingStage === 3) {
+    if (editingStage === 1) {
+      const v = Number(editForm.participation_value)
+      if (editForm.participation_value === '' || !Number.isFinite(v) || v < 0) {
+        toast.error('Escribe un valor de participación válido (0 o más)')
+        return
+      }
+      payload.participation_value = v
+    } else if (editingStage === 3) {
       if (editForm.cash_receipts !== undefined) payload.cash_receipts = editForm.cash_receipts.trim() || null
       if (editForm.cash_receipt_date !== undefined) payload.cash_receipt_date = editForm.cash_receipt_date || null
       if (editForm.collected !== undefined && editForm.collected !== '') {
@@ -1540,12 +1547,51 @@ function ParticipationDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-slim px-6 py-5 space-y-3">
-          {/* Etapa 1: Solo lectura */}
-          <DetailStage n={1} title="Generación · OC" done>
+          {/* Etapa 1: OC — solo la participación causada es editable */}
+          <DetailStage
+            n={1}
+            title="Generación · OC"
+            done
+            editable
+            isEditing={editingStage === 1}
+            onToggleEdit={() => {
+              if (editingStage === 1) setEditingStage(null)
+              else {
+                setEditForm({ participation_value: item.participation_value ?? '' })
+                setEditingStage(1)
+              }
+            }}
+          >
             <DetailField label="Orden de compra" value={item.purchase_order} mono />
             <DetailField label="Periodo" value={item.period ?? '—'} />
             <DetailField label="Servicio" value={p.company_service?.services?.name ?? '—'} />
-            <DetailField label="Participación causada" value={fmtMoney(Number(item.participation_value ?? 0))} />
+            {editingStage === 1 ? (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Participación causada ($)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    min={0}
+                    value={editForm.participation_value ?? ''}
+                    onChange={e => setEditForm(f => ({ ...f, participation_value: e.target.value }))}
+                    className="w-full text-xs font-semibold px-2.5 py-1.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Queda fija: los próximos imports y cambios de % no la recalculan. La partición tributaria y el disponible se recalculan con este valor.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <Button size="sm" variant="secondary" onClick={() => setEditingStage(null)}>Cancelar</Button>
+                  <Button size="sm" loading={updateMutation.isPending} onClick={handleSaveStage}>Guardar cambios</Button>
+                </div>
+              </div>
+            ) : (
+              <DetailField
+                label={item.participation_value_manual ? 'Participación causada (ajustada a mano)' : 'Participación causada'}
+                value={fmtMoney(Number(item.participation_value ?? 0))}
+              />
+            )}
           </DetailStage>
 
           {/* Etapa 2: Venta Finto */}
