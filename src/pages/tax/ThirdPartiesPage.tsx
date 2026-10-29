@@ -120,15 +120,32 @@ function CalcDrawer({ party, profile, onClose }: { party: ThirdParty; profile: T
   // lleva); el check permite forzarla o quitarla para simular. null = automático.
   const [withCommission, setWithCommission] = useState<boolean | null>(null)
   const [autoType, setAutoType] = useState<'servicio' | 'mandato' | null>(null)
+  // % de comisión: null = el del contrato de mandato (Empresas) o el general
+  const [commissionPct, setCommissionPct] = useState<number | null>(null)
+  const [pctDraft, setPctDraft] = useState('')
 
-  const { data, isFetching, error } = useQuery<{ result: OperationResult; contract_type: 'servicio' | 'mandato' }>({
-    queryKey: ['tax-compute', party.id, value, withCommission],
+  const { data, isFetching, error } = useQuery<{
+    result: OperationResult; contract_type: 'servicio' | 'mandato'
+    commission_percentage: number; commission_source: 'manual' | 'contrato' | 'general'
+    mandate_contracts: { id: string; percentage: number; company: string | null; service: string | null }[]
+  }>({
+    queryKey: ['tax-compute', party.id, value, withCommission, commissionPct],
     enabled: value != null && !!party.tax_profile_id,
     queryFn: async () => (await api.post('/api/tax/compute', {
       invoice_value: value, third_party_id: party.id,
       ...(withCommission === null ? {} : { contract_type: withCommission ? 'mandato' : 'servicio' }),
+      ...(commissionPct === null ? {} : { commission_percentage: commissionPct }),
     })).data,
+    placeholderData: prev => prev,
   })
+  // El campo muestra el % en uso mientras no se escriba otro
+  useEffect(() => { if (commissionPct === null && data) setPctDraft(String(data.commission_percentage)) }, [data, commissionPct])
+  const applyPct = () => {
+    const v = Number(pctDraft.replace(',', '.'))
+    if (pctDraft.trim() === '' || !isFinite(v) || v < 0 || v > 100) { toast.error('Porcentaje inválido (0 a 100)'); return }
+    setCommissionPct(v)
+  }
+  const contractPcts = (data?.mandate_contracts ?? []).filter(m => m.percentage > 0)
   useEffect(() => { if (withCommission === null && data?.contract_type) setAutoType(data.contract_type) }, [data, withCommission])
   const r = data?.result
   // Solo los contratos de mandato llevan comisión de la firma (o si se marca el check).
@@ -191,6 +208,34 @@ function CalcDrawer({ party, profile, onClose }: { party: ThirdParty; profile: T
                     </span>
                   </span>
                 </label>
+                {(withCommission ?? isMandate) && data && (
+                  <div className="mt-3 rounded-lg border border-slate-200 p-3 space-y-2">
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider">Comisión de la firma (%)</label>
+                    <div className="flex items-center gap-2">
+                      <input value={pctDraft} onChange={e => setPctDraft(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyPct()}
+                        onBlur={() => { if (pctDraft !== String(data.commission_percentage)) applyPct() }} inputMode="decimal"
+                        className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                      <span className="text-[11px] text-slate-500">
+                        {data.commission_source === 'contrato' && 'Del contrato de mandato (Empresas)'}
+                        {data.commission_source === 'general' && (data.mandate_contracts.length ? 'General (el contrato no tiene %)' : 'General (sin contrato de mandato)')}
+                        {data.commission_source === 'manual' && (
+                          <>Escrito a mano · <button type="button" onClick={() => setCommissionPct(null)} className="text-primary-600 hover:text-primary-700 font-medium">usar el del contrato</button></>
+                        )}
+                      </span>
+                    </div>
+                    {/* Varios contratos de mandato con % distinto: escoger cuál usar */}
+                    {(contractPcts.length > 1 || (data.commission_source === 'manual' && contractPcts.length > 0)) && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {contractPcts.map(m => (
+                          <button key={m.id} type="button" onClick={() => { setCommissionPct(m.percentage); setPctDraft(String(m.percentage)) }}
+                            className={`text-[11px] px-2 py-0.5 rounded border transition-colors ${data.commission_percentage === m.percentage ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                            {m.percentage}% · {m.company ?? '—'}{m.service ? ` · ${m.service}` : ''}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {error && <p className="text-sm text-red-600">No se pudo calcular.</p>}
@@ -211,7 +256,7 @@ function CalcDrawer({ party, profile, onClose }: { party: ThirdParty; profile: T
 
                   {isMandate ? (
                     <section className="bg-slate-50 rounded-xl p-4">
-                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Comisión (mandato)</p>
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Comisión ({data?.commission_percentage ?? 0}%)</p>
                       <Row label="Comisión" v={r.commission} />
                       <Row label="IVA comisión" v={r.commissionIva} />
                       <Row label="Total comisión" v={r.commissionTotal} strong />
