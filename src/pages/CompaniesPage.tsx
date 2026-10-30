@@ -724,7 +724,7 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         has_third_party:    hasThird,
         third_party_id:     hasThird ? thirdId : null,
         contract_type:      ctype,
-        // Solo porcentaje. En mandato el % es la comisión (informativa).
+        // Solo porcentaje. En mandato el % es la comisión de la firma.
         participation_type: 'percentage',
         percentage:         hasThird ? pctNum : undefined,
         // Cambio de % → desde el mes elegido. Conversión de valor fijo → desde el inicio.
@@ -743,7 +743,6 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
       const r = data?.rate_recalculated
       const n = Number(r?.updated ?? 0)
       toast.success(n ? `Participación guardada · ${n} OC recalculada${n === 1 ? '' : 's'} con el % de su mes` : 'Participación guardada')
-      if (r?.reason === 'mandato') toast.info('Contrato de mandato: las OC no se recalculan, su valor viene del informe.')
       if (r?.reason === 'single_rate') toast.info('Este servicio tiene un solo % registrado: no hay meses por recalcular.')
       if (r?.manual) toast.warning(`${r.manual} OC con valor ajustado a mano no se recalcularon.`)
       if (r?.no_base) toast.warning(`${r.no_base} OC con FV están en 0%: ajústalas a mano en la etapa 1.`)
@@ -867,7 +866,7 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
             <>
               <div className="sm:col-span-2 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-[11px] text-amber-700">
                 <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                <span>La porción del mandante se <b>lee del reporte SIIGO</b> (cuenta 28150601) al importar; no se calcula aquí. El porcentaje es la comisión de la firma, informativa.</span>
+                <span>La porción del mandante se <b>lee del reporte SIIGO</b> (cuenta 28150601) al importar; no se calcula aquí. El porcentaje es la comisión de la firma de cada mes; sin él se usa la comisión general.</span>
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-slate-500 mb-1">Comisión de la firma (%) · opcional</label>

@@ -2119,7 +2119,7 @@ function ParticipationDetailModal({
                   <DetailField label="Retención ICA" value={fmtMoney(item.tax_partition.breakdown.icaWithholding.amount)} />
                   <DetailField label="Retención IVA" value={fmtMoney(item.tax_partition.breakdown.ivaWithholding.amount)} />
                   {item.contract_type === 'mandato' && (
-                    <DetailField label="Comisión + IVA" value={fmtMoney(item.tax_partition.breakdown.commissionTotal)} />
+                    <DetailField label={`Comisión${item.percentage > 0 ? ` (${Number(item.percentage)}%)` : ''} + IVA`} value={fmtMoney(item.tax_partition.breakdown.commissionTotal)} />
                   )}
                   <DetailField label="Giro final (100% recaudo)" value={fmtMoney(item.tax_partition.breakdown.finalTotal)} />
                 </div>
