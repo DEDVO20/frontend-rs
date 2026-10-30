@@ -22,6 +22,7 @@ import { PortalTopBar } from '@/components/layout/PortalTopBar'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { useThemeStore } from '@/stores/themeStore'
+import { SiigoBooksSelect, SiigoNotConnected, useSiigoBooks, type SiigoBooksInfo } from './siigoBooks'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff', 'contador']
 const MAX_SERVICES = 8
@@ -44,6 +45,8 @@ interface ProductRow {
 }
 
 interface SiigoReport {
+  books: SiigoBooksInfo | null
+  notConnected: boolean
   clientCompany: { id: string; name: string; nit: string | null } | null
   lastSync: { started_at: string; end_date: string } | null
   summary: {
@@ -178,8 +181,12 @@ export function SiigoChartsPage() {
   const [customTo, setCustomTo] = useState('')
   const [companyId, setCompanyId] = useState('')
 
+  // Libros: los internos eligen la cuenta de Siigo; los clientes ven siempre la de su empresa
+  const { booksParam, selected: selectedBooks } = useSiigoBooks()
+
   const range = presetRange(preset, customFrom, customTo)
   const params = {
+    ...booksParam,
     ...(range.from ? { startDate: `${range.from}-01` } : {}),
     ...(range.to ? { endDate: lastDayOfMonth(range.to) } : {}),
     ...(isInternal && companyId ? { companyId } : {}),
@@ -215,8 +222,9 @@ export function SiigoChartsPage() {
   const summary = data?.summary
   const hasData = (data?.monthly?.length ?? 0) > 0
   const year = new Date().getFullYear()
+  const booksLabel = data?.books?.label ?? selectedBooks?.label ?? 'Finto'
   const scopeName = isInternal
-    ? (data?.clientCompany?.name ?? 'Todos los clientes')
+    ? (data?.clientCompany ? `${booksLabel} · cliente ${data.clientCompany.name}` : booksLabel)
     : (data?.clientCompany?.name ?? 'Mi empresa')
 
   const cardCls = isInternal
@@ -257,7 +265,7 @@ export function SiigoChartsPage() {
       ) : (
         <PortalTopBar
           title="Gráficas de facturación"
-          subtitle="Tu facturación, tus pagos y tus saldos con nosotros en el tiempo"
+          subtitle="La facturación, el recaudo y el balance de tu empresa en el tiempo"
           companyName={data?.clientCompany?.name ?? 'Mi Empresa'}
         />
       )}
@@ -293,19 +301,24 @@ export function SiigoChartsPage() {
             </div>
           )}
           {isInternal && (
-            <select
-              value={companyId}
-              onChange={e => setCompanyId(e.target.value)}
-              aria-label="Empresa"
-              className={cn(inputCls, 'ml-auto min-w-[200px]')}
-            >
-              <option value="">Todos los clientes</option>
-              {companies.map((c: any) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <div className="ml-auto flex flex-wrap items-center gap-3">
+              <SiigoBooksSelect />
+              <select
+                value={companyId}
+                onChange={e => setCompanyId(e.target.value)}
+                aria-label="Cliente dentro de los libros"
+                className={cn(inputCls, 'min-w-[200px]')}
+              >
+                <option value="">Todos los clientes</option>
+                {companies.map((c: any) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
           )}
         </div>
+
+        {data?.notConnected ? <SiigoNotConnected /> : (<>
 
         {/* Pestañas */}
         <div className={cn('flex items-center gap-2 border-b pb-1', isInternal ? 'border-slate-200' : 'border-navy-900/10 dark:border-white/10')}>
@@ -503,6 +516,7 @@ export function SiigoChartsPage() {
             </div>
           </>
         )}
+        </>)}
       </div>
     </div>
   )

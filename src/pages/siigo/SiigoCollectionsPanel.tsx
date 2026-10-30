@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useSiigoSyncStore } from '@/stores/siigoSyncStore'
+import { SiigoNotConnected, useSiigoBooks, type SiigoBooksInfo } from './siigoBooks'
 
 interface CollectionLine {
   voucher_id: string
@@ -44,6 +45,8 @@ interface CollectionsResponse {
   page: number
   limit: number
   isSyncRunning: boolean
+  books: SiigoBooksInfo | null
+  notConnected: boolean
   lastSync: CollectionSyncLog | null
   summary: { totalRecaudado: number; recibos: number; movimientos: number; facturas: number; anticipos: number; clientes: number }
 }
@@ -64,10 +67,14 @@ const fmtDate = (d: string | null) => {
   return `${day}/${m}/${y}`
 }
 
-/** Recaudo (recibos de caja de Siigo) para roles internos: detalle por movimiento aplicado */
+/**
+ * Recaudo (recibos de caja de Siigo) de los libros consultados: detalle por movimiento aplicado.
+ * Internos: la cuenta elegida en «Libros de»; clientes: la de su propia empresa.
+ */
 export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
   const qc = useQueryClient()
   const startWatching = useSiigoSyncStore(s => s.start)
+  const { isInternal, booksParam, selected } = useSiigoBooks()
   const [companyId, setCompanyId] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -76,7 +83,8 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
   const limit = 50
 
   const params = {
-    ...(companyId ? { companyId } : {}),
+    ...booksParam,
+    ...(isInternal && companyId ? { companyId } : {}),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
     ...(search.trim() ? { search: search.trim() } : {}),
@@ -87,6 +95,7 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
   const { data: companiesRes } = useQuery({
     queryKey: ['companies-siigo-selector'],
     queryFn: async () => (await api.get('/api/companies?limit=100')).data,
+    enabled: isInternal,
     staleTime: 120_000,
   })
   const companies: any[] = Array.isArray(companiesRes) ? companiesRes : (companiesRes?.data ?? [])
@@ -100,10 +109,10 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
   })
 
   const syncMut = useMutation({
-    mutationFn: async () => (await api.post('/api/siigo/collections/sync', {})).data,
-    onSuccess: () => {
+    mutationFn: async () => (await api.post('/api/siigo/collections/sync', { connectionId: selected?.id })).data,
+    onSuccess: (res) => {
       // La sincronización sigue en el servidor; SiigoSyncWatcher avisa cuando termine
-      startWatching('collections')
+      startWatching('collections', res.connectionId, selected?.label ?? 'Finto')
       toast.info('Sincronización de recaudo iniciada en segundo plano. Puedes seguir trabajando: te avisaremos cuando termine.')
       qc.invalidateQueries({ queryKey: ['siigo-collections'] })
     },
@@ -116,6 +125,8 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
   const last = data?.lastSync
   const inputCls = 'w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500'
 
+  if (data?.notConnected) return <SiigoNotConnected dark={false} />
+
   return (
     <div className="space-y-5">
       {/* Estado y acciones */}
@@ -125,7 +136,9 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
             <HandCoins className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="font-bold text-base text-slate-900">Recaudo · recibos de caja</h2>
+            <h2 className="font-bold text-base text-slate-900">
+              Recaudo · recibos de caja{data?.books ? ` · ${data.books.label}` : ''}
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {data?.isSyncRunning
                 ? 'Sincronización en curso…'
@@ -194,13 +207,15 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
               />
             </div>
           </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Empresa (Plataforma)</label>
-            <select value={companyId} onChange={e => { setCompanyId(e.target.value); setPage(1) }} className={inputCls}>
-              <option value="">Todas las empresas…</option>
-              {companies.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          {isInternal && (
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Cliente (empresa de la plataforma)</label>
+              <select value={companyId} onChange={e => { setCompanyId(e.target.value); setPage(1) }} className={inputCls}>
+                <option value="">Todos los clientes…</option>
+                {companies.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
           <div>
             <label className="block text-[11px] font-medium text-slate-500 mb-1">Fecha desde</label>
             <input type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1) }} className={inputCls} />

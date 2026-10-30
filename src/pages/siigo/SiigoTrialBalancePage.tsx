@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Filter, Layers, RefreshCw, Scale, Search, X } from 'lucide-react'
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { useSiigoSyncStore } from '@/stores/siigoSyncStore'
+import { SiigoNotConnected, useSiigoBooks, type SiigoBooksInfo } from './siigoBooks'
 
 interface TrialBalanceLine {
   id: string
@@ -48,6 +49,8 @@ interface TrialBalanceResponse {
   period: string | null
   periods: PeriodControl[]
   isSyncRunning: boolean
+  books: SiigoBooksInfo | null
+  notConnected: boolean
   lastSync: { started_at: string; status: string; mode: string; months_ok: number; months_failed: number; error_message?: string | null } | null
   data: TrialBalanceLine[]
   total: number
@@ -62,12 +65,16 @@ const money = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximum
 const fmt = (n: number) => (n ? money.format(n) : '—')
 const fmtDateTime = (d: string | null) => (d ? new Date(d).toLocaleString('es-CO') : '—')
 
-/** Pestaña Balance de prueba por tercero (Siigo) — solo roles internos */
+/**
+ * Pestaña Balance de prueba por tercero (Siigo) de los libros consultados.
+ * Internos: la cuenta elegida en «Libros de»; clientes: la de su propia empresa.
+ */
 export function SiigoTrialBalancePage() {
   const qc = useQueryClient()
   const role = useAuthStore(s => s.user?.role ?? '')
   const canSync = ['admin', 'rs_admin', 'contador'].includes(role)
   const startWatching = useSiigoSyncStore(s => s.start)
+  const { booksParam, selected, connectionId } = useSiigoBooks()
 
   const [period, setPeriod] = useState('')
   const [account, setAccount] = useState('')
@@ -75,7 +82,11 @@ export function SiigoTrialBalancePage() {
   const [page, setPage] = useState(1)
   const limit = 100
 
+  // Otra cuenta = otros periodos importados: se vuelve al último mes disponible
+  useEffect(() => { setPeriod(''); setPage(1) }, [connectionId])
+
   const params = {
+    ...booksParam,
     ...(period ? { period } : {}),
     ...(account.trim() ? { account: account.trim() } : {}),
     ...(search.trim() ? { search: search.trim() } : {}),
@@ -91,9 +102,10 @@ export function SiigoTrialBalancePage() {
   })
 
   const syncMut = useMutation({
-    mutationFn: async (mode: 'current' | 'year') => (await api.post('/api/siigo/trial-balance/sync', { mode })).data,
-    onSuccess: (_res, mode) => {
-      startWatching('trialBalance')
+    mutationFn: async (mode: 'current' | 'year') =>
+      (await api.post('/api/siigo/trial-balance/sync', { mode, connectionId: selected?.id })).data,
+    onSuccess: (res, mode) => {
+      startWatching('trialBalance', res.connectionId, selected?.label ?? 'Finto')
       toast.info(
         mode === 'year'
           ? 'Importación del año iniciada en segundo plano (un mes tras otro). Te avisaremos cuando termine.'
@@ -112,8 +124,13 @@ export function SiigoTrialBalancePage() {
   const control = data?.periods.find(p => p.period === current)
   const inputCls = 'w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500'
 
+  if (data?.notConnected) {
+    return <div className="flex-1 overflow-y-auto p-4 md:p-6"><SiigoNotConnected /></div>
+  }
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
+    // El detalle contable usa el estilo claro del back-office también en el portal
+    <div data-theme="light" style={{ colorScheme: 'light' }} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
       {/* Estado y acciones */}
       <div className="rounded-2xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 border bg-white border-slate-200">
         <div className="flex items-center gap-3">
@@ -121,7 +138,9 @@ export function SiigoTrialBalancePage() {
             <Scale className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="font-bold text-base text-slate-900">Balance de prueba por tercero</h2>
+            <h2 className="font-bold text-base text-slate-900">
+              Balance de prueba por tercero{data?.books ? ` · ${data.books.label}` : ''}
+            </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               {data?.isSyncRunning
                 ? 'Importación en curso (segundo plano)…'

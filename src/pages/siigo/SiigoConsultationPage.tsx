@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { useSiigoSyncStore } from '@/stores/siigoSyncStore'
+import { SiigoNotConnected, useSiigoBooks, type SiigoBooksInfo, type SiigoConnection } from './siigoBooks'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
@@ -57,6 +58,10 @@ interface SiigoSalesResponse {
   total: number
   page: number
   limit: number
+  /** Libros consultados (cuenta de Siigo) */
+  books: SiigoBooksInfo | null
+  /** Cliente cuya empresa aún no tiene su cuenta de Siigo conectada */
+  notConnected: boolean
   clientCompany: { id: string; name: string; nit: string | null } | null
   isSyncRunning: boolean
   lastSync: {
@@ -139,6 +144,8 @@ export function SiigoConsultationPage() {
   const { user } = useAuthStore()
   const isInternal = INTERNAL_ROLES.includes(user?.role ?? '')
   const canSync = CAN_SYNC_ROLES.includes(user?.role ?? '')
+  // Libros consultados: los internos eligen la cuenta; los clientes ven siempre la de su empresa
+  const { booksParam, selected: selectedBooks } = useSiigoBooks()
 
   // Filtros
   const [companyId, setCompanyId] = useState<string>('')
@@ -168,8 +175,9 @@ export function SiigoConsultationPage() {
 
   // Consulta principal de datos Siigo
   const queryParams = {
+    ...booksParam,
     ...(isInternal && companyId ? { companyId } : {}),
-    ...(isInternal && customerNit ? { customerNit } : {}),
+    ...(customerNit ? { customerNit } : {}),
     ...(startDate ? { startDate } : {}),
     ...(endDate ? { endDate } : {}),
     ...(docType ? { docType } : {}),
@@ -257,11 +265,14 @@ export function SiigoConsultationPage() {
       {!isInternal && (
         <PortalTopBar
           title="Facturación Siigo"
-          subtitle="Consulta detallada de facturas, servicios facturados y estados de cuenta de tu empresa"
+          subtitle="Las facturas y notas crédito que tu empresa emite en Siigo, por cliente y por servicio"
           companyName={data?.clientCompany?.name ?? 'Mi Empresa'}
         />
       )}
 
+      {data?.notConnected ? (
+        <div className="flex-1 overflow-y-auto p-4 md:p-6"><SiigoNotConnected /></div>
+      ) : (
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5">
         {/* Barra superior de estado y acciones */}
         <div className={cn(
@@ -284,8 +295,10 @@ export function SiigoConsultationPage() {
                   isInternal ? 'text-slate-900' : 'text-navy-900 dark:text-cream-100 font-display',
                 )}>
                   {isInternal
-                    ? (data?.clientCompany ? `Cliente: ${data.clientCompany.name}` : 'Consolidado de Clientes Siigo')
-                    : (data?.clientCompany?.name ?? 'Mis Documentos Facturados')}
+                    ? (data?.clientCompany
+                        ? `${data.books?.label ?? 'Finto'} · cliente ${data.clientCompany.name}`
+                        : `Facturación de ${data?.books?.label ?? selectedBooks?.label ?? 'Finto'}`)
+                    : `Facturación de ${data?.clientCompany?.name ?? 'tu empresa'}`}
                 </h2>
                 {data?.clientCompany?.nit && (
                   <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-navy-800 text-slate-600 dark:text-cream-100/70">
@@ -426,11 +439,11 @@ export function SiigoConsultationPage() {
               </div>
             </div>
 
-            {/* Selector de Empresa (Solo roles internos) */}
+            {/* Tercero que es una empresa de la plataforma (solo roles internos) */}
             {isInternal && (
               <div>
                 <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                  Empresa (Plataforma)
+                  Cliente (empresa de la plataforma)
                 </label>
                 <select
                   value={companyId}
@@ -447,16 +460,16 @@ export function SiigoConsultationPage() {
               </div>
             )}
 
-            {/* Selector de Cliente directo de Siigo (Solo roles internos) */}
-            {isInternal && (
+            {/* Cliente (tercero) dentro de los libros consultados */}
+            {(
               <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                  Tercero / NIT en Siigo
+                <label className="block text-[11px] font-medium text-slate-500 dark:text-cream-100/60 mb-1">
+                  Cliente / NIT en Siigo
                 </label>
                 <select
                   value={customerNit}
                   onChange={e => { setCustomerNit(e.target.value); setCompanyId(''); setPage(1) }}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-white/10 dark:bg-navy-800 dark:text-cream-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                 >
                   <option value="">Todos los NITs…</option>
                   {(data?.catalogs?.customers ?? []).map(c => (
@@ -607,7 +620,7 @@ export function SiigoConsultationPage() {
             )}
           >
             <Package className="w-4 h-4" />
-            Agrupado por Servicio {isInternal ? 'y Cliente' : ''}
+            Agrupado por Servicio y Cliente
           </button>
         </div>
 
@@ -642,7 +655,7 @@ export function SiigoConsultationPage() {
                         <th className="py-3 px-3 whitespace-nowrap">No. Comprobante</th>
                         <th className="py-3 px-3 whitespace-nowrap">Fecha</th>
                         <th className="py-3 px-3 whitespace-nowrap">Identificación</th>
-                        {isInternal && <th className="py-3 px-3 whitespace-nowrap">Cliente</th>}
+                        <th className="py-3 px-3 whitespace-nowrap">Cliente</th>
                         <th className="py-3 px-3 whitespace-nowrap">Cód.</th>
                         <th className="py-3 px-3 whitespace-nowrap">Descripción Producto / Servicio</th>
                         <th className="py-3 px-3 text-right whitespace-nowrap">Valor Bruto</th>
@@ -678,11 +691,9 @@ export function SiigoConsultationPage() {
                               {row.customer_nit || '—'}
                               {row.sucursal ? <span className="text-[10px] text-slate-400 ml-1">(Suc. {row.sucursal})</span> : null}
                             </td>
-                            {isInternal && (
-                              <td className="py-2.5 px-3 max-w-[220px] truncate font-medium text-slate-800" title={row.customer_name}>
-                                {row.customer_name || '—'}
-                              </td>
-                            )}
+                            <td className="py-2.5 px-3 max-w-[220px] truncate font-medium text-slate-800 dark:text-cream-100" title={row.customer_name}>
+                              {row.customer_name || '—'}
+                            </td>
                             <td className="py-2.5 px-3 whitespace-nowrap font-mono text-slate-500 dark:text-cream-100/60">
                               {row.product_code || '—'}
                             </td>
@@ -716,7 +727,7 @@ export function SiigoConsultationPage() {
                     </tbody>
                     <tfoot>
                       <tr className="bg-slate-100 dark:bg-navy-800 font-bold text-xs border-t-2 border-slate-300 dark:border-white/10">
-                        <td colSpan={isInternal ? 6 : 5} className="py-3 px-3 text-right uppercase text-slate-600 dark:text-cream-100/80">
+                        <td colSpan={6} className="py-3 px-3 text-right uppercase text-slate-600 dark:text-cream-100/80">
                           Total General Filtrado ({summary.totalLineas} ítems):
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-slate-700 dark:text-cream-100/90">{fmtMoney(summary.totalBruto)}</td>
@@ -852,10 +863,13 @@ export function SiigoConsultationPage() {
               </div>
             </div>
 
-            {isInternal && (
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100">
-                  <h3 className="font-bold text-sm text-slate-900">
+            {(
+              <div className={cn(
+                'rounded-2xl border overflow-hidden',
+                isInternal ? 'bg-white border-slate-200' : 'bg-cream-100 dark:bg-navy-900 border-navy-900/10 dark:border-white/10',
+              )}>
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10">
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-cream-100">
                     Facturación por Cliente ({data?.byCustomer?.length ?? 0})
                   </h3>
                   <p className="text-xs text-slate-400">Haz clic en un cliente para filtrar sus facturas</p>
@@ -871,7 +885,7 @@ export function SiigoConsultationPage() {
                         <th className="py-2.5 px-4 text-right">Total Neto</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs">
+                    <tbody className="divide-y divide-slate-100 dark:divide-white/5 text-xs">
                       {(data?.byCustomer ?? []).map(c => (
                         <tr
                           key={c.nit}
@@ -881,13 +895,14 @@ export function SiigoConsultationPage() {
                             setActiveTab('items')
                             setPage(1)
                           }}
-                          className="hover:bg-primary-50/60 cursor-pointer transition-colors"
+                          className="hover:bg-primary-50/60 dark:hover:bg-white/5 cursor-pointer transition-colors"
                         >
-                          <td className="py-2.5 px-4 font-mono text-slate-600">{c.nit}</td>
-                          <td className="py-2.5 px-4 font-medium text-slate-900">
+                          <td className="py-2.5 px-4 font-mono text-slate-600 dark:text-cream-100/70">{c.nit}</td>
+                          <td className="py-2.5 px-4 font-medium text-slate-900 dark:text-cream-100">
                             <div className="flex items-center gap-1.5">
                               <span className="truncate max-w-[200px]">{c.name}</span>
-                              {c.companyId && (
+                              {/* "Vinculado" solo tiene sentido en los libros de Finto (sus clientes son empresas de la plataforma) */}
+                              {isInternal && c.companyId && (
                                 <span
                                   title="Vinculado con empresa en plataforma"
                                   className="inline-flex items-center px-1.5 py-0.5 text-[10px] rounded bg-emerald-50 text-emerald-700 font-semibold"
@@ -898,8 +913,8 @@ export function SiigoConsultationPage() {
                             </div>
                           </td>
                           <td className="py-2.5 px-4 text-center">
-                            <span className="text-blue-600 font-semibold">{c.facturas}</span>
-                            {c.notasCredito > 0 && <span className="text-red-500 ml-1">/ {c.notasCredito} NC</span>}
+                            <span className="text-blue-600 dark:text-blue-300 font-semibold">{c.facturas}</span>
+                            {c.notasCredito > 0 && <span className="text-red-500 dark:text-red-400 ml-1">/ {c.notasCredito} NC</span>}
                           </td>
                           <td className="py-2.5 px-4 text-right font-mono text-slate-700 dark:text-cream-100/90">{fmtMoney(c.subtotal)}</td>
                           <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-cream-100">{fmtMoney(c.total)}</td>
@@ -913,10 +928,12 @@ export function SiigoConsultationPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Modal de Sincronización con Siigo API (Solo Roles Internos Autorizados) */}
       {showSyncModal && (
         <SyncSiigoModal
+          books={selectedBooks}
           lastSync={data?.lastSync ?? null}
           onClose={() => setShowSyncModal(false)}
           onSynced={() => {
@@ -983,10 +1000,12 @@ function KpiCard({
 }
 
 function SyncSiigoModal({
+  books,
   lastSync,
   onClose,
   onSynced,
 }: {
+  books: SiigoConnection | null
   lastSync: SiigoSalesResponse['lastSync']
   onClose: () => void
   onSynced: () => void
@@ -994,15 +1013,17 @@ function SyncSiigoModal({
   const qc = useQueryClient()
   const [mode, setMode] = useState<'incremental' | 'days' | 'range' | 'full'>('incremental')
   const [days, setDays] = useState<number>(15)
-  const [year, setYear] = useState<number>(2025)
+  const [year, setYear] = useState<number>(books?.sales_start_year ?? 2025)
   const [startDate, setStartDate] = useState<string>(new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState<string>(new Date().toISOString().slice(0, 10))
-  const [sellerFilter, setSellerFilter] = useState<string>('689')
+  // El vendedor 689 (Paola Blanco) solo aplica a los libros de Finto; otras cuentas usan su propio filtro
+  const [sellerFilter, setSellerFilter] = useState<string>(books?.seller_filter || (books?.is_platform ? '689' : ''))
   const startWatching = useSiigoSyncStore(s => s.start)
 
   const syncMut = useMutation({
     mutationFn: async () => {
       const { data } = await api.post('/api/siigo/sync', {
+        connectionId: books?.id,
         mode,
         days,
         year,
@@ -1012,9 +1033,9 @@ function SyncSiigoModal({
       })
       return data
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       // La sincronización sigue en el servidor; SiigoSyncWatcher avisa cuando termine
-      startWatching('sales')
+      startWatching('sales', res.connectionId, books?.label ?? 'Finto')
       toast.info('Sincronización iniciada en segundo plano. Puedes seguir trabajando: te avisaremos cuando termine.')
       qc.invalidateQueries({ queryKey: ['siigo-sales'] })
       onSynced()
@@ -1032,7 +1053,7 @@ function SyncSiigoModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
           <div className="flex items-center gap-2.5">
             <RefreshCw className={cn('w-5 h-5 text-primary-600', syncMut.isPending && 'animate-spin')} />
-            <h3 className="text-base font-bold text-slate-900">Sincronizar con Siigo API</h3>
+            <h3 className="text-base font-bold text-slate-900">Sincronizar facturación · {books?.label ?? 'Finto'}</h3>
           </div>
           {!syncMut.isPending && (
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500">
@@ -1155,7 +1176,7 @@ function SyncSiigoModal({
             <input
               value={sellerFilter}
               onChange={e => setSellerFilter(e.target.value)}
-              placeholder="689 = Paola Blanco (dejar vacío para todos)"
+              placeholder={books?.is_platform ? '689 = Paola Blanco (dejar vacío para todos)' : 'Vacío = todas las facturas'}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             <p className="text-[10px] text-slate-400 mt-1">
