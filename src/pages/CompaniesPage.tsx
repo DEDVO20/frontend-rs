@@ -713,7 +713,7 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
 
   const saveMut = useMutation({
     mutationFn: async () => {
-      await api.put('/api/participations/config', {
+      const { data } = await api.put('/api/participations/config', {
         company_service_id: row.company_service_id,
         service_value:      valueNum,
         has_third_party:    hasThird,
@@ -732,8 +732,14 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         billing_mode:       billingMode,
         active,
       })
+      return data
     },
-    onSuccess: () => { toast.success('Participación guardada'); qc.invalidateQueries({ queryKey: ['company-participations'] }) },
+    onSuccess: (data: any) => {
+      const n = Number(data?.rate_recalculated ?? 0)
+      toast.success(n ? `Participación guardada · ${n} OC recalculada${n === 1 ? '' : 's'} con el % de su mes` : 'Participación guardada')
+      qc.invalidateQueries({ queryKey: ['company-participations'] })
+      qc.invalidateQueries({ queryKey: ['participations'] })
+    },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
   })
 
