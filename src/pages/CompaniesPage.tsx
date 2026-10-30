@@ -10,8 +10,9 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   Building2, Search, Plus, Eye, Pencil, Trash2, X,
   CheckCircle2, FileText, LayoutGrid, ListTodo, Activity,
-  FileSignature, Upload, Download, Handshake, Info, Calendar,
+  FileSignature, Upload, Download, Handshake, Info, Calendar, PlugZap,
 } from 'lucide-react'
+import { SiigoConnectionPanel } from '@/pages/siigo/SiigoConnectionPanel'
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -52,7 +53,7 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-type DetailTab = 'info' | 'modules' | 'tasks' | 'docs' | 'proposals' | 'participations' | 'activity'
+type DetailTab = 'info' | 'modules' | 'tasks' | 'docs' | 'proposals' | 'participations' | 'siigo' | 'activity'
 
 const DEPARTAMENTOS = [
   'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Boyacá', 'Caldas', 'Caquetá',
@@ -687,8 +688,8 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const savedPct = row.participation?.participation_type === 'fixed' ? null
     : row.participation?.percentage != null ? Number(row.participation.percentage) : null
   const [pct, setPct] = useState<string>(savedPct != null ? String(savedPct) : '')
-  // Mes desde el que rige el % nuevo (solo cuando cambia en una participación existente)
-  const [rateFrom, setRateFrom] = useState<string>(new Date().toISOString().slice(0, 7))
+  // Mes desde el que rige el %: al cambiarlo, o para corregir desde cuándo aplica el actual
+  const [rateFrom, setRateFrom] = useState<string | null>(null)
   const rates: { percentage: number; valid_from: string }[] = row.participation?.rates ?? []
   const [startDate, setStartDate] = useState<string>(row.participation?.start_date ?? row.start_date ?? '')
   const [endDate, setEndDate] = useState<string>(row.participation?.end_date ?? row.end_date ?? '')
@@ -702,6 +703,11 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   const isMandate = ctype === 'mandato'
   // ¿Cambió el % de una participación que ya existía? → pedir desde qué mes rige.
   const pctChanged = !!row.participation?.id && pct !== '' && savedPct != null && pctNum !== savedPct
+  const canSetRateFrom = !!row.participation?.id && savedPct != null && pct !== ''
+  // Mes desde el que rige hoy el % guardado
+  const currentFrom = (rates.length ? String(rates[rates.length - 1]!.valid_from) : startDate).slice(0, 7)
+  const rateMonth = rateFrom ?? (pctChanged ? new Date().toISOString().slice(0, 7) : currentFrom)
+  const rateFromChanged = pctChanged || (rateFrom != null && rateFrom !== currentFrom)
   // En mandato el monto lo aporta SIIGO (cuenta 28150601), no se calcula aquí.
   const preview = isMandate ? 0 : Math.round(valueNum * (pctNum / 100) * 100) / 100
 
@@ -718,7 +724,7 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         percentage:         hasThird ? pctNum : undefined,
         // Cambio de % → desde el mes elegido. Conversión de valor fijo → desde el inicio.
         rate_valid_from:    !hasThird ? undefined
-          : pctChanged ? `${rateFrom}-01`
+          : rateFromChanged && rateMonth ? `${rateMonth}-01`
           : legacyFixed != null && startDate ? `${startDate.slice(0, 7)}-01` : undefined,
         start_date:         hasThird ? (startDate || undefined) : undefined,
         end_date:           hasThird ? (endDate || null) : undefined,
@@ -734,13 +740,22 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
   // En mandato no se exige % (el monto viene del reporte SIIGO).
   const valueOk = isMandate ? true : pct !== ''
   const missingStart = hasThird && !startDate
-  const canSave = value !== '' && (!hasThird || (thirdId && valueOk && startDate && (!pctChanged || !!rateFrom)))
+  const canSave = value !== '' && (!hasThird || (thirdId && valueOk && startDate && (!canSetRateFrom || !!rateMonth)))
   const missing = [
     value === '' && 'el valor del servicio',
     hasThird && !thirdId && 'el tercero',
     hasThird && !valueOk && 'el porcentaje',
     missingStart && 'la fecha de inicio',
   ].filter(Boolean) as string[]
+
+  const rateFromField = canSetRateFrom && (
+    <div>
+      <label className="block text-[11px] font-semibold text-slate-500 mb-1">El {pctNum}% rige desde el mes</label>
+      <input type="month" value={rateMonth} max={pctChanged ? undefined : currentFrom} onChange={e => setRateFrom(e.target.value)}
+        className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${rateFromChanged ? 'border-primary-300' : 'border-slate-200'}`} />
+      <p className="mt-1 text-[10px] text-slate-400">Los meses anteriores conservan el % que tenían.</p>
+    </div>
+  )
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-4">
@@ -824,14 +839,7 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
                 <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
                   className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${pct === '' ? 'border-amber-300' : 'border-slate-200'}`} />
               </div>
-              {pctChanged ? (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">El {pctNum}% rige desde el mes</label>
-                  <input type="month" value={rateFrom} onChange={e => setRateFrom(e.target.value)}
-                    className="w-full border border-primary-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
-                  <p className="mt-1 text-[10px] text-slate-400">Los meses anteriores conservan el {savedPct}%.</p>
-                </div>
-              ) : <div className="hidden sm:block" />}
+              {rateFromField || <div className="hidden sm:block" />}
               {rates.length > 1 && (
                 <div className="sm:col-span-2 text-[11px] text-slate-500">
                   <span className="font-semibold text-slate-600">Historial del %:</span>{' '}
@@ -850,6 +858,7 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
                 <input type="number" min={0} max={100} step="0.01" value={pct} onChange={e => setPct(e.target.value)} placeholder="0"
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
               </div>
+              {rateFromField}
             </>
           )}
           <div>
@@ -1054,6 +1063,7 @@ export function CompaniesPage() {
     { key: 'docs', label: 'Documentos', icon: FileText },
     { key: 'proposals', label: 'Propuestas', icon: FileSignature },
     ...(canParticipations ? [{ key: 'participations' as DetailTab, label: 'Participación de Terceros', icon: Handshake }] : []),
+    { key: 'siigo', label: 'Siigo', icon: PlugZap },
     { key: 'activity', label: 'Actividad', icon: Activity },
   ]
 
@@ -1412,6 +1422,10 @@ export function CompaniesPage() {
 
               {detailTab === 'participations' && (
                 <ParticipationsPanel companyId={selectedId!} />
+              )}
+
+              {detailTab === 'siigo' && (
+                <SiigoConnectionPanel key={selectedId!} companyId={selectedId!} />
               )}
 
               {detailTab === 'activity' && (
