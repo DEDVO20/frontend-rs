@@ -7,6 +7,19 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { FintoIcon, type FintoIconName } from '@/components/ui/FintoIcon'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
+import {
+  CarteraCharts,
+  ComercialCharts,
+  FacturacionCharts,
+  PeriodFilterBar,
+  RecaudoCharts,
+  useChartStyle,
+  usePeriodFilter,
+  useSalesReport,
+  type ChartProps,
+  type PeriodFilter,
+} from '@/pages/siigo/SiigoChartsPage'
+import { SiigoNotConnected } from '@/pages/siigo/siigoBooks'
 
 // ── Pestañas ────────────────────────────────────────────────────────────────
 type TabId = 'general' | 'facturacion' | 'recaudo' | 'cartera' | 'comercial'
@@ -54,10 +67,40 @@ function StatusDot({ tone }: { tone: 'red' | 'amber' | 'green' | 'slate' }) {
   return <span className={cn('inline-block w-2 h-2 rounded-full shrink-0', c)} />
 }
 
+/**
+ * Pestañas con datos de Siigo de los libros de la empresa del cliente.
+ * El filtro de periodo se conserva al cambiar de pestaña.
+ */
+function SiigoDashboardTab({ tab, period, companyName }: {
+  tab: Exclude<TabId, 'general'>
+  period: PeriodFilter
+  companyName: string
+}) {
+  const style = useChartStyle()
+  const params = period.dateParams
+  // La misma consulta (en caché) indica si la empresa tiene su cuenta de Siigo conectada
+  const { data, isLoading } = useSalesReport(params)
+
+  if (isLoading) return <PageLoader />
+  if (data?.notConnected) return <SiigoNotConnected />
+
+  const props: ChartProps = { params, range: period.range, style, scopeName: companyName }
+  return (
+    <>
+      <PeriodFilterBar filter={period} style={style} />
+      {tab === 'facturacion' && <FacturacionCharts {...props} />}
+      {tab === 'recaudo' && <RecaudoCharts {...props} />}
+      {tab === 'cartera' && <CarteraCharts {...props} />}
+      {tab === 'comercial' && <ComercialCharts {...props} />}
+    </>
+  )
+}
+
 export function ClientDashboard() {
   const { user } = useAuthStore()
   const nav = useNavigate()
   const [tab, setTab] = useState<TabId>('general')
+  const period = usePeriodFilter()
 
   const { data, isLoading } = useQuery({
     queryKey: ['client-dashboard'],
@@ -220,24 +263,8 @@ export function ClientDashboard() {
             </div>
           </>
         ) : (
-          // Pestañas pendientes de datos (Facturación, Recaudo, Cartera, Comercial)
-          <Card className="flex flex-col items-center justify-center text-center py-20">
-            <FintoIcon name={TABS.find(t => t.id === tab)!.icon} size={48} className="mb-4 opacity-70" />
-            <h3 className="font-display text-xl font-bold text-navy-900 dark:text-cream-100 mb-1">
-              {TABS.find(t => t.id === tab)!.label}
-            </h3>
-            <p className="text-sm text-navy-900/50 dark:text-cream-100/50 max-w-sm">
-              Esta sección estará disponible próximamente con sus indicadores y gráficas.
-            </p>
-            {tab === 'facturacion' && (
-              <button
-                onClick={() => nav('/app/siigo')}
-                className="mt-5 px-4 py-2.5 rounded-xl bg-gold-500 text-cream-100 text-sm font-semibold font-display hover:opacity-90 transition-opacity"
-              >
-                Ver consulta de facturación Siigo →
-              </button>
-            )}
-          </Card>
+          // Facturación, Recaudo, Cartera y Comercial: gráficas con los libros de Siigo de la empresa
+          <SiigoDashboardTab tab={tab} period={period} companyName={d.company?.name ?? 'Mi empresa'} />
         )}
       </div>
     </div>

@@ -53,7 +53,9 @@ export function useSiigoBooks() {
   const role = useAuthStore(s => s.user?.role ?? '')
   const isInternal = SIIGO_INTERNAL_ROLES.includes(role)
   const [searchParams, setSearchParams] = useSearchParams()
-  const { data: connections = [] } = useSiigoConnections(isInternal)
+  const { data } = useSiigoConnections(isInternal)
+  // Tolerante a una respuesta inesperada: sin lista no hay selector, pero la página sigue funcionando
+  const connections = Array.isArray(data) ? data : []
 
   const requested = isInternal ? searchParams.get('libros') : null
   const selected = connections.find(c => c.id === requested) ?? connections.find(c => c.is_platform) ?? null

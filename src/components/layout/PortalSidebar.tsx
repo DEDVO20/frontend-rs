@@ -13,6 +13,8 @@ type Item = {
   icon: FintoIconName
   external?: boolean
   module?: string
+  /** Solo visible para estos roles (sin definir = todos) */
+  roles?: string[]
   badgeKey?: string
 }
 
@@ -24,7 +26,8 @@ const GROUPS: Group[] = [
     items: [
       { to: '/app/dashboard',   label: 'Dashboard',         icon: 'dashboard' },
       { to: '/app/siigo',       label: 'Facturación Siigo', icon: 'facturacion' },
-      { to: '/app/siigo-graficas', label: 'Gráficas de facturación', icon: 'analytics' },
+      // Los clientes ven estas gráficas en las pestañas del Dashboard; la página aparte es para el contador
+      { to: '/app/siigo-graficas', label: 'Gráficas Siigo', icon: 'analytics', roles: ['contador'] },
       { to: '/app/my-company',  label: 'Perfil empresa',    icon: 'perfil-empresa' },
       { to: '/app/tasks',       label: 'Tareas',         icon: 'tareas',      badgeKey: 'overdueTasks' },
       { to: '/app/documents',   label: 'Documentos',     icon: 'documentos' },
@@ -78,8 +81,9 @@ export function PortalSidebar({ onClose }: Props) {
   })
 
   const moduleItems = MODULE_ITEMS.filter(i => !i.module || user?.modules?.includes(i.module))
+  const byRole = (i: Item) => !i.roles || i.roles.includes(user?.role ?? '')
   const groups: Group[] = [
-    ...GROUPS,
+    ...GROUPS.map(g => ({ ...g, items: g.items.filter(byRole) })),
     ...(moduleItems.length ? [{ title: 'Módulos', items: moduleItems }] : []),
     SYSTEM,
   ]

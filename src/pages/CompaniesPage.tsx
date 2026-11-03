@@ -679,6 +679,7 @@ function NewTerceroModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
 function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; terceros: any[]; onNewTercero: () => void }) {
   const qc = useQueryClient()
+  const confirm = useConfirm()
   const [value, setValue] = useState<string>(row.service_value != null ? String(row.service_value) : '')
   const [hasThird, setHasThird] = useState<boolean>(row.has_third_party)
   const [thirdId, setThirdId] = useState<string>(row.third_party?.id ?? '')
@@ -751,6 +752,26 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
     },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al guardar'),
   })
+
+  // Guardar: si cambia el mes desde el que rige el %, pedir confirmación antes
+  // (recalcula las OC de ese mes en adelante con el nuevo %).
+  const handleSave = () => {
+    if (!(hasThird && rateFromChanged && rateMonth)) { saveMut.mutate(); return }
+    const fmtMonth = (ym: string) => {
+      const [y, m] = ym.split('-').map(Number)
+      return new Date(y!, (m ?? 1) - 1, 1).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+    }
+    const before = savedPct != null && currentFrom ? `${savedPct}% desde ${fmtMonth(currentFrom)}` : null
+    confirm({
+      title: '¿Cambiar el mes desde el que rige el %?',
+      description: `El ${pctNum}% regirá desde ${fmtMonth(rateMonth)}${before ? ` (hoy: ${before})` : ''}. ` +
+        'Las OC desde ese mes se recalcularán con este %; los meses anteriores conservan el que tenían.',
+      type: 'warning',
+      confirmLabel: 'Sí, cambiar',
+      // El error ya lo muestra onError (toast); aquí solo se evita el rechazo sin capturar.
+      onConfirm: () => saveMut.mutateAsync().then(() => setRateFrom(null)).catch(() => {}),
+    })
+  }
 
   // En mandato no se exige % (el monto viene del reporte SIIGO).
   const valueOk = isMandate ? true : pct !== ''
@@ -929,7 +950,7 @@ function ServiceParticipationCard({ row, terceros, onNewTercero }: { row: any; t
         {!canSave && missing.length > 0 && (
           <p className="text-[11px] text-amber-700">Falta {missing.join(', ')}.</p>
         )}
-        <Button size="sm" loading={saveMut.isPending} disabled={!canSave} onClick={() => saveMut.mutate()}>Guardar</Button>
+        <Button size="sm" loading={saveMut.isPending} disabled={!canSave} onClick={handleSave}>Guardar</Button>
       </div>
     </div>
   )

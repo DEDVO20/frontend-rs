@@ -28,13 +28,14 @@ import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
 import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { SiigoConsultationPage } from '@/pages/siigo/SiigoConsultationPage'
-import { SiigoCollectionsPage, SiigoLayout } from '@/pages/siigo/SiigoLayout'
+import { SiigoCollectionsPage, SiigoLayout, SIIGO_INTERNAL_ROLES } from '@/pages/siigo/SiigoLayout'
 import { SiigoTrialBalancePage } from '@/pages/siigo/SiigoTrialBalancePage'
 import { SiigoChartsPage } from '@/pages/siigo/SiigoChartsPage'
 import { TaxProfilesPage } from '@/pages/tax/TaxProfilesPage'
 import { ThirdPartiesPage } from '@/pages/tax/ThirdPartiesPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
 import { BlogAdminPage } from '@/pages/admin/BlogAdminPage'
+import { ServicesAdminPage } from '@/pages/admin/ServicesAdminPage'
 import { LeadsPage }     from '@/pages/LeadsPage'
 import { DataPolicyPage } from '@/pages/DataPolicyPage'
 import { TermsPage }     from '@/pages/TermsPage'
@@ -59,6 +60,12 @@ function SmartDashboard() {
   // El contador aterriza directo en su dashboard contable
   if (role === 'contador') return <Navigate to="/app/accounting" replace />
   return INTERNAL_ROLES.includes(role) ? <DashboardPage /> : <ClientDashboard />
+}
+
+/** Los clientes tienen estas gráficas en las pestañas de su Dashboard */
+function SmartSiigoCharts() {
+  const role = useAuthStore(s => s.user?.role ?? '')
+  return SIIGO_INTERNAL_ROLES.includes(role) ? <SiigoChartsPage /> : <Navigate to="/app/dashboard" replace />
 }
 
 function SmartTasks() {
@@ -107,7 +114,7 @@ export const router = createBrowserRouter([
           { path: 'balance',     element: <SiigoTrialBalancePage /> },
         ],
       },
-      { path: 'siigo-graficas', element: <SiigoChartsPage /> },
+      { path: 'siigo-graficas', element: <SmartSiigoCharts /> },
       { path: 'tax-profiles', element: <TaxProfilesPage /> },
       { path: 'third-parties', element: <ThirdPartiesPage /> },
       { path: 'onboarding',   element: <OnboardingPage /> },
@@ -116,6 +123,7 @@ export const router = createBrowserRouter([
       { path: 'companies',    element: <CompaniesPage /> },
       { path: 'requests',     element: <SmartRequests /> },
       { path: 'dashboards-bi', element: <DashboardsBIPage /> },
+      { path: 'services',     element: <ServicesAdminPage /> },
       { path: 'task-templates', element: <TaskTemplatesPage /> },
       { path: 'profiles',     element: <ProfilesPage /> },
       { path: 'roles',        element: <RolesPage /> },
