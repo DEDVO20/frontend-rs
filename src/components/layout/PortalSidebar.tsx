@@ -25,7 +25,8 @@ const GROUPS: Group[] = [
     title: 'Principal',
     items: [
       { to: '/app/dashboard',   label: 'Dashboard',         icon: 'dashboard' },
-      { to: '/app/siigo',       label: 'Facturación Siigo', icon: 'facturacion' },
+      // Oculto para el cliente: solo el contador consulta la facturación Siigo
+      { to: '/app/siigo',       label: 'Facturación Siigo', icon: 'facturacion', roles: ['contador'] },
       // Los clientes ven estas gráficas en las pestañas del Dashboard; la página aparte es para el contador
       { to: '/app/siigo-graficas', label: 'Gráficas Siigo', icon: 'analytics', roles: ['contador'] },
       { to: '/app/my-company',  label: 'Perfil empresa',    icon: 'perfil-empresa' },
@@ -40,7 +41,6 @@ const GROUPS: Group[] = [
 const MODULE_ITEMS: Item[] = [
   { to: '/app/accounting',     label: 'Contabilidad',   icon: 'doc-money', module: 'accounting' },
   { to: '/app/participations', label: 'Participaciones', icon: 'briefcase', module: 'participations' },
-  { to: '/app/dashboards-bi',  label: 'Dashboards BI',  icon: 'analytics' },
 ]
 
 const SYSTEM: Group = {

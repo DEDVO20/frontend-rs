@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import {
   Area,
   AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   LabelList,
   Legend,
   ReferenceLine,
@@ -22,6 +24,7 @@ import { PortalTopBar } from '@/components/layout/PortalTopBar'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { useThemeStore } from '@/stores/themeStore'
+import { useSiigoSyncStore } from '@/stores/siigoSyncStore'
 import { SiigoBooksSelect, SiigoNotConnected, useSiigoBooks, type SiigoBooksInfo } from './siigoBooks'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff', 'contador']
@@ -90,7 +93,7 @@ interface CollectionsReport {
   lastSync: { started_at: string; end_date: string; status: string } | null
 }
 
-type ViewTab = 'facturacion' | 'recaudo' | 'balance'
+type ViewTab = 'facturacion' | 'recaudo' | 'cartera' | 'balance'
 
 interface BalanceMonthly {
   period: string
@@ -356,7 +359,7 @@ export function SiigoChartsPage() {
       {...(isInternal ? { 'data-theme': 'light', style: { colorScheme: 'light' } } : {})}
     >
       {isInternal ? (
-        <TopBar title="Gráficas de facturación" subtitle="Facturación, recaudo y balance de prueba mes a mes (Siigo)" />
+        <TopBar title="Gráficas de facturación" subtitle="Facturación, recaudo, cartera y balance de prueba (Siigo)" />
       ) : (
         <PortalTopBar
           title="Gráficas de facturación"
@@ -391,6 +394,7 @@ export function SiigoChartsPage() {
             {([
               { id: 'facturacion', label: 'Facturación' },
               { id: 'recaudo', label: 'Recaudo' },
+              { id: 'cartera', label: 'Cartera' },
               { id: 'balance', label: 'Balance' },
             ] as const).map(t => (
               <button
@@ -411,6 +415,7 @@ export function SiigoChartsPage() {
           </div>
 
           {tab === 'balance' ? <BalanceCharts {...chartProps} />
+            : tab === 'cartera' ? <CarteraCharts {...chartProps} />
             : tab === 'recaudo' ? <RecaudoCharts {...chartProps} />
               : <FacturacionCharts {...chartProps} />}
         </>)}
@@ -1044,122 +1049,260 @@ export function BalanceCharts({ params, range, style, scopeName }: ChartProps) {
 
 const pct = (part: number, total: number) => (total > 0 ? `${Math.round((part / total) * 100)}%` : '—')
 
+interface ReceivablesReport {
+  scope: 'global' | 'company'
+  books: SiigoBooksInfo | null
+  isSyncRunning: boolean
+  lastSync: { started_at: string; status: string; cut_date: string; error_message: string | null } | null
+  lastSuccess: { started_at: string; cut_date: string } | null
+  cutDate: string | null
+  summary: {
+    total: number
+    vencido: number
+    porVencer: number
+    facturas: number
+    clientes: number
+    diasPromedioMora: number
+    reduccionControl: number
+  } | null
+  byBucket: { bucket: string; total: number; facturas: number }[]
+  byCustomer: { nit: string; name: string; companyId: string | null; total: number; vencido: number; facturas: number; maxDias: number }[]
+  bySeller: { seller: string; total: number; vencido: number; facturas: number }[]
+  oldest: { invoice: string; customer: string; dueDate: string; dias: number; balance: number }[]
+  history: { cutDate: string; total: number; vencido: number }[]
+}
+
+const SYNC_ROLES = ['admin', 'rs_admin', 'contador']
+
+const fmtDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
+
 /**
- * Cartera: cuentas por cobrar (clase 13) del balance de prueba de los libros consultados.
- * Saldo al cierre de cada mes y clientes con mayor saldo en el último mes importado.
+ * Cartera: facturas con saldo a la fecha de corte (Siigo /v1/invoices), con el saldo de cada cliente
+ * limitado a su saldo contable en 130505 + 13051001. Foto diaria; el periodo solo filtra la evolución.
+ * Es independiente de las importaciones del módulo de cobro.
  */
 export function CarteraCharts({ params, style, scopeName }: ChartProps) {
   const { colors, isDark, isInternal, cardCls, titleCls, mutedCls } = style
-  const { data, isLoading } = useBalanceReport(params)
+  const role = useAuthStore(s => s.user?.role ?? '')
+  const canSync = SYNC_ROLES.includes(role)
+  const qc = useQueryClient()
+  const startWatching = useSiigoSyncStore(s => s.start)
 
-  const monthly = useMemo(
-    () => (data?.monthly ?? []).map(m => ({
-      period: m.period,
-      label: fmtPeriod(m.period),
-      cartera: Number(m.cartera ?? 0),
-      anticipos: Number(m.anticipos ?? 0),
-    })),
-    [data?.monthly],
-  )
-  const deudores = useMemo(
-    () => (data?.topCartera ?? []).map(t => ({ name: t.name, nit: t.nit, total: Number(t.saldo) })),
-    [data?.topCartera],
+  const { data, isLoading } = useQuery<ReceivablesReport>({
+    queryKey: ['siigo-receivables-report', params],
+    queryFn: async () => (await api.get('/api/siigo/receivables/report', { params })).data,
+    staleTime: 30_000,
+    // Mientras corre una sincronización se refresca su estado
+    refetchInterval: q => (q.state.data?.isSyncRunning ? 10_000 : false),
+  })
+
+  const syncMut = useMutation({
+    mutationFn: async () => (await api.post('/api/siigo/receivables/sync', { connectionId: data?.books?.connectionId })).data,
+    onSuccess: (res) => {
+      startWatching('receivables', res.connectionId, data?.books?.label ?? 'Finto')
+      toast.info('Cálculo de cartera iniciado en segundo plano. Te avisaremos cuando termine.')
+      qc.invalidateQueries({ queryKey: ['siigo-receivables-report'] })
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudo iniciar la sincronización de cartera'),
+  })
+
+  const history = useMemo(
+    () => (data?.history ?? []).map(h => ({ label: fmtDay(h.cutDate), total: Number(h.total), vencido: Number(h.vencido) })),
+    [data?.history],
   )
 
   if (isLoading) return <PageLoader />
-  if (!monthly.length) {
+
+  const s = data?.summary
+  const running = Boolean(data?.isSyncRunning || syncMut.isPending)
+  const syncBar = canSync && (
+    <div className={cn(cardCls, 'flex flex-wrap items-center justify-between gap-3 py-3')}>
+      <p className={cn('text-xs', mutedCls)}>
+        {data?.lastSuccess
+          ? `Cartera con corte al ${fmtDay(data.lastSuccess.cut_date)} · calculada el ${new Date(data.lastSuccess.started_at).toLocaleString('es-CO')}`
+          : 'La cartera aún no se ha calculado para estos libros.'}
+        {data?.lastSync?.status === 'failed' && (
+          <span className="block text-red-600">Último intento fallido: {data.lastSync.error_message}</span>
+        )}
+      </p>
+      <button
+        onClick={() => syncMut.mutate()}
+        disabled={running}
+        className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60"
+      >
+        {running ? 'Calculando cartera…' : 'Actualizar cartera desde Siigo'}
+      </button>
+    </div>
+  )
+
+  if (!s || !s.facturas) {
     return (
-      <div className={cn(cardCls, 'py-16 text-center space-y-2')}>
-        <BarChart3 className={cn('w-10 h-10 mx-auto', mutedCls)} />
-        <p className={cn('font-semibold', titleCls)}>No hay cartera en el periodo seleccionado</p>
-        <p className={cn('text-xs', mutedCls)}>La cartera sale del balance de prueba; aún no hay meses importados en este periodo.</p>
-      </div>
+      <>
+        {syncBar}
+        <div className={cn(cardCls, 'py-16 text-center space-y-2')}>
+          <BarChart3 className={cn('w-10 h-10 mx-auto', mutedCls)} />
+          <p className={cn('font-semibold', titleCls)}>No hay cartera calculada</p>
+          <p className={cn('text-xs', mutedCls)}>
+            {data?.scope === 'company'
+              ? 'Este cliente no tiene facturas con saldo en la última cartera calculada.'
+              : 'La cartera se calcula cada día desde Siigo; aún no hay una foto disponible.'}
+          </p>
+        </div>
+      </>
     )
   }
 
   const axisProps = { tick: { fill: colors.axis, fontSize: 11 }, tickLine: false, axisLine: false }
   const tile = { cardCls, titleCls, mutedCls }
-  const last = monthly[monthly.length - 1]!
-  const prev = monthly.length > 1 ? monthly[monthly.length - 2]! : null
-  const lastLabel = fmtPeriod(last.period)
-  const variacion = prev ? last.cartera - prev.cartera : null
-  const top5 = deudores.slice(0, 5).reduce((s, d) => s + d.total, 0)
+  const cut = data?.cutDate ? fmtDay(data.cutDate) : ''
+  const buckets = (data?.byBucket ?? [])
+    .filter(b => b.bucket !== 'Sin vencimiento' || Number(b.total) > 0)
+    .map(b => ({ name: b.bucket === 'No vencido' ? 'Por vencer' : b.bucket === 'Sin vencimiento' ? b.bucket : `${b.bucket} días`, bucket: b.bucket, total: Number(b.total), facturas: b.facturas }))
+  const customers = (data?.byCustomer ?? []).map(c => ({
+    name: c.name, nit: c.nit, total: Number(c.total), vencido: Number(c.vencido), porVencer: Number(c.total) - Number(c.vencido), facturas: c.facturas, maxDias: c.maxDias,
+  }))
+  const sellers = (data?.bySeller ?? []).map(v => ({ name: v.seller, total: Number(v.total), vencido: Number(v.vencido), facturas: v.facturas }))
+  const bucketColor = (bucket: string) => bucket === 'No vencido' ? colors.facturado : bucket === 'Sin vencimiento' ? colors.axis : colors.notas
+  const legend = (
+    <Legend
+      verticalAlign="top"
+      align="right"
+      iconType="circle"
+      iconSize={8}
+      wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
+      formatter={(value: string) => <span style={{ color: colors.axis }}>{value}</span>}
+    />
+  )
 
   return (
     <>
+      {syncBar}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatTile label={`Saldo de cartera · ${lastLabel}`} value={fmtCompact(last.cartera)} title={fmtMoney(last.cartera)} {...tile} />
-        <StatTile
-          label={prev ? `Variación vs ${fmtPeriod(prev.period)}` : 'Variación mensual'}
-          value={variacion === null ? '—' : `${variacion > 0 ? '+' : ''}${fmtCompact(variacion)}`}
-          title={variacion === null ? undefined : fmtMoney(variacion)}
-          {...tile}
-        />
-        <StatTile label={`Anticipos de clientes · ${lastLabel}`} value={fmtCompact(last.anticipos)} title={fmtMoney(last.anticipos)} {...tile} />
-        <StatTile label="Concentración en 5 mayores" value={deudores.length ? pct(top5, last.cartera) : '—'} {...tile} />
+        <StatTile label={`Cartera total · ${cut}`} value={fmtCompact(s.total)} title={fmtMoney(s.total)} {...tile} />
+        <StatTile label="Cartera vencida" value={fmtCompact(s.vencido)} title={`${fmtMoney(s.vencido)} · ${pct(s.vencido, s.total)} del total`} {...tile} />
+        <StatTile label="Mora promedio (ponderada)" value={s.diasPromedioMora ? `${s.diasPromedioMora} días` : '—'} {...tile} />
+        <StatTile label="Facturas / clientes con saldo" value={`${s.facturas} / ${s.clientes}`} {...tile} />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {/* Edades */}
         <section className={cardCls}>
           <ChartHeader
-            title="Saldo de cartera mes a mes"
-            subtitle={`${scopeName} · cuentas por cobrar (13) al cierre de cada mes`}
+            title={`Cartera por edades · ${cut}`}
+            subtitle={`${scopeName} · saldo por días vencidos (azul por vencer, dorado vencido)`}
             titleCls={titleCls}
             mutedCls={mutedCls}
           />
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthly} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <BarChart data={buckets} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke={colors.grid} />
-                <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={12} />
+                <XAxis dataKey="name" {...axisProps} />
                 <YAxis {...axisProps} tickFormatter={fmtCompact} width={64} />
                 <Tooltip
-                  cursor={{ stroke: colors.axis, strokeOpacity: 0.4 }}
-                  content={<ChartTooltip isDark={isDark} isInternal={isInternal} rows={[
-                    { key: 'cartera', label: 'Cartera', color: colors.facturado },
-                    { key: 'anticipos', label: 'Anticipos' },
-                  ]} />}
+                  cursor={{ fill: colors.grid }}
+                  content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[{ key: 'total', label: 'Saldo' }]} />}
                 />
-                <Area
-                  // Saldos al cierre de cada mes: tramos rectos, sin suavizar entre fotos mensuales
-                  type="linear"
-                  dataKey="cartera"
-                  stroke={colors.facturado}
-                  strokeWidth={2}
-                  fill={colors.facturado}
-                  fillOpacity={0.1}
-                  dot={monthly.length < 3 ? { r: 4, fill: colors.facturado } : false}
-                  activeDot={{ r: 5, stroke: isDark ? '#1a2545' : (isInternal ? '#ffffff' : '#fff7e4'), strokeWidth: 2 }}
-                />
-              </AreaChart>
+                <Bar dataKey="total" maxBarSize={40} radius={[4, 4, 0, 0]}>
+                  {buckets.map(b => <Cell key={b.bucket} fill={bucketColor(b.bucket)} />)}
+                  <LabelList dataKey="total" position="top" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
           <DataTable
             mutedCls={mutedCls}
             isInternal={isInternal}
-            headers={['Mes', 'Cartera', 'Anticipos']}
-            rows={monthly.map(m => [m.label, fmtMoney(m.cartera), fmtMoney(m.anticipos)])}
+            headers={['Edad', 'Facturas', 'Saldo', 'Participación']}
+            rows={buckets.map(b => [b.name, String(b.facturas), fmtMoney(b.total), pct(b.total, s.total)])}
           />
         </section>
 
+        {/* Evolución */}
         <section className={cardCls}>
-          <ChartHeader
-            title={`Clientes con mayor saldo · ${lastLabel}`}
-            subtitle="Saldo en cuentas por cobrar de cada cliente al cierre"
-            titleCls={titleCls}
-            mutedCls={mutedCls}
-          />
-          {deudores.length ? (
-            <div style={{ height: Math.max(180, deudores.length * 40) }}>
+          <ChartHeader title="Evolución de la cartera" subtitle="Total y vencida en cada cálculo diario del periodo" titleCls={titleCls} mutedCls={mutedCls} />
+          {history.length >= 2 ? (
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={deudores} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }}>
+                <AreaChart data={history} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid vertical={false} stroke={colors.grid} />
+                  <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
+                  <YAxis {...axisProps} tickFormatter={fmtCompact} width={64} />
+                  <Tooltip
+                    cursor={{ stroke: colors.axis, strokeOpacity: 0.4 }}
+                    content={<ChartTooltip isDark={isDark} isInternal={isInternal} rows={[
+                      { key: 'total', label: 'Total', color: colors.facturado },
+                      { key: 'vencido', label: 'Vencida', color: colors.notas },
+                    ]} />}
+                  />
+                  {legend}
+                  <Area type="linear" dataKey="total" name="Total" stroke={colors.facturado} strokeWidth={2} fill={colors.facturado} fillOpacity={0.1} dot={false} />
+                  <Area type="linear" dataKey="vencido" name="Vencida" stroke={colors.notas} strokeWidth={2} fill={colors.notas} fillOpacity={0.1} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className={cn('text-sm py-16 text-center', mutedCls)}>
+              La evolución se construye con cada cálculo diario; vuelve en unos días para ver la tendencia.
+            </p>
+          )}
+        </section>
+      </div>
+
+      {/* Clientes */}
+      <section className={cardCls}>
+        <ChartHeader
+          title={`Clientes con mayor saldo · ${cut}`}
+          subtitle={`Saldo vencido y por vencer de cada cliente${customers.length >= 15 ? ' · top 15' : ''}`}
+          titleCls={titleCls}
+          mutedCls={mutedCls}
+        />
+        <div style={{ height: Math.max(180, customers.length * 36) }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={customers} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }}>
+              <CartesianGrid horizontal={false} stroke={colors.grid} />
+              <XAxis type="number" {...axisProps} tickFormatter={fmtCompact} />
+              <YAxis type="category" dataKey="name" {...axisProps} width={190} tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />} />
+              <Tooltip
+                cursor={{ fill: colors.grid }}
+                content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
+                  { key: 'vencido', label: 'Vencido', color: colors.notas },
+                  { key: 'porVencer', label: 'Por vencer', color: colors.facturado },
+                  { key: 'total', label: 'Total' },
+                ]} />}
+              />
+              {legend}
+              <Bar dataKey="vencido" name="Vencido" stackId="c" fill={colors.notas} maxBarSize={22} />
+              <Bar dataKey="porVencer" name="Por vencer" stackId="c" fill={colors.facturado} maxBarSize={22} radius={[0, 4, 4, 0]}>
+                <LabelList dataKey="total" position="right" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <DataTable
+          mutedCls={mutedCls}
+          isInternal={isInternal}
+          headers={['Cliente', 'NIT', 'Facturas', 'Vencido', 'Total', 'Mayor mora', 'Participación']}
+          rows={customers.map(c => [c.name, c.nit, String(c.facturas), fmtMoney(c.vencido), fmtMoney(c.total), c.maxDias > 0 ? `${c.maxDias} días` : '—', pct(c.total, s.total)])}
+        />
+      </section>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        {sellers.length > 1 && (
+          <section className={cardCls}>
+            <ChartHeader title="Cartera por vendedor" subtitle="Saldo total de las facturas de cada vendedor" titleCls={titleCls} mutedCls={mutedCls} />
+            <div style={{ height: Math.max(160, sellers.length * 40) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={sellers} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }}>
                   <CartesianGrid horizontal={false} stroke={colors.grid} />
                   <XAxis type="number" {...axisProps} tickFormatter={fmtCompact} />
-                  <YAxis type="category" dataKey="name" {...axisProps} width={170} tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />} />
+                  <YAxis type="category" dataKey="name" {...axisProps} width={150} tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />} />
                   <Tooltip
                     cursor={{ fill: colors.grid }}
                     content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
-                      { key: 'total', label: 'Saldo', color: colors.facturado },
+                      { key: 'total', label: 'Total', color: colors.facturado },
+                      { key: 'vencido', label: 'Vencido' },
                     ]} />}
                   />
                   <Bar dataKey="total" fill={colors.facturado} maxBarSize={24} radius={[0, 4, 4, 0]}>
@@ -1168,17 +1311,48 @@ export function CarteraCharts({ params, style, scopeName }: ChartProps) {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          ) : (
-            <p className={cn('text-sm py-10 text-center', mutedCls)}>Sin saldos por cliente en el último mes.</p>
-          )}
-          <DataTable
-            mutedCls={mutedCls}
-            isInternal={isInternal}
-            headers={['Cliente', 'NIT', 'Saldo', 'Participación']}
-            rows={deudores.map(d => [d.name, d.nit, fmtMoney(d.total), pct(d.total, last.cartera)])}
-          />
-        </section>
+            <DataTable
+              mutedCls={mutedCls}
+              isInternal={isInternal}
+              headers={['Vendedor', 'Facturas', 'Vencido', 'Total']}
+              rows={sellers.map(v => [v.name, String(v.facturas), fmtMoney(v.vencido), fmtMoney(v.total)])}
+            />
+          </section>
+        )}
+
+        {(data?.oldest ?? []).length > 0 && (
+          <section className={cardCls}>
+            <ChartHeader title="Facturas con más días vencidos" subtitle="Las 10 facturas con mayor mora a la fecha de corte" titleCls={titleCls} mutedCls={mutedCls} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className={cn('text-left', mutedCls)}>
+                    {['Factura', 'Cliente', 'Vencimiento', 'Días', 'Saldo'].map((h, i) => (
+                      <th key={h} className={cn('py-1.5 px-2 font-semibold', i > 2 && 'text-right')}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className={cn('divide-y', isInternal ? 'divide-slate-100 text-slate-700' : 'divide-navy-900/5 dark:divide-white/5 text-navy-900 dark:text-cream-100/90')}>
+                  {data!.oldest.map(o => (
+                    <tr key={o.invoice}>
+                      <td className="py-1.5 px-2 font-mono whitespace-nowrap">{o.invoice}</td>
+                      <td className="py-1.5 px-2 truncate max-w-[180px]" title={o.customer}>{o.customer}</td>
+                      <td className="py-1.5 px-2 whitespace-nowrap">{fmtDay(o.dueDate)}</td>
+                      <td className="py-1.5 px-2 text-right font-mono">{o.dias}</td>
+                      <td className="py-1.5 px-2 text-right font-mono whitespace-nowrap">{fmtMoney(Number(o.balance))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </div>
+
+      <p className={cn('text-xs', mutedCls)}>
+        Facturas de Siigo con saldo a la fecha de corte. El saldo de cada cliente se limita a su saldo contable en las cuentas
+        130505 y 13051001{s.reduccionControl > 0 ? ` (se descontaron ${fmtMoney(s.reduccionControl)} de las facturas más antiguas)` : ''}.
+      </p>
     </>
   )
 }

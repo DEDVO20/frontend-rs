@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type SiigoSyncKind = 'sales' | 'collections' | 'trialBalance'
+export type SiigoSyncKind = 'sales' | 'collections' | 'trialBalance' | 'receivables'
 
 export interface WatchedSync {
   kind: SiigoSyncKind

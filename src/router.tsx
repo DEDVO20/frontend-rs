@@ -24,13 +24,13 @@ import { RolesPage } from '@/pages/RolesPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { RequestsPage } from '@/pages/RequestsPage'
 import { ClientRequestsPage } from '@/pages/client/ClientRequestsPage'
-import { DashboardsBIPage } from '@/pages/DashboardsBIPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
 import { ParticipationsPage } from '@/pages/participations/ParticipationsPage'
 import { SiigoConsultationPage } from '@/pages/siigo/SiigoConsultationPage'
 import { SiigoCollectionsPage, SiigoLayout, SIIGO_INTERNAL_ROLES } from '@/pages/siigo/SiigoLayout'
 import { SiigoTrialBalancePage } from '@/pages/siigo/SiigoTrialBalancePage'
 import { SiigoChartsPage } from '@/pages/siigo/SiigoChartsPage'
+import { SiigoReceivablesPage } from '@/pages/siigo/SiigoReceivablesPage'
 import { TaxProfilesPage } from '@/pages/tax/TaxProfilesPage'
 import { ThirdPartiesPage } from '@/pages/tax/ThirdPartiesPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
@@ -66,6 +66,12 @@ function SmartDashboard() {
 function SmartSiigoCharts() {
   const role = useAuthStore(s => s.user?.role ?? '')
   return SIIGO_INTERNAL_ROLES.includes(role) ? <SiigoChartsPage /> : <Navigate to="/app/dashboard" replace />
+}
+
+/** Facturación Siigo está oculta para el cliente: solo equipo interno y contador */
+function SmartSiigo() {
+  const role = useAuthStore(s => s.user?.role ?? '')
+  return SIIGO_INTERNAL_ROLES.includes(role) ? <SiigoLayout /> : <Navigate to="/app/dashboard" replace />
 }
 
 function SmartTasks() {
@@ -105,12 +111,13 @@ export const router = createBrowserRouter([
       { path: 'participations', element: <ParticipationsPage /> },
       {
         path: 'siigo',
-        element: <SiigoLayout />,
+        element: <SmartSiigo />,
         children: [
           { index: true,         element: <Navigate to="facturacion" replace /> },
           { path: 'facturacion', element: <SiigoConsultationPage /> },
           // Clientes y equipo: cada uno ve los libros que le corresponden (el backend aplica el alcance)
           { path: 'recaudo',     element: <SiigoCollectionsPage /> },
+          { path: 'cartera',     element: <SiigoReceivablesPage /> },
           { path: 'balance',     element: <SiigoTrialBalancePage /> },
         ],
       },
@@ -122,7 +129,6 @@ export const router = createBrowserRouter([
       { path: 'documents',    element: <SmartDocuments /> },
       { path: 'companies',    element: <CompaniesPage /> },
       { path: 'requests',     element: <SmartRequests /> },
-      { path: 'dashboards-bi', element: <DashboardsBIPage /> },
       { path: 'services',     element: <ServicesAdminPage /> },
       { path: 'task-templates', element: <TaskTemplatesPage /> },
       { path: 'profiles',     element: <ProfilesPage /> },

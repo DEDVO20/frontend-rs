@@ -1,5 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
+import { Pencil } from 'lucide-react'
 import { api } from '@/lib/api'
 import { PortalTopBar } from '@/components/layout/PortalTopBar'
 import { PageLoader } from '@/components/ui/Spinner'
@@ -46,6 +49,92 @@ function Field({ label, value }: { label: string; value?: string | null }) {
     <div>
       <p className="text-[11px] font-bold text-brand-600 dark:text-brand-300 uppercase tracking-wider">{label}</p>
       <p className="text-sm font-medium text-navy-900 dark:text-cream-100 mt-0.5 break-words">{value || '—'}</p>
+    </div>
+  )
+}
+
+/** Sitio web editable por el dueño de la empresa (los demás solo lo ven) */
+function WebsiteField({ companyId, value, canEdit }: { companyId: string; value?: string | null; canEdit: boolean }) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? '')
+
+  const saveMut = useMutation({
+    mutationFn: async (website: string) => (await api.patch(`/api/companies/${companyId}`, { website: website.trim() })).data,
+    onSuccess: () => {
+      toast.success('Sitio web actualizado')
+      setEditing(false)
+      qc.invalidateQueries({ queryKey: ['my-company', companyId] })
+      qc.invalidateQueries({ queryKey: ['client-dashboard'] })
+    },
+    onError: (err: any) => {
+      const issues = err.response?.data?.error?.issues ?? err.response?.data?.issues
+      toast.error(issues?.[0]?.message ?? err.response?.data?.error ?? 'No se pudo guardar el sitio web')
+    },
+  })
+
+  const href = value ? (/^https?:\/\//i.test(value) ? value : `https://${value}`) : ''
+
+  if (editing) {
+    return (
+      <div>
+        <p className="text-[11px] font-bold text-brand-600 dark:text-brand-300 uppercase tracking-wider">Sitio web</p>
+        <form
+          className="flex items-center gap-2 mt-1"
+          onSubmit={e => { e.preventDefault(); saveMut.mutate(draft) }}
+        >
+          <input
+            autoFocus
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            placeholder="www.miempresa.com"
+            aria-label="Sitio web"
+            className="flex-1 min-w-0 px-3 py-1.5 text-sm rounded-xl border border-navy-900/10 bg-white text-navy-900
+                       dark:border-white/10 dark:bg-navy-800 dark:text-cream-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+          <button
+            type="submit"
+            disabled={saveMut.isPending}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-navy-900 text-cream-100 hover:bg-navy-800 dark:bg-brand-600 dark:hover:bg-brand-500 disabled:opacity-60"
+          >
+            {saveMut.isPending ? 'Guardando…' : 'Guardar'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setEditing(false); setDraft(value ?? '') }}
+            className="px-2 py-1.5 text-xs font-semibold text-navy-900/60 hover:text-navy-900 dark:text-cream-100/60 dark:hover:text-cream-100"
+          >
+            Cancelar
+          </button>
+        </form>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] font-bold text-brand-600 dark:text-brand-300 uppercase tracking-wider">Sitio web</p>
+      <div className="flex items-center gap-2 mt-0.5">
+        {value ? (
+          <a href={href} target="_blank" rel="noopener noreferrer"
+             className="text-sm font-medium text-navy-900 dark:text-cream-100 break-all hover:underline">
+            {value}
+          </a>
+        ) : (
+          <p className="text-sm font-medium text-navy-900 dark:text-cream-100">—</p>
+        )}
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => { setDraft(value ?? ''); setEditing(true) }}
+            aria-label="Editar sitio web"
+            title="Editar sitio web"
+            className="p-1 rounded-lg text-navy-900/50 hover:text-navy-900 hover:bg-navy-900/5 dark:text-cream-100/50 dark:hover:text-cream-100 dark:hover:bg-white/5"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -97,7 +186,7 @@ export function MyCompanyPage() {
               <Field label="Razón social" value={co.name} />
               <Field label="Ciudad" value={co.city} />
               <Field label="Teléfono" value={co.phone} />
-              <Field label="Sitio web" value={co.website} />
+              <WebsiteField key={co.website ?? ''} companyId={companyId} value={co.website} canEdit={user?.role === 'client_owner'} />
               <Field label="NIT" value={co.nit} />
             </div>
 

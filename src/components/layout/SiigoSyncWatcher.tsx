@@ -10,6 +10,7 @@ const SOURCES: Record<SiigoSyncKind, { url: string; queryKeys: string[][] }> = {
   sales:        { url: '/api/siigo/sync-logs',               queryKeys: [['siigo-sales'], ['siigo-report']] },
   collections:  { url: '/api/siigo/collections/sync-logs',   queryKeys: [['siigo-collections'], ['siigo-collections-report']] },
   trialBalance: { url: '/api/siigo/trial-balance/sync-logs', queryKeys: [['siigo-trial-balance'], ['siigo-trial-balance-report']] },
+  receivables:  { url: '/api/siigo/receivables/sync-logs',   queryKeys: [['siigo-receivables'], ['siigo-receivables-report']] },
 }
 
 function successMessage(w: WatchedSync, log: any): string {
@@ -20,6 +21,9 @@ function successMessage(w: WatchedSync, log: any): string {
     return `Balance de prueba de ${w.label}: ${log.months_ok} mes(es) correctos` +
       (log.months_failed ? `, ${log.months_failed} con error (se conservaron sus datos anteriores)` : '') +
       ` · ${log.rows_count} filas en ${log.duration_sec}s`
+  }
+  if (w.kind === 'receivables') {
+    return `Cartera de ${w.label} al ${log.cut_date}: ${log.invoices_count} facturas de ${log.customers_count} clientes en ${log.duration_sec}s`
   }
   return `Recaudo de ${w.label} sincronizado: ${log.vouchers_count} recibos y ${log.lines_count} movimientos en ${log.duration_sec}s`
 }

@@ -1217,7 +1217,7 @@ export function CompaniesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="secondary" onClick={() => { setEditing(!editing); if (!editing) setEditForm({ name: co.name ?? '', nit: co.nit ?? '', city: co.city ?? '', dept: co.dept ?? '', sector: co.sector ?? '', size: co.size ?? '', contact: co.contact ?? '', email: co.email ?? '', phone: co.phone ?? '', asesor: co.asesor ?? '', fecha_vinculacion: co.fecha_vinculacion ?? '', notes: co.notes ?? '' }) }}>
+                  <Button size="sm" variant="secondary" onClick={() => { setEditing(!editing); if (!editing) setEditForm({ name: co.name ?? '', nit: co.nit ?? '', city: co.city ?? '', dept: co.dept ?? '', sector: co.sector ?? '', size: co.size ?? '', contact: co.contact ?? '', email: co.email ?? '', phone: co.phone ?? '', website: co.website ?? '', asesor: co.asesor ?? '', fecha_vinculacion: co.fecha_vinculacion ?? '', notes: co.notes ?? '' }) }}>
                     <Pencil className="w-3.5 h-3.5" /> Editar
                   </Button>
                   <Button size="sm" variant="secondary">
@@ -1294,6 +1294,7 @@ export function CompaniesPage() {
                             { key: 'contact', label: 'Contacto principal' },
                             { key: 'email', label: 'Email' },
                             { key: 'phone', label: 'Teléfono' },
+                            { key: 'website', label: 'Sitio web' },
                             { key: 'asesor', label: 'Asesor asignado' },
                           ].map(f => (
                             <div key={f.key}>
@@ -1342,6 +1343,7 @@ export function CompaniesPage() {
                             { label: 'Contacto principal', value: co.contact },
                             { label: 'Email', value: co.email },
                             { label: 'Teléfono', value: co.phone },
+                            { label: 'Sitio web', value: co.website },
                             { label: 'Fecha de creación', value: co.created_at ? fmtDate(co.created_at) : null },
                             { label: 'Fecha de vinculación', value: co.fecha_vinculacion ? fmtDate(co.fecha_vinculacion) : null },
                             { label: 'Asesor asignado', value: co.asesor },

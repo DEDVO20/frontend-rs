@@ -4,7 +4,7 @@ import { TopBar } from '@/components/layout/TopBar'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useNavigate } from 'react-router-dom'
 import {
-  Building2, CheckCircle2, FileText, BarChart3,
+  Building2, CheckCircle2, FileText,
   AlertTriangle, ChevronRight, Eye, RefreshCw,
 } from 'lucide-react'
 
@@ -36,18 +36,16 @@ export function DashboardPage() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-dashboard'],
     queryFn: async () => {
-      const [companies, tasks, documents, dashboards, requests] = await Promise.allSettled([
+      const [companies, tasks, documents, requests] = await Promise.allSettled([
         api.get('/api/companies?limit=100'),
         api.get('/api/tasks?limit=100'),
         api.get('/api/documents?limit=20'),
-        api.get('/api/dashboards'),
         api.get('/api/requests?limit=20'),
       ])
 
       const companiesData = companies.status === 'fulfilled' ? companies.value.data : { data: [], total: 0 }
       const tasksData     = tasks.status === 'fulfilled'     ? tasks.value.data     : { data: [], total: 0 }
       const docsData      = documents.status === 'fulfilled' ? documents.value.data : { data: [], total: 0 }
-      const dashData      = dashboards.status === 'fulfilled' ? dashboards.value.data : []
       const reqData       = requests.status === 'fulfilled'  ? requests.value.data  : { data: [], total: 0 }
 
       const allCompanies = Array.isArray(companiesData) ? companiesData : (companiesData.data ?? [])
@@ -62,9 +60,6 @@ export function DashboardPage() {
 
       const allDocs = Array.isArray(docsData) ? docsData : (docsData.data ?? [])
       const totalDocs = docsData.total ?? allDocs.length
-
-      const allDashboards = Array.isArray(dashData) ? dashData : []
-      const publishedDashboards = allDashboards.filter((d: any) => d.active)
 
       const allRequests = Array.isArray(reqData) ? reqData : (reqData.data ?? [])
       const openRequests = allRequests.filter((r: any) => r.status === 'open' || r.status === 'pending')
@@ -83,7 +78,6 @@ export function DashboardPage() {
         companies: allCompanies, totalCompanies, activeCompanies,
         tasks: allTasks, totalTasks, pendingTasks, overdueTasks,
         docs: allDocs, totalDocs,
-        dashboards: allDashboards, publishedDashboards,
         requests: allRequests, openRequests, inProgress,
         modules, companyCount: allCompanies.length,
       }
@@ -134,7 +128,7 @@ export function DashboardPage() {
         )}
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-3">
             <div className="w-9 h-9 rounded-lg bg-blue-500 flex items-center justify-center shrink-0">
               <Building2 className="w-4 h-4 text-white" />
@@ -163,16 +157,6 @@ export function DashboardPage() {
               <p className="text-xs text-slate-500">Documentos</p>
               <p className="text-2xl font-bold text-slate-900">{d.totalDocs}</p>
               <p className="text-xs text-slate-400">Últimos 20 registros</p>
-            </div>
-          </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-sky-500 flex items-center justify-center shrink-0">
-              <BarChart3 className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-500">Dashboards BI activos</p>
-              <p className="text-2xl font-bold text-slate-900">{d.publishedDashboards.length}</p>
-              <p className="text-xs text-slate-400">{d.publishedDashboards.length} publicados</p>
             </div>
           </div>
         </div>
@@ -311,10 +295,6 @@ export function DashboardPage() {
                 })}
               </div>
               <div className="grid grid-cols-2 gap-3 mt-4 pt-3 border-t border-slate-100">
-                <div>
-                  <p className="text-xs text-slate-400">Dashboards BI</p>
-                  <p className="text-lg font-bold text-slate-900">{d.publishedDashboards.length}</p>
-                </div>
                 <div>
                   <p className="text-xs text-slate-400">Usuarios portal</p>
                   <p className="text-lg font-bold text-slate-900">—</p>
