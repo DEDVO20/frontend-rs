@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { BookOpen, PlugZap } from 'lucide-react'
+import { AlertTriangle, BookOpen, PlugZap } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -53,9 +53,10 @@ export function useSiigoBooks() {
   const role = useAuthStore(s => s.user?.role ?? '')
   const isInternal = SIIGO_INTERNAL_ROLES.includes(role)
   const [searchParams, setSearchParams] = useSearchParams()
-  const { data } = useSiigoConnections(isInternal)
-  // Tolerante a una respuesta inesperada: sin lista no hay selector, pero la página sigue funcionando
+  const { data, isLoading, isError } = useSiigoConnections(isInternal)
+  // Tolerante a una respuesta inesperada: sin lista el backend sigue usando Finto por defecto
   const connections = Array.isArray(data) ? data : []
+  const connectionsUnavailable = isInternal && !isLoading && (isError || !connections.length)
 
   const requested = isInternal ? searchParams.get('libros') : null
   const selected = connections.find(c => c.id === requested) ?? connections.find(c => c.is_platform) ?? null
@@ -71,6 +72,7 @@ export function useSiigoBooks() {
   return {
     isInternal,
     connections,
+    connectionsUnavailable,
     selected,
     connectionId: selected?.id ?? null,
     setConnectionId,
@@ -81,7 +83,7 @@ export function useSiigoBooks() {
 
 /** Selector "Libros de:" para roles internos */
 export function SiigoBooksSelect({ className }: { className?: string }) {
-  const { isInternal, connections, selected, setConnectionId } = useSiigoBooks()
+  const { isInternal, connections, connectionsUnavailable, selected, setConnectionId } = useSiigoBooks()
   if (!isInternal) return null
 
   return (
@@ -91,14 +93,25 @@ export function SiigoBooksSelect({ className }: { className?: string }) {
       <select
         value={selected?.id ?? ''}
         onChange={e => setConnectionId(e.target.value)}
-        className="px-3 py-1.5 text-sm font-medium text-slate-800 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+        disabled={connectionsUnavailable}
+        title={connectionsUnavailable
+          ? 'No se pudo cargar la lista de cuentas de Siigo; se muestran los libros de Finto. Verifica que el backend esté actualizado.'
+          : undefined}
+        className="px-3 py-1.5 text-sm font-medium text-slate-800 border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-600"
       >
+        {/* Sin lista (error o backend sin la ruta) el backend usa Finto por defecto: se indica así, no un selector vacío */}
+        {connectionsUnavailable && <option value="">Finto (plataforma)</option>}
         {connections.map(c => (
           <option key={c.id} value={c.id} disabled={!c.active}>
             {c.is_platform ? `${c.label} (plataforma)` : c.label}{c.active ? '' : ' · inactiva'}
           </option>
         ))}
       </select>
+      {connectionsUnavailable && (
+        <span className="flex items-center gap-1 text-[11px] font-medium text-amber-700">
+          <AlertTriangle className="w-3.5 h-3.5" /> Lista de cuentas no disponible
+        </span>
+      )}
     </label>
   )
 }
