@@ -84,7 +84,7 @@ function SiigoDashboardTab({ tab, period, companyName }: {
   if (isLoading) return <PageLoader />
   if (data?.notConnected) return <SiigoNotConnected />
 
-  const props: ChartProps = { params, range: period.range, style, scopeName: companyName }
+  const props: ChartProps = { params, range: period.range, style, scopeName: companyName, month: period.month, onMonth: period.setMonth }
   return (
     <>
       <PeriodFilterBar filter={period} style={style} />
