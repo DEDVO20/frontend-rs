@@ -9,7 +9,6 @@ import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import {
   CarteraCharts,
-  ComercialCharts,
   FacturacionCharts,
   PeriodFilterBar,
   RecaudoCharts,
@@ -22,13 +21,10 @@ import {
 import { SiigoNotConnected } from '@/pages/siigo/siigoBooks'
 
 // ── Pestañas ────────────────────────────────────────────────────────────────
-type TabId = 'general' | 'facturacion' | 'recaudo' | 'cartera' | 'comercial'
+type TabId = 'general' | 'dashboard'
 const TABS: { id: TabId; label: string; icon: FintoIconName }[] = [
-  { id: 'general',     label: 'General',     icon: 'general' },
-  { id: 'facturacion', label: 'Facturación', icon: 'facturacion' },
-  { id: 'recaudo',     label: 'Recaudo',     icon: 'recaudo' },
-  { id: 'cartera',     label: 'Cartera',     icon: 'cartera' },
-  { id: 'comercial',   label: 'Comercial',   icon: 'comercial' },
+  { id: 'general',   label: 'General',   icon: 'general' },
+  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
 ]
 
 function fmtMonth(d?: string) {
@@ -71,8 +67,7 @@ function StatusDot({ tone }: { tone: 'red' | 'amber' | 'green' | 'slate' }) {
  * Pestañas con datos de Siigo de los libros de la empresa del cliente.
  * El filtro de periodo se conserva al cambiar de pestaña.
  */
-function SiigoDashboardTab({ tab, period, companyName }: {
-  tab: Exclude<TabId, 'general'>
+function SiigoDashboardTab({ period, companyName }: {
   period: PeriodFilter
   companyName: string
 }) {
@@ -84,15 +79,32 @@ function SiigoDashboardTab({ tab, period, companyName }: {
   if (isLoading) return <PageLoader />
   if (data?.notConnected) return <SiigoNotConnected />
 
-  const props: ChartProps = { params, range: period.range, style, scopeName: companyName, month: period.month, onMonth: period.setMonth }
+  // Vista reducida: solo las gráficas principales, agrupadas por sección
+  const props: ChartProps = { params, range: period.range, style, scopeName: companyName, month: period.month, onMonth: period.setMonth, compact: true }
   return (
     <>
       <PeriodFilterBar filter={period} style={style} />
-      {tab === 'facturacion' && <FacturacionCharts {...props} />}
-      {tab === 'recaudo' && <RecaudoCharts {...props} />}
-      {tab === 'cartera' && <CarteraCharts {...props} />}
-      {tab === 'comercial' && <ComercialCharts {...props} />}
+
+      <DashboardSection title="Facturación y recaudo">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+          <RecaudoCharts {...props} />
+          <FacturacionCharts {...props} />
+        </div>
+      </DashboardSection>
+
+      <DashboardSection title="Cartera">
+        <CarteraCharts {...props} />
+      </DashboardSection>
     </>
+  )
+}
+
+function DashboardSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-4 pt-2">
+      <h2 className="font-display text-xl font-bold text-navy-900 dark:text-cream-100">{title}</h2>
+      {children}
+    </section>
   )
 }
 
@@ -149,7 +161,7 @@ export function ClientDashboard() {
       <div className="flex-1 overflow-y-auto px-5 md:px-8 pb-8 space-y-5">
 
         {/* Barra de pestañas */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {TABS.map(t => {
             const active = t.id === tab
             return (
@@ -263,8 +275,8 @@ export function ClientDashboard() {
             </div>
           </>
         ) : (
-          // Facturación, Recaudo, Cartera y Comercial: gráficas con los libros de Siigo de la empresa
-          <SiigoDashboardTab tab={tab} period={period} companyName={d.company?.name ?? 'Mi empresa'} />
+          // Dashboard: gráficas de facturación, recaudo y cartera con los libros de Siigo de la empresa
+          <SiigoDashboardTab period={period} companyName={d.company?.name ?? 'Mi empresa'} />
         )}
       </div>
     </div>

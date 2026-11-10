@@ -422,6 +422,8 @@ export interface ChartProps {
   onMonth?: (month: string | null) => void
   /** Solo internos: clic en un tercero con empresa vinculada para ver solo esa empresa */
   onCompany?: (companyId: string) => void
+  /** Vista reducida del dashboard del cliente: solo las gráficas principales, sin cifras ni tablas extra */
+  compact?: boolean
 }
 
 /** Sufijo de etiquetas cuando hay mes seleccionado */
@@ -536,7 +538,7 @@ export function SiigoChartsPage() {
 }
 
 /** Facturación: facturas y notas crédito por mes, por servicio y valor bruto mes a mes */
-export function FacturacionCharts({ params, range, style, scopeName, month = null, onMonth }: ChartProps) {
+export function FacturacionCharts({ params, range, style, scopeName, month = null, onMonth, compact = false }: ChartProps) {
   const { colors, isDark, isInternal, cardCls, titleCls, mutedCls } = style
   const { data, isLoading } = useSalesReport(params)
   // Cifras y desglose por servicio del mes seleccionado (sin mes es la misma consulta)
@@ -562,6 +564,50 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
       </div>
     )
   }
+
+  // 2. Facturación por servicio
+  const porServicio = (
+        <section className={cardCls}>
+          <ChartHeader
+            title={`Facturación por servicio${mn}`}
+            subtitle={`Subtotal por servicio ${month ? 'en el mes' : 'en el periodo'}${services.length > MAX_SERVICES ? ` · top ${MAX_SERVICES}` : ''}`}
+            titleCls={titleCls}
+            mutedCls={mutedCls}
+          />
+          <div style={{ height: Math.max(180, services.length * 40) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={services} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }}>
+                <CartesianGrid horizontal={false} stroke={colors.grid} />
+                <XAxis type="number" {...axisProps} tickFormatter={fmtCompact} />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  {...axisProps}
+                  width={170}
+                  tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />}
+                />
+                <Tooltip
+                  cursor={{ fill: colors.grid }}
+                  content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
+                    { key: 'total', label: 'Subtotal', color: colors.facturado },
+                  ]} />}
+                />
+                <Bar dataKey="total" fill={colors.facturado} maxBarSize={24} radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="total" position="right" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <DataTable
+            mutedCls={mutedCls}
+            isInternal={isInternal}
+            headers={['Servicio', 'Valor bruto', 'Subtotal']}
+            rows={(focus?.byProduct ?? []).map(p => [p.description, fmtMoney(Number(p.bruto)), fmtMoney(Number(p.subtotal ?? p.total))])}
+          />
+        </section>
+  )
+
+  if (compact) return porServicio
 
   return (
     <>
@@ -610,45 +656,7 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
       </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        {/* 2. Facturación por servicio */}
-        <section className={cardCls}>
-          <ChartHeader
-            title={`Facturación por servicio${mn}`}
-            subtitle={`Subtotal por servicio ${month ? 'en el mes' : 'en el periodo'}${services.length > MAX_SERVICES ? ` · top ${MAX_SERVICES}` : ''}`}
-            titleCls={titleCls}
-            mutedCls={mutedCls}
-          />
-          <div style={{ height: Math.max(180, services.length * 40) }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={services} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }}>
-                <CartesianGrid horizontal={false} stroke={colors.grid} />
-                <XAxis type="number" {...axisProps} tickFormatter={fmtCompact} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  {...axisProps}
-                  width={170}
-                  tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />}
-                />
-                <Tooltip
-                  cursor={{ fill: colors.grid }}
-                  content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
-                    { key: 'total', label: 'Subtotal', color: colors.facturado },
-                  ]} />}
-                />
-                <Bar dataKey="total" fill={colors.facturado} maxBarSize={24} radius={[0, 4, 4, 0]}>
-                  <LabelList dataKey="total" position="right" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <DataTable
-            mutedCls={mutedCls}
-            isInternal={isInternal}
-            headers={['Servicio', 'Valor bruto', 'Subtotal']}
-            rows={(focus?.byProduct ?? []).map(p => [p.description, fmtMoney(Number(p.bruto)), fmtMoney(Number(p.subtotal ?? p.total))])}
-          />
-        </section>
+        {porServicio}
 
         {/* 3. Valor bruto mes a mes */}
         <section className={cardCls}>
@@ -698,7 +706,7 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
 }
 
 /** Pestaña Recaudo: recibos de caja aplicados (Siigo vouchers RC) */
-export function RecaudoCharts({ params, range, style, scopeName, month = null, onMonth }: ChartProps) {
+export function RecaudoCharts({ params, range, style, scopeName, month = null, onMonth, compact = false }: ChartProps) {
   const { colors, isDark, isInternal, cardCls, titleCls, mutedCls } = style
   // Filtro por cliente (clic en "Recaudo por cliente"): acota series, cifras y servicios
   const [customer, setCustomer] = useState<{ nit: string; name: string } | null>(null)
@@ -772,22 +780,8 @@ export function RecaudoCharts({ params, range, style, scopeName, month = null, o
   const mn = monthNote(month)
   const cells = monthly.map(m => <Cell key={m.period} fillOpacity={dimOpacity(m.period, month)} />)
 
-  return (
-    <>
-      <FilterChips
-        mutedCls={mutedCls}
-        onClearAll={() => setCustomer(null)}
-        filters={customer ? [{ label: `Cliente: ${customer.name}`, onClear: () => setCustomer(null) }] : []}
-      />
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatTile label={`Total recaudado${mn}`} value={fmtCompact(s.totalRecaudado)} title={fmtMoney(s.totalRecaudado)} {...tile} />
-        <StatTile label={`Recibos de caja${mn}`} value={String(s.recibos)} {...tile} />
-        <StatTile label={`Facturas pagadas${mn}`} value={String(s.facturas)} {...tile} />
-        <StatTile label={`Anticipos y otros ingresos${mn}`} value={fmtCompact(s.anticipos)} title={fmtMoney(s.anticipos)} {...tile} />
-      </div>
-
-      {/* Facturado vs recaudado: misma unidad, un solo eje */}
+  // Facturado vs recaudado: misma unidad, un solo eje
+  const facturadoVsRecaudado = (
       <section className={cardCls}>
         <ChartHeader
           title="Facturado vs recaudado"
@@ -829,6 +823,26 @@ export function RecaudoCharts({ params, range, style, scopeName, month = null, o
           select={select}
         />
       </section>
+  )
+
+  if (compact) return facturadoVsRecaudado
+
+  return (
+    <>
+      <FilterChips
+        mutedCls={mutedCls}
+        onClearAll={() => setCustomer(null)}
+        filters={customer ? [{ label: `Cliente: ${customer.name}`, onClear: () => setCustomer(null) }] : []}
+      />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatTile label={`Total recaudado${mn}`} value={fmtCompact(s.totalRecaudado)} title={fmtMoney(s.totalRecaudado)} {...tile} />
+        <StatTile label={`Recibos de caja${mn}`} value={String(s.recibos)} {...tile} />
+        <StatTile label={`Facturas pagadas${mn}`} value={String(s.facturas)} {...tile} />
+        <StatTile label={`Anticipos y otros ingresos${mn}`} value={fmtCompact(s.anticipos)} title={fmtMoney(s.anticipos)} {...tile} />
+      </div>
+
+      {facturadoVsRecaudado}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <section className={cardCls}>
@@ -1294,7 +1308,7 @@ const fmtDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('es-C
  * limitado a su saldo contable en 130505 + 13051001. Foto diaria; el periodo solo filtra la evolución.
  * Es independiente de las importaciones del módulo de cobro.
  */
-export function CarteraCharts({ params, style, scopeName }: ChartProps) {
+export function CarteraCharts({ params, style, scopeName, compact = false }: ChartProps) {
   const { colors, isDark, isInternal, cardCls, titleCls, mutedCls } = style
   const role = useAuthStore(s => s.user?.role ?? '')
   const canSync = SYNC_ROLES.includes(role)
@@ -1415,11 +1429,172 @@ export function CarteraCharts({ params, style, scopeName }: ChartProps) {
   // Participación de cada edad sobre el total sin el filtro de edad (la gráfica de edades lo ignora)
   const bucketsTotal = buckets.reduce((n, b) => n + b.total, 0)
 
+  const edadesChart = (
+    <section className={cardCls}>
+      <ChartHeader
+        title={`Cartera por edades · ${cut}`}
+        subtitle={`${scopeName} · saldo por días vencidos (azul por vencer, dorado vencido) · clic en una edad para filtrar`}
+        titleCls={titleCls}
+        mutedCls={mutedCls}
+      />
+      <div className="h-72">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={buckets} margin={{ top: 16, right: 8, left: 0, bottom: 0 }} onClick={rowClick(buckets, pickBucket)} style={clickable}>
+            <CartesianGrid vertical={false} stroke={colors.grid} />
+            <XAxis dataKey="name" {...axisProps} />
+            <YAxis {...axisProps} tickFormatter={fmtCompact} width={64} />
+            <Tooltip
+              cursor={{ fill: colors.grid }}
+              content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[{ key: 'total', label: 'Saldo' }]} />}
+            />
+            <Bar dataKey="total" maxBarSize={40} radius={[4, 4, 0, 0]}>
+              {buckets.map(b => <Cell key={b.bucket} fill={bucketColor(b.bucket)} fillOpacity={dimKey(b.bucket, bucket)} />)}
+              <LabelList dataKey="total" position="top" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <DataTable
+        mutedCls={mutedCls}
+        isInternal={isInternal}
+        headers={['Edad', 'Facturas', 'Saldo', 'Participación']}
+        rows={buckets.map(b => [b.name, String(b.facturas), fmtMoney(b.total), pct(b.total, bucketsTotal)])}
+        select={{ keys: buckets.map(b => b.bucket), selected: bucket, onSelect: k => pickBucket({ bucket: k }) }}
+      />
+    </section>
+  )
+
+  const evolucionChart = (
+    <section className={cardCls}>
+      <ChartHeader title="Evolución de la cartera" subtitle={`Total y vencida en cada cálculo diario del periodo${hasFilters ? ' · no aplica los filtros de edad, cliente ni vendedor' : ''}`} titleCls={titleCls} mutedCls={mutedCls} />
+      {history.length >= 2 ? (
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={history} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke={colors.grid} />
+              <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
+              <YAxis {...axisProps} tickFormatter={fmtCompact} width={64} />
+              <Tooltip
+                cursor={{ stroke: colors.axis, strokeOpacity: 0.4 }}
+                content={<ChartTooltip isDark={isDark} isInternal={isInternal} rows={[
+                  { key: 'total', label: 'Total', color: colors.facturado },
+                  { key: 'vencido', label: 'Vencida', color: colors.notas },
+                ]} />}
+              />
+              {legend}
+              <Area type="linear" dataKey="total" name="Total" stroke={colors.facturado} strokeWidth={2} fill={colors.facturado} fillOpacity={0.1} dot={false} />
+              <Area type="linear" dataKey="vencido" name="Vencida" stroke={colors.notas} strokeWidth={2} fill={colors.notas} fillOpacity={0.1} dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <p className={cn('text-sm py-16 text-center', mutedCls)}>
+          La evolución se construye con cada cálculo diario; vuelve en unos días para ver la tendencia.
+        </p>
+      )}
+    </section>
+  )
+
+  const clientesChart = (
+    <section className={cardCls}>
+      <ChartHeader
+        title={`Clientes con mayor saldo · ${cut}`}
+        subtitle={`Saldo vencido y por vencer de cada cliente${customers.length >= 15 ? ' · top 15' : ''} · clic en un cliente para filtrar`}
+        titleCls={titleCls}
+        mutedCls={mutedCls}
+      />
+      <div style={{ height: Math.max(180, customers.length * 36) }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={customers} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }} onClick={rowClick(customers, pickCustomer)} style={clickable}>
+            <CartesianGrid horizontal={false} stroke={colors.grid} />
+            <XAxis type="number" {...axisProps} tickFormatter={fmtCompact} />
+            <YAxis type="category" dataKey="name" {...axisProps} width={190} tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />} />
+            <Tooltip
+              cursor={{ fill: colors.grid }}
+              content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
+                { key: 'vencido', label: 'Vencido', color: colors.notas },
+                { key: 'porVencer', label: 'Por vencer', color: colors.facturado },
+                { key: 'total', label: 'Total' },
+              ]} />}
+            />
+            {legend}
+            <Bar dataKey="vencido" name="Vencido" stackId="c" fill={colors.notas} maxBarSize={22}>
+              {customers.map(c => <Cell key={c.nit} fillOpacity={dimKey(c.nit, customer?.nit)} />)}
+            </Bar>
+            <Bar dataKey="porVencer" name="Por vencer" stackId="c" fill={colors.facturado} maxBarSize={22} radius={[0, 4, 4, 0]}>
+              {customers.map(c => <Cell key={c.nit} fillOpacity={dimKey(c.nit, customer?.nit)} />)}
+              <LabelList dataKey="total" position="right" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <DataTable
+        mutedCls={mutedCls}
+        isInternal={isInternal}
+        headers={['Cliente', 'NIT', 'Facturas', 'Vencido', 'Total', 'Mayor mora', 'Participación']}
+        rows={customers.map(c => [c.name, c.nit, String(c.facturas), fmtMoney(c.vencido), fmtMoney(c.total), c.maxDias > 0 ? `${c.maxDias} días` : '—', customer ? '—' : pct(c.total, s.total)])}
+        select={{ keys: customers.map(c => c.nit), selected: customer?.nit ?? null, onSelect: nit => pickCustomer(customers.find(c => c.nit === nit)!) }}
+      />
+    </section>
+  )
+
+  const vendedorChart = (sellers.length > 1 || seller) && (
+    <section className={cardCls}>
+      <ChartHeader title="Cartera por vendedor" subtitle="Saldo total de las facturas de cada vendedor · clic en un vendedor para filtrar" titleCls={titleCls} mutedCls={mutedCls} />
+      <div style={{ height: Math.max(160, sellers.length * 40) }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={sellers} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }} onClick={rowClick(sellers, pickSeller)} style={clickable}>
+            <CartesianGrid horizontal={false} stroke={colors.grid} />
+            <XAxis type="number" {...axisProps} tickFormatter={fmtCompact} />
+            <YAxis type="category" dataKey="name" {...axisProps} width={150} tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />} />
+            <Tooltip
+              cursor={{ fill: colors.grid }}
+              content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
+                { key: 'total', label: 'Total', color: colors.facturado },
+                { key: 'vencido', label: 'Vencido' },
+              ]} />}
+            />
+            <Bar dataKey="total" fill={colors.facturado} maxBarSize={24} radius={[0, 4, 4, 0]}>
+              {sellers.map(v => <Cell key={v.name} fillOpacity={dimKey(v.name, seller)} />)}
+              <LabelList dataKey="total" position="right" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <DataTable
+        mutedCls={mutedCls}
+        isInternal={isInternal}
+        headers={['Vendedor', 'Facturas', 'Vencido', 'Total']}
+        rows={sellers.map(v => [v.name, String(v.facturas), fmtMoney(v.vencido), fmtMoney(v.total)])}
+        select={{ keys: sellers.map(v => v.name), selected: seller, onSelect: k => pickSeller({ name: k }) }}
+      />
+    </section>
+  )
+
+  const filterChips = <FilterChips filters={chips} onClearAll={clearFilters} mutedCls={mutedCls} />
+
+  // Dashboard del cliente: solo edades, vendedor, evolución y clientes
+  if (compact) {
+    return (
+      <>
+        {filterChips}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          {edadesChart}
+          {vendedorChart}
+        </div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          {evolucionChart}
+          {clientesChart}
+        </div>
+      </>
+    )
+  }
+
   return (
     <>
       {syncBar}
 
-      <FilterChips filters={chips} onClearAll={clearFilters} mutedCls={mutedCls} />
+      {filterChips}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile label={`Cartera total · ${cut}`} value={fmtCompact(s.total)} title={fmtMoney(s.total)} {...tile} />
@@ -1429,146 +1604,14 @@ export function CarteraCharts({ params, style, scopeName }: ChartProps) {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        {/* Edades */}
-        <section className={cardCls}>
-          <ChartHeader
-            title={`Cartera por edades · ${cut}`}
-            subtitle={`${scopeName} · saldo por días vencidos (azul por vencer, dorado vencido) · clic en una edad para filtrar`}
-            titleCls={titleCls}
-            mutedCls={mutedCls}
-          />
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={buckets} margin={{ top: 16, right: 8, left: 0, bottom: 0 }} onClick={rowClick(buckets, pickBucket)} style={clickable}>
-                <CartesianGrid vertical={false} stroke={colors.grid} />
-                <XAxis dataKey="name" {...axisProps} />
-                <YAxis {...axisProps} tickFormatter={fmtCompact} width={64} />
-                <Tooltip
-                  cursor={{ fill: colors.grid }}
-                  content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[{ key: 'total', label: 'Saldo' }]} />}
-                />
-                <Bar dataKey="total" maxBarSize={40} radius={[4, 4, 0, 0]}>
-                  {buckets.map(b => <Cell key={b.bucket} fill={bucketColor(b.bucket)} fillOpacity={dimKey(b.bucket, bucket)} />)}
-                  <LabelList dataKey="total" position="top" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <DataTable
-            mutedCls={mutedCls}
-            isInternal={isInternal}
-            headers={['Edad', 'Facturas', 'Saldo', 'Participación']}
-            rows={buckets.map(b => [b.name, String(b.facturas), fmtMoney(b.total), pct(b.total, bucketsTotal)])}
-            select={{ keys: buckets.map(b => b.bucket), selected: bucket, onSelect: k => pickBucket({ bucket: k }) }}
-          />
-        </section>
-
-        {/* Evolución */}
-        <section className={cardCls}>
-          <ChartHeader title="Evolución de la cartera" subtitle={`Total y vencida en cada cálculo diario del periodo${hasFilters ? ' · no aplica los filtros de edad, cliente ni vendedor' : ''}`} titleCls={titleCls} mutedCls={mutedCls} />
-          {history.length >= 2 ? (
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={history} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke={colors.grid} />
-                  <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={16} />
-                  <YAxis {...axisProps} tickFormatter={fmtCompact} width={64} />
-                  <Tooltip
-                    cursor={{ stroke: colors.axis, strokeOpacity: 0.4 }}
-                    content={<ChartTooltip isDark={isDark} isInternal={isInternal} rows={[
-                      { key: 'total', label: 'Total', color: colors.facturado },
-                      { key: 'vencido', label: 'Vencida', color: colors.notas },
-                    ]} />}
-                  />
-                  {legend}
-                  <Area type="linear" dataKey="total" name="Total" stroke={colors.facturado} strokeWidth={2} fill={colors.facturado} fillOpacity={0.1} dot={false} />
-                  <Area type="linear" dataKey="vencido" name="Vencida" stroke={colors.notas} strokeWidth={2} fill={colors.notas} fillOpacity={0.1} dot={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className={cn('text-sm py-16 text-center', mutedCls)}>
-              La evolución se construye con cada cálculo diario; vuelve en unos días para ver la tendencia.
-            </p>
-          )}
-        </section>
+        {edadesChart}
+        {evolucionChart}
       </div>
 
-      {/* Clientes */}
-      <section className={cardCls}>
-        <ChartHeader
-          title={`Clientes con mayor saldo · ${cut}`}
-          subtitle={`Saldo vencido y por vencer de cada cliente${customers.length >= 15 ? ' · top 15' : ''} · clic en un cliente para filtrar`}
-          titleCls={titleCls}
-          mutedCls={mutedCls}
-        />
-        <div style={{ height: Math.max(180, customers.length * 36) }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={customers} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }} onClick={rowClick(customers, pickCustomer)} style={clickable}>
-              <CartesianGrid horizontal={false} stroke={colors.grid} />
-              <XAxis type="number" {...axisProps} tickFormatter={fmtCompact} />
-              <YAxis type="category" dataKey="name" {...axisProps} width={190} tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />} />
-              <Tooltip
-                cursor={{ fill: colors.grid }}
-                content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
-                  { key: 'vencido', label: 'Vencido', color: colors.notas },
-                  { key: 'porVencer', label: 'Por vencer', color: colors.facturado },
-                  { key: 'total', label: 'Total' },
-                ]} />}
-              />
-              {legend}
-              <Bar dataKey="vencido" name="Vencido" stackId="c" fill={colors.notas} maxBarSize={22}>
-                {customers.map(c => <Cell key={c.nit} fillOpacity={dimKey(c.nit, customer?.nit)} />)}
-              </Bar>
-              <Bar dataKey="porVencer" name="Por vencer" stackId="c" fill={colors.facturado} maxBarSize={22} radius={[0, 4, 4, 0]}>
-                {customers.map(c => <Cell key={c.nit} fillOpacity={dimKey(c.nit, customer?.nit)} />)}
-                <LabelList dataKey="total" position="right" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <DataTable
-          mutedCls={mutedCls}
-          isInternal={isInternal}
-          headers={['Cliente', 'NIT', 'Facturas', 'Vencido', 'Total', 'Mayor mora', 'Participación']}
-          rows={customers.map(c => [c.name, c.nit, String(c.facturas), fmtMoney(c.vencido), fmtMoney(c.total), c.maxDias > 0 ? `${c.maxDias} días` : '—', customer ? '—' : pct(c.total, s.total)])}
-          select={{ keys: customers.map(c => c.nit), selected: customer?.nit ?? null, onSelect: nit => pickCustomer(customers.find(c => c.nit === nit)!) }}
-        />
-      </section>
+      {clientesChart}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        {(sellers.length > 1 || seller) && (
-          <section className={cardCls}>
-            <ChartHeader title="Cartera por vendedor" subtitle="Saldo total de las facturas de cada vendedor · clic en un vendedor para filtrar" titleCls={titleCls} mutedCls={mutedCls} />
-            <div style={{ height: Math.max(160, sellers.length * 40) }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={sellers} layout="vertical" margin={{ top: 0, right: 72, left: 0, bottom: 0 }} onClick={rowClick(sellers, pickSeller)} style={clickable}>
-                  <CartesianGrid horizontal={false} stroke={colors.grid} />
-                  <XAxis type="number" {...axisProps} tickFormatter={fmtCompact} />
-                  <YAxis type="category" dataKey="name" {...axisProps} width={150} tick={(props: any) => <ServiceTick {...props} fill={colors.axis} />} />
-                  <Tooltip
-                    cursor={{ fill: colors.grid }}
-                    content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
-                      { key: 'total', label: 'Total', color: colors.facturado },
-                      { key: 'vencido', label: 'Vencido' },
-                    ]} />}
-                  />
-                  <Bar dataKey="total" fill={colors.facturado} maxBarSize={24} radius={[0, 4, 4, 0]}>
-                    {sellers.map(v => <Cell key={v.name} fillOpacity={dimKey(v.name, seller)} />)}
-                    <LabelList dataKey="total" position="right" formatter={(v: any) => fmtCompact(Number(v))} style={{ fill: colors.axis, fontSize: 11 }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <DataTable
-              mutedCls={mutedCls}
-              isInternal={isInternal}
-              headers={['Vendedor', 'Facturas', 'Vencido', 'Total']}
-              rows={sellers.map(v => [v.name, String(v.facturas), fmtMoney(v.vencido), fmtMoney(v.total)])}
-              select={{ keys: sellers.map(v => v.name), selected: seller, onSelect: k => pickSeller({ name: k }) }}
-            />
-          </section>
-        )}
+        {vendedorChart}
 
         {(data?.oldest ?? []).length > 0 && (
           <section className={cardCls}>
