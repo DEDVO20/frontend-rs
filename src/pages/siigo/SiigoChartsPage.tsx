@@ -35,6 +35,7 @@ interface MonthlyRow {
   facturas: number
   notasCredito: number
   bruto: number
+  subtotal: number
   total: number
   totalFacturado: number
   totalNotasCredito: number
@@ -44,6 +45,7 @@ interface ProductRow {
   code: string
   description: string
   bruto: number
+  subtotal?: number
   total: number
 }
 
@@ -66,6 +68,7 @@ interface SiigoReport {
     totalFacturas: number
     totalNotasCredito: number
     totalBruto: number
+    totalSubtotal: number
     totalNeto: number
   }
   monthly: MonthlyRow[]
@@ -163,7 +166,8 @@ function fillMonths(rows: MonthlyRow[], from: string | null, to: string | null):
     const ym = `${y}-${String(m).padStart(2, '0')}`
     if (ym > end) break
     out.push(byPeriod.get(ym) ?? {
-      period: ym, facturas: 0, notasCredito: 0, bruto: 0, total: 0, totalFacturado: 0, totalNotasCredito: 0,
+      period: ym, facturas: 0, notasCredito: 0, bruto: 0, subtotal: 0, total: 0,
+      totalFacturado: 0, totalNotasCredito: 0,
     })
     m++
     if (m > 12) { m = 1; y++ }
@@ -395,11 +399,15 @@ function toSalesMonthly(rows: MonthlyRow[], range: { from: string | null; to: st
     ...m,
     label: fmtPeriod(m.period),
     bruto: Number(m.bruto),
+    subtotal: Number(m.subtotal ?? 0),
     total: Number(m.total),
     totalFacturado: Number(m.totalFacturado),
     totalNotasCredito: Number(m.totalNotasCredito),
   }))
 }
+
+/** Servicios con su subtotal (antes de impuestos) como valor a graficar */
+const bySubtotal = (rows: ProductRow[]) => rows.map(p => ({ ...p, total: Number(p.subtotal ?? p.total) }))
 
 /** Props comunes de cada bloque de gráficas */
 export interface ChartProps {
@@ -535,7 +543,7 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
   const { data: focus } = useSalesReport(monthParams(params, month), true)
 
   const monthly = useMemo(() => toSalesMonthly(data?.monthly ?? [], range), [data?.monthly, range.from, range.to])
-  const services = useMemo(() => topServices(focus?.byProduct ?? []), [focus?.byProduct])
+  const services = useMemo(() => topServices(bySubtotal(focus?.byProduct ?? [])), [focus?.byProduct])
   const summary = focus?.summary
   const axisProps = { tick: { fill: colors.axis, fontSize: 11 }, tickLine: false, axisLine: false }
   const onChartClick = monthClick(monthly, month, onMonth)
@@ -560,7 +568,7 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
       {/* Cifras del periodo */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile label={`Valor bruto facturado${mn}`} value={fmtCompact(summary?.totalBruto ?? 0)} title={fmtMoney(summary?.totalBruto ?? 0)} cardCls={cardCls} titleCls={titleCls} mutedCls={mutedCls} />
-        <StatTile label={`Total neto${mn}`} value={fmtCompact(summary?.totalNeto ?? 0)} title={fmtMoney(summary?.totalNeto ?? 0)} cardCls={cardCls} titleCls={titleCls} mutedCls={mutedCls} />
+        <StatTile label={`Subtotal facturado${mn}`} value={fmtCompact(summary?.totalSubtotal ?? 0)} title={fmtMoney(summary?.totalSubtotal ?? 0)} cardCls={cardCls} titleCls={titleCls} mutedCls={mutedCls} />
         <StatTile label={`Facturas emitidas${mn}`} value={String(summary?.totalFacturas ?? 0)} cardCls={cardCls} titleCls={titleCls} mutedCls={mutedCls} />
         <StatTile label={`Notas crédito${mn}`} value={String(summary?.totalNotasCredito ?? 0)} cardCls={cardCls} titleCls={titleCls} mutedCls={mutedCls} />
       </div>
@@ -569,13 +577,13 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
       <section className={cardCls}>
         <ChartHeader
           title="Facturación mes a mes"
-          subtitle={`${scopeName} · facturas y notas crédito por mes (total con impuestos)${onChartClick ? ' · clic en un mes para filtrar' : ''}`}
+          subtitle={`${scopeName} · subtotal por mes, antes de impuestos (facturas menos notas crédito)${onChartClick ? ' · clic en un mes para filtrar' : ''}`}
           titleCls={titleCls}
           mutedCls={mutedCls}
         />
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={monthly} stackOffset="sign" margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onClick={onChartClick} style={clickable}>
+            <BarChart data={monthly} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onClick={onChartClick} style={clickable}>
               <CartesianGrid vertical={false} stroke={colors.grid} />
               <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={12} />
               <YAxis {...axisProps} tickFormatter={fmtCompact} width={64} />
@@ -583,24 +591,10 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
               <Tooltip
                 cursor={{ fill: colors.grid }}
                 content={<ChartTooltip isDark={isDark} isInternal={isInternal} rows={[
-                  { key: 'totalFacturado', label: 'Facturado', color: colors.facturado },
-                  { key: 'totalNotasCredito', label: 'Notas crédito', color: colors.notas },
-                  { key: 'total', label: 'Neto' },
+                  { key: 'subtotal', label: 'Subtotal', color: colors.facturado },
                 ]} />}
               />
-              <Legend
-                verticalAlign="top"
-                align="right"
-                iconType="circle"
-                iconSize={8}
-                wrapperStyle={{ fontSize: 12, paddingBottom: 8 }}
-                // El texto de la leyenda usa tokens de texto; el color de serie va solo en el punto
-                formatter={(value: string) => <span style={{ color: colors.axis }}>{value}</span>}
-              />
-              <Bar dataKey="totalFacturado" name="Facturado" stackId="v" fill={colors.facturado} maxBarSize={24} radius={[4, 4, 0, 0]}>
-                {monthly.map(m => <Cell key={m.period} fillOpacity={dimOpacity(m.period, month)} />)}
-              </Bar>
-              <Bar dataKey="totalNotasCredito" name="Notas crédito" stackId="v" fill={colors.notas} maxBarSize={24} radius={[0, 0, 4, 4]}>
+              <Bar dataKey="subtotal" name="Subtotal" fill={colors.facturado} maxBarSize={24} radius={[4, 4, 0, 0]}>
                 {monthly.map(m => <Cell key={m.period} fillOpacity={dimOpacity(m.period, month)} />)}
               </Bar>
             </BarChart>
@@ -609,8 +603,8 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
         <DataTable
           mutedCls={mutedCls}
           isInternal={isInternal}
-          headers={['Mes', 'Facturas', 'Facturado', 'Notas crédito', 'Neto']}
-          rows={monthly.map(m => [m.label, String(m.facturas), fmtMoney(m.totalFacturado), fmtMoney(m.totalNotasCredito), fmtMoney(m.total)])}
+          headers={['Mes', 'Facturas', 'Notas crédito', 'Subtotal']}
+          rows={monthly.map(m => [m.label, String(m.facturas), String(m.notasCredito), fmtMoney(m.subtotal)])}
           select={select}
         />
       </section>
@@ -620,7 +614,7 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
         <section className={cardCls}>
           <ChartHeader
             title={`Facturación por servicio${mn}`}
-            subtitle={`Total neto por servicio ${month ? 'en el mes' : 'en el periodo'}${services.length > MAX_SERVICES ? ` · top ${MAX_SERVICES}` : ''}`}
+            subtitle={`Subtotal por servicio ${month ? 'en el mes' : 'en el periodo'}${services.length > MAX_SERVICES ? ` · top ${MAX_SERVICES}` : ''}`}
             titleCls={titleCls}
             mutedCls={mutedCls}
           />
@@ -639,7 +633,7 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
                 <Tooltip
                   cursor={{ fill: colors.grid }}
                   content={<ChartTooltip isDark={isDark} isInternal={isInternal} labelKey="name" rows={[
-                    { key: 'total', label: 'Total neto', color: colors.facturado },
+                    { key: 'total', label: 'Subtotal', color: colors.facturado },
                   ]} />}
                 />
                 <Bar dataKey="total" fill={colors.facturado} maxBarSize={24} radius={[0, 4, 4, 0]}>
@@ -651,8 +645,8 @@ export function FacturacionCharts({ params, range, style, scopeName, month = nul
           <DataTable
             mutedCls={mutedCls}
             isInternal={isInternal}
-            headers={['Servicio', 'Valor bruto', 'Total neto']}
-            rows={(focus?.byProduct ?? []).map(p => [p.description, fmtMoney(Number(p.bruto)), fmtMoney(Number(p.total))])}
+            headers={['Servicio', 'Valor bruto', 'Subtotal']}
+            rows={(focus?.byProduct ?? []).map(p => [p.description, fmtMoney(Number(p.bruto)), fmtMoney(Number(p.subtotal ?? p.total))])}
           />
         </section>
 
@@ -733,7 +727,10 @@ export function RecaudoCharts({ params, range, style, scopeName, month = null, o
     const from = range.from ?? periods[0]
     const to = range.to ?? periods[periods.length - 1]
     const filled = fillMonths(
-      periods.map(p => ({ period: p, facturas: 0, notasCredito: 0, bruto: 0, total: 0, totalFacturado: 0, totalNotasCredito: 0 })),
+      periods.map(p => ({
+        period: p, facturas: 0, notasCredito: 0, bruto: 0, subtotal: 0, total: 0,
+        totalFacturado: 0, totalNotasCredito: 0,
+      })),
       from ?? null,
       to ?? null,
     )
