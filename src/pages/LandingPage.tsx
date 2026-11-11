@@ -13,6 +13,9 @@ import imgController from '@/assets/finto/images/CONTROLLER FINANCIERO Y TESORER
 import imgFacturacion from '@/assets/finto/images/FACTURACION Y RECAUDO.webp'
 import imgPersonal from '@/assets/finto/images/GESTION DE PERSONAL Y COMPRAS.webp'
 
+// Cotizador en línea (ContactFormModal) oculto por ahora; true para volver a mostrarlo
+const QUOTE_FORM_ENABLED = false
+
 const NAV_LINKS = [
   { label: 'Servicios', href: '#servicios' },
   { label: 'Cómo funciona', href: '#proceso' },
@@ -104,7 +107,7 @@ export function LandingPage() {
 
           <nav className="hidden md:flex items-center gap-7">
             {NAV_LINKS.map(l =>
-              l.label === 'Contacto' ? (
+              QUOTE_FORM_ENABLED && l.label === 'Contacto' ? (
                 <button
                   key={l.label}
                   type="button"
@@ -139,7 +142,7 @@ export function LandingPage() {
         {mobileOpen && (
           <div className="md:hidden bg-cream-50 border-t border-sand-300/40 px-6 py-4 space-y-3">
             {NAV_LINKS.map(l =>
-              l.label === 'Contacto' ? (
+              QUOTE_FORM_ENABLED && l.label === 'Contacto' ? (
                 <button
                   key={l.label}
                   type="button"
@@ -199,13 +202,15 @@ export function LandingPage() {
                 className="inline-flex items-center justify-center gap-2 font-display font-semibold text-cream-100 border border-cream-100/30 bg-white/5 px-6 py-3 rounded-full hover:bg-white/10 transition-colors">
                 Acceder al Portal
               </Link>
-              <button
-                id="hero-cta-cotiza"
-                type="button"
-                onClick={() => setContactOpen(true)}
-                className="inline-flex items-center justify-center gap-2 font-display font-semibold bg-navy-950 text-cream-100 px-6 py-3 rounded-full ring-1 ring-white/10 hover:bg-navy-900 transition-colors">
-                Cotiza en línea <ArrowRight className="w-4 h-4" />
-              </button>
+              {QUOTE_FORM_ENABLED && (
+                <button
+                  id="hero-cta-cotiza"
+                  type="button"
+                  onClick={() => setContactOpen(true)}
+                  className="inline-flex items-center justify-center gap-2 font-display font-semibold bg-navy-950 text-cream-100 px-6 py-3 rounded-full ring-1 ring-white/10 hover:bg-navy-900 transition-colors">
+                  Cotiza en línea <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -420,7 +425,7 @@ export function LandingPage() {
       </section>
 
       {/* ── Artículos y Publicaciones (Blog) ───────────────────── */}
-      <BlogSection onOpenContact={() => setContactOpen(true)} />
+      <BlogSection onOpenContact={QUOTE_FORM_ENABLED ? () => setContactOpen(true) : undefined} />
 
       {/* ── CTA ────────────────────────────────────────────────── */}
       <section id="contacto" className="relative overflow-hidden py-20 md:py-28 bg-gradient-to-br from-navy-900 to-brand-700">
@@ -433,13 +438,15 @@ export function LandingPage() {
             Contáctenos y en menos de 48 horas tendrá una propuesta personalizada para su negocio.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button
-              id="cta-cotiza-en-linea"
-              type="button"
-              onClick={() => setContactOpen(true)}
-              className="inline-flex items-center justify-center gap-2 font-display font-semibold border border-cream-100/40 text-cream-100 px-8 py-3.5 rounded-full hover:bg-white/10 transition-colors">
-              Cotiza en línea
-            </button>
+            {QUOTE_FORM_ENABLED && (
+              <button
+                id="cta-cotiza-en-linea"
+                type="button"
+                onClick={() => setContactOpen(true)}
+                className="inline-flex items-center justify-center gap-2 font-display font-semibold border border-cream-100/40 text-cream-100 px-8 py-3.5 rounded-full hover:bg-white/10 transition-colors">
+                Cotiza en línea
+              </button>
+            )}
             <a
               id="cta-hablar-asesor"
               href="https://wa.me/573102170905"
@@ -535,7 +542,7 @@ export function LandingPage() {
     </div>
 
     {/* ── Contact form modal ───────────────────────────────────────── */}
-    <ContactFormModal open={contactOpen} onClose={() => setContactOpen(false)} />
+    {QUOTE_FORM_ENABLED && <ContactFormModal open={contactOpen} onClose={() => setContactOpen(false)} />}
 
     {/* ── Scroll-to-top button ─────────────────────────────────────── */}
     <button

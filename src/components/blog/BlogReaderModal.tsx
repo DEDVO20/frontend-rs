@@ -332,14 +332,16 @@ export function BlogReaderModal({ post, onClose, onOpenContact }: Props) {
               </p>
             </div>
             <div className="shrink-0 flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                id="blog-cta-cotiza-btn"
-                onClick={() => { onClose(); onOpenContact?.() }}
-                className="inline-flex items-center justify-center gap-2 font-display font-semibold text-sm bg-gold-500 hover:bg-gold-400 text-navy-950 px-6 py-3 rounded-full transition-colors shadow-md"
-              >
-                Cotiza en línea <ArrowRight className="w-4 h-4" />
-              </button>
+              {onOpenContact && (
+                <button
+                  type="button"
+                  id="blog-cta-cotiza-btn"
+                  onClick={() => { onClose(); onOpenContact() }}
+                  className="inline-flex items-center justify-center gap-2 font-display font-semibold text-sm bg-gold-500 hover:bg-gold-400 text-navy-950 px-6 py-3 rounded-full transition-colors shadow-md"
+                >
+                  Cotiza en línea <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
