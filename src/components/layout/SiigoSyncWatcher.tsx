@@ -11,6 +11,7 @@ const SOURCES: Record<SiigoSyncKind, { url: string; queryKeys: string[][] }> = {
   collections:  { url: '/api/siigo/collections/sync-logs',   queryKeys: [['siigo-collections'], ['siigo-collections-report']] },
   trialBalance: { url: '/api/siigo/trial-balance/sync-logs', queryKeys: [['siigo-trial-balance'], ['siigo-trial-balance-report']] },
   receivables:  { url: '/api/siigo/receivables/sync-logs',   queryKeys: [['siigo-receivables'], ['siigo-receivables-report']] },
+  hubspot:      { url: '/api/hubspot/sync-logs',              queryKeys: [['hubspot-report']] },
 }
 
 function successMessage(w: WatchedSync, log: any): string {
@@ -21,6 +22,9 @@ function successMessage(w: WatchedSync, log: any): string {
     return `Balance de prueba de ${w.label}: ${log.months_ok} mes(es) correctos` +
       (log.months_failed ? `, ${log.months_failed} con error (se conservaron sus datos anteriores)` : '') +
       ` · ${log.rows_count} filas en ${log.duration_sec}s`
+  }
+  if (w.kind === 'hubspot') {
+    return `HubSpot de ${w.label} sincronizado: ${log.deals_count} negocios en ${log.duration_sec}s`
   }
   if (w.kind === 'receivables') {
     return `Cartera de ${w.label} al ${log.cut_date}: ${log.invoices_count} facturas de ${log.customers_count} clientes en ${log.duration_sec}s`

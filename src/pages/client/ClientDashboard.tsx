@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
 import {
   CarteraCharts,
+  CrmCharts,
   FacturacionCharts,
   PeriodFilterBar,
   RecaudoCharts,
@@ -90,6 +91,10 @@ function SiigoDashboardTab({ period, companyName }: {
           <RecaudoCharts {...props} />
           <FacturacionCharts {...props} />
         </div>
+      </DashboardSection>
+
+      <DashboardSection title="CRM">
+        <CrmCharts {...props} />
       </DashboardSection>
 
       <DashboardSection title="Cartera">

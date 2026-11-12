@@ -13,6 +13,7 @@ import {
   FileSignature, Upload, Download, Handshake, Info, Calendar, PlugZap,
 } from 'lucide-react'
 import { SiigoConnectionPanel } from '@/pages/siigo/SiigoConnectionPanel'
+import { HubspotConnectionPanel } from '@/pages/siigo/HubspotConnectionPanel'
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -1463,7 +1464,12 @@ export function CompaniesPage() {
               )}
 
               {detailTab === 'siigo' && (
-                <SiigoConnectionPanel key={selectedId!} companyId={selectedId!} />
+                <div className="space-y-8">
+                  <SiigoConnectionPanel key={selectedId!} companyId={selectedId!} />
+                  <div className="border-t border-slate-200 pt-6">
+                    <HubspotConnectionPanel key={`hs-${selectedId}`} companyId={selectedId!} />
+                  </div>
+                </div>
               )}
 
               {detailTab === 'activity' && (
