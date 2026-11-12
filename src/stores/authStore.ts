@@ -4,6 +4,11 @@ import axios from 'axios'
 
 const BASE = import.meta.env.VITE_API_URL || ''
 
+// Los tokens de sesión viven SOLO en cookies httpOnly emitidas por el backend:
+// el JavaScript no puede leerlos. Aquí solo se guarda el perfil (no es credencial;
+// el backend valida rol y permisos en cada request).
+const http = axios.create({ baseURL: BASE, withCredentials: true })
+
 interface User {
   id: string
   email: string
@@ -14,50 +19,53 @@ interface User {
 }
 
 interface AuthState {
-  accessToken: string | null
-  refreshToken: string | null
   user: User | null
   login: (email: string, password: string) => Promise<void>
   refresh: () => Promise<boolean>
-  logout: () => void
+  logout: () => Promise<void>
+  clearSession: () => void
 }
+
+// Varias peticiones pueden recibir 401 a la vez: un solo refresh compartido
+let refreshing: Promise<boolean> | null = null
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
-      accessToken:  null,
-      refreshToken: null,
-      user:         null,
+    (set) => ({
+      user: null,
 
       login: async (email, password) => {
-        const { data } = await axios.post(`${BASE}/auth/login`, { email, password })
-        const meRes = await axios.get(`${BASE}/auth/me`, {
-          headers: { Authorization: `Bearer ${data.access_token}` },
-        })
-        set({
-          accessToken:  data.access_token,
-          refreshToken: data.refresh_token,
-          user: { ...data.user, ...meRes.data },
-        })
+        const { data } = await http.post('/auth/login', { email, password })
+        const meRes = await http.get('/auth/me')
+        set({ user: { ...data.user, ...meRes.data } })
       },
 
-      refresh: async () => {
-        const rt = get().refreshToken
-        if (!rt) return false
+      refresh: () => {
+        refreshing ??= http
+          .post('/auth/refresh')
+          .then(() => true)
+          .catch(() => false)
+          .finally(() => { refreshing = null })
+        return refreshing
+      },
+
+      logout: async () => {
         try {
-          const { data } = await axios.post(`${BASE}/auth/refresh`, { refresh_token: rt })
-          set({ accessToken: data.access_token, refreshToken: data.refresh_token })
-          return true
+          await http.post('/auth/logout')
         } catch {
-          return false
+          // aunque falle la red, se limpia la sesión local
         }
+        set({ user: null })
       },
 
-      logout: () => set({ accessToken: null, refreshToken: null, user: null }),
+      clearSession: () => set({ user: null }),
     }),
     {
       name: 'rs-auth',
-      partialize: (s) => ({ accessToken: s.accessToken, refreshToken: s.refreshToken, user: s.user }),
+      version: 1,
+      partialize: (s) => ({ user: s.user }),
+      // v0 guardaba access/refresh token en localStorage: se descartan
+      migrate: (persisted) => ({ user: (persisted as { user?: User | null })?.user ?? null }),
     },
   ),
 )

@@ -529,6 +529,12 @@ export function LandingPage() {
                   >
                     Términos y Condiciones
                   </Link>
+                  <Link
+                    to="/politica-cookies"
+                    className="block text-cream-100/70 hover:text-cream-100 transition-colors"
+                  >
+                    Política de Cookies
+                  </Link>
                 </div>
               </div>
             </div>

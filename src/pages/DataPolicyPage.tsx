@@ -368,7 +368,8 @@ export function DataPolicyPage() {
       <footer className="bg-navy-950 text-cream-100/60 py-8 border-t border-white/10 mt-auto">
         <div className="max-w-4xl mx-auto px-5 md:px-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs">
           <p>© {new Date().getFullYear()} Finto · RAD Services S.A.S. Todos los derechos reservados.</p>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link to="/politica-cookies" className="hover:text-cream-100 transition-colors">Política de Cookies</Link>
             <a href="mailto:finto@finto.la" className="hover:text-cream-100 transition-colors">finto@finto.la</a>
             <a href="https://wa.me/573102170905" target="_blank" rel="noopener noreferrer" className="hover:text-cream-100 transition-colors">WhatsApp Soporte</a>
           </div>

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import { router } from './router'
 import { initTheme } from './stores/themeStore'
+import { CookieNotice } from './components/ui/CookieNotice'
 import './index.css'
 
 initTheme()
@@ -26,6 +27,7 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
       <Toaster position="top-right" richColors />
+      <CookieNotice />
     </QueryClientProvider>
   </StrictMode>,
 )

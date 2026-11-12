@@ -162,6 +162,7 @@ export function TermsPage() {
           <p>© {new Date().getFullYear()} Finto · RAD Services S.A.S. Todos los derechos reservados.</p>
           <div className="flex items-center gap-4">
             <Link to="/politica-tratamiento-datos" className="hover:text-cream-100 transition-colors">Política de Tratamiento de Datos</Link>
+            <Link to="/politica-cookies" className="hover:text-cream-100 transition-colors">Política de Cookies</Link>
             <a href="mailto:finto@finto.la" className="hover:text-cream-100 transition-colors">finto@finto.la</a>
             <a href="https://wa.me/573102170905" target="_blank" rel="noopener noreferrer" className="hover:text-cream-100 transition-colors">WhatsApp Soporte</a>
           </div>

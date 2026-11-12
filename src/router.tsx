@@ -39,13 +39,14 @@ import { ServicesAdminPage } from '@/pages/admin/ServicesAdminPage'
 import { LeadsPage }     from '@/pages/LeadsPage'
 import { DataPolicyPage } from '@/pages/DataPolicyPage'
 import { TermsPage }     from '@/pages/TermsPage'
+import { CookiePolicyPage } from '@/pages/CookiePolicyPage'
 import { NotFoundPage }  from '@/pages/NotFoundPage'
 
 const INTERNAL_ROLES = ['admin', 'rs_admin', 'rs_staff']
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
-  const token = useAuthStore(s => s.accessToken)
-  if (!token) return <Navigate to="/login" replace />
+  const isAuthenticated = useAuthStore(s => !!s.user)
+  if (!isAuthenticated) return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
@@ -97,6 +98,7 @@ export const router = createBrowserRouter([
   { path: '/politica-tratamiento-datos', element: <DataPolicyPage /> },
   { path: '/politica-privacidad',        element: <Navigate to="/politica-tratamiento-datos" replace /> },
   { path: '/terminos-y-condiciones',     element: <TermsPage /> },
+  { path: '/politica-cookies',           element: <CookiePolicyPage /> },
   { path: '/invitations/accept',        element: <AcceptInvitationPage /> },
   { path: '/reset-password',             element: <ResetPasswordPage /> },
   {

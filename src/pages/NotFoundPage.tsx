@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/Button'
 
 export function NotFoundPage() {
   const nav = useNavigate()
-  const token = useAuthStore(s => s.accessToken)
-  const home = token ? '/app/dashboard' : '/'
+  const isAuthenticated = useAuthStore(s => !!s.user)
+  const home = isAuthenticated ?'/app/dashboard' : '/'
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">

@@ -1324,17 +1324,20 @@ function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: (import
       fd.append('file', file)
       if (companyId) fd.append('company_id', companyId)
 
-      const token = (await import('@/stores/authStore')).useAuthStore.getState().accessToken
       const baseUrl = import.meta.env.VITE_API_URL || ''
-
-      const response = await fetch(`${baseUrl}/api/collection/debtors/import`, {
+      const send = () => fetch(`${baseUrl}/api/collection/debtors/import`, {
         method: 'POST',
-        headers: {
-          'Accept': 'text/event-stream',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        },
+        credentials: 'include',   // cookie httpOnly de sesión
+        headers: { 'Accept': 'text/event-stream' },
         body: fd,
       })
+
+      let response = await send()
+      if (response.status === 401) {
+        const { useAuthStore } = await import('@/stores/authStore')
+        if (await useAuthStore.getState().refresh()) response = await send()
+        else useAuthStore.getState().clearSession()
+      }
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({ error: 'Error al importar' }))
