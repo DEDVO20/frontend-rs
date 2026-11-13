@@ -31,6 +31,7 @@ import { SiigoCollectionsPage, SiigoLayout, SIIGO_INTERNAL_ROLES } from '@/pages
 import { SiigoTrialBalancePage } from '@/pages/siigo/SiigoTrialBalancePage'
 import { SiigoChartsPage } from '@/pages/siigo/SiigoChartsPage'
 import { SiigoReceivablesPage } from '@/pages/siigo/SiigoReceivablesPage'
+import { HubspotDealsPage } from '@/pages/siigo/HubspotDealsPage'
 import { TaxProfilesPage } from '@/pages/tax/TaxProfilesPage'
 import { ThirdPartiesPage } from '@/pages/tax/ThirdPartiesPage'
 import { TaskTemplatesPage } from '@/pages/TaskTemplatesPage'
@@ -121,6 +122,7 @@ export const router = createBrowserRouter([
           { path: 'recaudo',     element: <SiigoCollectionsPage /> },
           { path: 'cartera',     element: <SiigoReceivablesPage /> },
           { path: 'balance',     element: <SiigoTrialBalancePage /> },
+          { path: 'crm',         element: <HubspotDealsPage /> },
         ],
       },
       { path: 'siigo-graficas', element: <SmartSiigoCharts /> },

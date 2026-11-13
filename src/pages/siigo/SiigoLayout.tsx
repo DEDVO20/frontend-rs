@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { HandCoins, Receipt, Scale, Wallet, type LucideIcon } from 'lucide-react'
+import { Handshake, HandCoins, Receipt, Scale, Wallet, type LucideIcon } from 'lucide-react'
 import { TopBar } from '@/components/layout/TopBar'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
@@ -14,6 +14,7 @@ const TABS: { to: string; label: string; icon: LucideIcon }[] = [
   { to: 'recaudo',     label: 'Recaudo',           icon: HandCoins },
   { to: 'cartera',     label: 'Cartera',           icon: Wallet },
   { to: 'balance',     label: 'Balance de prueba', icon: Scale },
+  { to: 'crm',         label: 'CRM',               icon: Handshake },
 ]
 
 /**
@@ -56,7 +57,7 @@ export function SiigoLayout() {
   return (
     // Vista interna siempre clara (el contador navega dentro del layout del portal, que puede estar en oscuro)
     <div data-theme="light" style={{ colorScheme: 'light' }} className="flex flex-col h-full overflow-hidden bg-slate-50">
-      <TopBar title="Consultas Siigo" subtitle="Facturación, recaudo, cartera y balance de prueba de cada cuenta de Siigo" />
+      <TopBar title="Consultas Siigo" subtitle="Facturación, recaudo, cartera, balance de prueba y CRM de cada cuenta" />
 
       <nav className="flex flex-wrap items-center gap-1 px-4 md:px-6 bg-white border-b border-slate-200 shrink-0">
         {TABS.map(({ to, label, icon: Icon }) => (
