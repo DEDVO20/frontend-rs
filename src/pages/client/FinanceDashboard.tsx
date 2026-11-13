@@ -24,8 +24,8 @@ const fmtCompact = (n: number) => `${n < 0 ? '-' : ''}$${compact.format(Math.abs
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const fmtPeriod = (p: string) => `${MONTHS[Number(p.slice(5, 7)) - 1] ?? p} ${p.slice(2, 4)}`
 
-/** Costos en azul claro: misma familia que ingresos, distinto paso de luminosidad */
-const COSTOS = { light: '#9db7e8', dark: '#3f5f99' }
+/** Costos en verde azulado: se distingue del azul de ingresos y del dorado de gastos (paleta de CRM) */
+const COSTOS = { light: '#2f8f83', dark: '#4fb3a6' }
 
 /** Meses YYYY-MM entre dos periodos (incluidos) */
 function monthsBetween(from: string, to: string): string[] {
