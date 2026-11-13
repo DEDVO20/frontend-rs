@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { PageLoader } from '@/components/ui/Spinner'
 import { useSiigoSyncStore } from '@/stores/siigoSyncStore'
 import { SiigoNotConnected, useSiigoBooks, type SiigoBooksInfo } from './siigoBooks'
+import { MonthPicker } from './MonthPicker'
 
 interface CollectionLine {
   voucher_id: string
@@ -108,12 +109,23 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
     refetchInterval: q => (q.state.data?.isSyncRunning ? 5000 : false),
   })
 
+  // Importación de meses específicos (en lugar de todo el periodo)
+  const [showMonths, setShowMonths] = useState(false)
+  const [monthsYear, setMonthsYear] = useState(new Date().getFullYear())
+  const [months, setMonths] = useState<number[]>([])
+
   const syncMut = useMutation({
-    mutationFn: async () => (await api.post('/api/siigo/collections/sync', { connectionId: selected?.id })).data,
-    onSuccess: (res) => {
+    mutationFn: async (byMonths: boolean) => (await api.post('/api/siigo/collections/sync', {
+      connectionId: selected?.id,
+      ...(byMonths ? { year: monthsYear, months } : {}),
+    })).data,
+    onSuccess: (res, byMonths) => {
       // La sincronización sigue en el servidor; SiigoSyncWatcher avisa cuando termine
       startWatching('collections', res.connectionId, selected?.label ?? 'Finto')
-      toast.info('Sincronización de recaudo iniciada en segundo plano. Puedes seguir trabajando: te avisaremos cuando termine.')
+      toast.info(byMonths
+        ? `Importación de ${months.length} mes(es) de ${monthsYear} iniciada en segundo plano. Te avisaremos cuando termine.`
+        : 'Sincronización de recaudo iniciada en segundo plano. Puedes seguir trabajando: te avisaremos cuando termine.')
+      if (byMonths) { setShowMonths(false); setMonths([]) }
       qc.invalidateQueries({ queryKey: ['siigo-collections'] })
     },
     onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudo iniciar la sincronización de recaudo'),
@@ -151,18 +163,39 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
           </div>
         </div>
         {canSync && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => syncMut.mutate()}
-            loading={syncMut.isPending}
-            disabled={data?.isSyncRunning}
-          >
-            <RefreshCw className={cn('w-4 h-4 text-primary-600', data?.isSyncRunning && 'animate-spin')} />
-            {data?.isSyncRunning ? 'Sincronizando…' : 'Sincronizar recaudo'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => syncMut.mutate(false)}
+              loading={syncMut.isPending}
+              disabled={data?.isSyncRunning}
+            >
+              <RefreshCw className={cn('w-4 h-4 text-primary-600', data?.isSyncRunning && 'animate-spin')} />
+              {data?.isSyncRunning ? 'Sincronizando…' : 'Sincronizar recaudo'}
+            </Button>
+            <Button variant={showMonths ? 'primary' : 'secondary'} size="sm" onClick={() => setShowMonths(v => !v)} disabled={data?.isSyncRunning}>
+              Elegir meses
+            </Button>
+          </div>
         )}
       </div>
+
+      {canSync && showMonths && (
+        <div className="rounded-2xl p-4 border bg-white border-slate-200 space-y-3">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Meses de recaudo a importar</p>
+          <MonthPicker year={monthsYear} months={months} onYear={setMonthsYear} onMonths={setMonths} />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-amber-700 max-w-xl">
+              Cada mes se recalcula solo con sus recibos de caja. Un pago que completa una factura abonada en meses
+              anteriores puede quedar clasificado distinto; para el histórico exacto usa «Sincronizar recaudo».
+            </p>
+            <Button size="sm" onClick={() => syncMut.mutate(true)} disabled={!months.length || syncMut.isPending || data?.isSyncRunning}>
+              Importar {months.length || ''} {months.length === 1 ? 'mes' : 'meses'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Cifras */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -101,16 +101,33 @@ export function SiigoTrialBalancePage() {
     refetchInterval: q => (q.state.data?.isSyncRunning ? 10_000 : false),
   })
 
+  // Importación: año y meses elegidos (año completo o meses específicos)
+  const thisYear = new Date().getFullYear()
+  const thisMonth = new Date().getMonth() + 1
+  const [importYear, setImportYear] = useState(thisYear)
+  const [importMonths, setImportMonths] = useState<number[]>([])
+  const [showPicker, setShowPicker] = useState(false)
+  const lastMonth = importYear < thisYear ? 12 : thisMonth
+  const toggleMonth = (m: number) => setImportMonths(cur => (cur.includes(m) ? cur.filter(x => x !== m) : [...cur, m].sort((a, b) => a - b)))
+
   const syncMut = useMutation({
-    mutationFn: async (mode: 'current' | 'year') =>
-      (await api.post('/api/siigo/trial-balance/sync', { mode, connectionId: selected?.id })).data,
+    mutationFn: async (mode: 'current' | 'year' | 'months') =>
+      (await api.post('/api/siigo/trial-balance/sync', {
+        mode,
+        connectionId: selected?.id,
+        ...(mode !== 'current' ? { year: importYear } : {}),
+        ...(mode === 'months' ? { months: importMonths } : {}),
+      })).data,
     onSuccess: (res, mode) => {
       startWatching('trialBalance', res.connectionId, selected?.label ?? 'Finto')
       toast.info(
         mode === 'year'
-          ? 'Importación del año iniciada en segundo plano (un mes tras otro). Te avisaremos cuando termine.'
-          : 'Actualización del mes actual iniciada en segundo plano. Te avisaremos cuando termine.',
+          ? `Importación de ${importYear} iniciada en segundo plano (un mes tras otro). Te avisaremos cuando termine.`
+          : mode === 'months'
+            ? `Importación de ${importMonths.length} mes(es) de ${importYear} iniciada en segundo plano. Te avisaremos cuando termine.`
+            : 'Actualización del mes actual iniciada en segundo plano. Te avisaremos cuando termine.',
       )
+      if (mode === 'months') { setShowPicker(false); setImportMonths([]) }
       qc.invalidateQueries({ queryKey: ['siigo-trial-balance'] })
     },
     onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudo iniciar la importación del balance'),
@@ -162,6 +179,14 @@ export function SiigoTrialBalancePage() {
               <RefreshCw className={cn('w-4 h-4 text-primary-600', data?.isSyncRunning && 'animate-spin')} />
               Actualizar mes actual
             </Button>
+            <select
+              value={importYear}
+              onChange={e => { setImportYear(Number(e.target.value)); setImportMonths([]) }}
+              aria-label="Año a importar"
+              className="px-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              {Array.from({ length: thisYear - 2019 }, (_, i) => thisYear - i).map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
             <Button
               variant="secondary"
               size="sm"
@@ -170,9 +195,68 @@ export function SiigoTrialBalancePage() {
             >
               Importar año completo
             </Button>
+            <Button variant={showPicker ? 'primary' : 'secondary'} size="sm" onClick={() => setShowPicker(v => !v)}>
+              Elegir meses
+            </Button>
           </div>
         )}
       </div>
+
+      {/* Importación de meses específicos */}
+      {canSync && showPicker && (
+        <div className="rounded-2xl p-4 border bg-white border-slate-200 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Meses de {importYear} a importar</p>
+            <div className="flex gap-3 text-xs font-semibold">
+              <button onClick={() => setImportMonths(Array.from({ length: lastMonth }, (_, i) => i + 1))} className="text-primary-600 hover:underline">Todos</button>
+              <button onClick={() => setImportMonths([])} className="text-slate-500 hover:underline">Ninguno</button>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-12 gap-2">
+            {MESES.map((nombre, i) => {
+              const m = i + 1
+              const per = `${importYear}-${String(m).padStart(2, '0')}`
+              const imported = data?.periods.find(p => p.period === per)
+              const future = m > lastMonth
+              const on = importMonths.includes(m)
+              return (
+                <button
+                  key={m}
+                  onClick={() => toggleMonth(m)}
+                  disabled={future}
+                  title={future ? 'Mes aún no comenzado' : imported ? `Importado: ${imported.status === 'OK' ? 'correcto' : 'con error'} · ${imported.detail}` : 'Sin importar'}
+                  className={cn(
+                    'relative px-2 py-2 rounded-xl border text-xs font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed',
+                    on ? 'bg-primary-600 text-white border-primary-600' : 'border-slate-200 text-slate-700 hover:bg-slate-50',
+                  )}
+                >
+                  {nombre.slice(0, 3)}
+                  {imported && (
+                    <span className={cn(
+                      'absolute top-1 right-1 w-1.5 h-1.5 rounded-full',
+                      imported.status === 'OK' ? 'bg-emerald-500' : 'bg-amber-500',
+                    )} />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[11px] text-slate-400">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 align-middle" />ya importado
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 ml-3 mr-1 align-middle" />importado con error ·
+              volver a importar un mes reemplaza sus datos.
+            </p>
+            <Button
+              size="sm"
+              onClick={() => syncMut.mutate('months')}
+              disabled={!importMonths.length || data?.isSyncRunning || syncMut.isPending}
+            >
+              Importar {importMonths.length || ''} {importMonths.length === 1 ? 'mes' : 'meses'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Control de periodos: un chip por mes con su estado */}
       {(data?.periods.length ?? 0) > 0 && (

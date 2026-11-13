@@ -7,6 +7,7 @@ import { PageLoader } from '@/components/ui/Spinner'
 import { useAuthStore } from '@/stores/authStore'
 import { useSiigoSyncStore } from '@/stores/siigoSyncStore'
 import { SiigoNotConnected, useSiigoBooks, type SiigoBooksInfo, type SiigoConnection } from './siigoBooks'
+import { MonthPicker } from './MonthPicker'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
@@ -1011,7 +1012,9 @@ function SyncSiigoModal({
   onSynced: () => void
 }) {
   const qc = useQueryClient()
-  const [mode, setMode] = useState<'incremental' | 'days' | 'range' | 'full'>('incremental')
+  const [mode, setMode] = useState<'incremental' | 'days' | 'range' | 'full' | 'months'>('incremental')
+  const [monthsYear, setMonthsYear] = useState<number>(new Date().getFullYear())
+  const [months, setMonths] = useState<number[]>([])
   const [days, setDays] = useState<number>(15)
   const [year, setYear] = useState<number>(books?.sales_start_year ?? 2025)
   const [startDate, setStartDate] = useState<string>(new Date(Date.now() - 15 * 86400000).toISOString().slice(0, 10))
@@ -1026,7 +1029,8 @@ function SyncSiigoModal({
         connectionId: books?.id,
         mode,
         days,
-        year,
+        year: mode === 'months' ? monthsYear : year,
+        months: mode === 'months' ? months : undefined,
         startDate: mode === 'range' ? startDate : undefined,
         endDate:   mode === 'range' ? endDate : undefined,
         sellerFilter,
@@ -1073,6 +1077,7 @@ function SyncSiigoModal({
               { id: 'incremental', label: 'Incremental', desc: 'Desde la última sync' },
               { id: 'days',  label: 'Últimos días', desc: 'Últimos N días' },
               { id: 'range', label: 'Por Fechas',  desc: 'Rango exacto' },
+              { id: 'months', label: 'Por meses',  desc: 'Meses específicos' },
               { id: 'full',  label: 'Completa',    desc: 'Todo el año' },
             ].map(opt => (
               <button
@@ -1150,6 +1155,14 @@ function SyncSiigoModal({
             </div>
           )}
 
+          {mode === 'months' && (
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-700">Meses a importar</label>
+              <MonthPicker year={monthsYear} months={months} onYear={setMonthsYear} onMonths={setMonths} />
+              <p className="text-[11px] text-slate-400">Cada mes se vuelve a traer completo desde Siigo y reemplaza lo que había de ese mes.</p>
+            </div>
+          )}
+
           {mode === 'full' && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -1189,7 +1202,7 @@ function SyncSiigoModal({
           <Button variant="secondary" onClick={onClose} disabled={syncMut.isPending}>
             Cancelar
           </Button>
-          <Button onClick={() => syncMut.mutate()} loading={syncMut.isPending}>
+          <Button onClick={() => syncMut.mutate()} loading={syncMut.isPending} disabled={mode === 'months' && !months.length}>
             <RefreshCw className="w-4 h-4" />
             {syncMut.isPending ? 'Iniciando…' : 'Iniciar sincronización'}
           </Button>
