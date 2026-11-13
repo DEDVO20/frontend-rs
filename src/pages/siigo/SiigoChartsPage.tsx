@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -101,7 +101,7 @@ interface CollectionsReport {
 
 type ViewTab = 'facturacion' | 'recaudo' | 'cartera' | 'balance'
 
-interface BalanceMonthly {
+export interface BalanceMonthly {
   period: string
   ingresos: number
   gastos: number
@@ -115,12 +115,16 @@ interface BalanceMonthly {
   credito: number
 }
 
-interface BalanceReport {
+export interface BalanceReport {
   scope: 'global' | 'company'
   latestPeriod: string | null
   monthly: BalanceMonthly[]
   byAccount: { code: string; name: string; debit: number; credit: number; finalBalance: number }[]
   topCartera: { nit: string; name: string; companyId: string | null; saldo: number }[]
+  /** Flujo de caja reportado (cuentas de disponible, clase 11) por mes */
+  cash?: { period: string; entradas: number; salidas: number; posicion: number }[]
+  /** Estado de importación de cada mes del periodo */
+  periods?: { period: string; status: 'OK' | 'ERROR' }[]
   lastSync: { started_at: string; status: string } | null
 }
 
@@ -387,7 +391,7 @@ export function useBalanceReport(params: Record<string, string>, keepPrevious = 
   })
 }
 
-function useCollectionsReport(params: Record<string, string>, keepPrevious = false) {
+export function useCollectionsReport(params: Record<string, string>, keepPrevious = false) {
   return useQuery<CollectionsReport>({
     queryKey: ['siigo-collections-report', params],
     queryFn: async () => (await api.get('/api/siigo/collections/report', { params })).data,
@@ -425,6 +429,8 @@ export interface ChartProps {
   /** Solo internos: clic en un tercero con empresa vinculada para ver solo esa empresa */
   onCompany?: (companyId: string) => void
   /** Vista reducida del dashboard del cliente: solo las gráficas principales, sin cifras ni tablas extra */
+  /** Con compact: qué gráficas mostrar (cartera: edades, vendedor, evolucion, clientes); sin definir = todas */
+  only?: string[]
   compact?: boolean
 }
 
@@ -1285,7 +1291,7 @@ export function BalanceCharts({ params, range, style, scopeName, month = null, o
 
 const pct = (part: number, total: number) => (total > 0 ? `${Math.round((part / total) * 100)}%` : '—')
 
-interface ReceivablesReport {
+export interface ReceivablesReport {
   scope: 'global' | 'company'
   books: SiigoBooksInfo | null
   isSyncRunning: boolean
@@ -1317,7 +1323,7 @@ const fmtDay = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('es-C
  * limitado a su saldo contable en 130505 + 13051001. Foto diaria; el periodo solo filtra la evolución.
  * Es independiente de las importaciones del módulo de cobro.
  */
-export function CarteraCharts({ params, style, scopeName, compact = false }: ChartProps) {
+export function CarteraCharts({ params, style, scopeName, compact = false, only }: ChartProps) {
   const { colors, isDark, isInternal, cardCls, titleCls, mutedCls } = style
   const role = useAuthStore(s => s.user?.role ?? '')
   const canSync = SYNC_ROLES.includes(role)
@@ -1583,6 +1589,11 @@ export function CarteraCharts({ params, style, scopeName, compact = false }: Cha
   const filterChips = <FilterChips filters={chips} onClearAll={clearFilters} mutedCls={mutedCls} />
 
   // Dashboard del cliente: solo edades, vendedor, evolución y clientes
+  if (compact && only) {
+    // Solo las gráficas pedidas, sin envoltorio: quien las usa decide la distribución
+    const byKey: Record<string, React.ReactNode> = { edades: edadesChart, vendedor: vendedorChart, evolucion: evolucionChart, clientes: clientesChart }
+    return <>{only.map(k => <Fragment key={k}>{byKey[k]}</Fragment>)}</>
+  }
   if (compact) {
     return (
       <>
@@ -1661,7 +1672,7 @@ export function CarteraCharts({ params, style, scopeName, compact = false }: Cha
 
 // ── CRM (HubSpot) ───────────────────────────────────────────────────────────
 
-interface CrmReport {
+export interface CrmReport {
   connection: { id: string; label: string; has_token: boolean } | null
   notConnected: boolean
   isSyncRunning: boolean
@@ -1669,6 +1680,35 @@ interface CrmReport {
   summary: { deals: number; amount: number; enviadas: number; ganadas: number; valorGanado: number } | null
   byStage: { stage: string; order: number; kind: string; owner: string; amount: number; deals: number }[]
   monthly: { period: string; enviadas: number; ganadas: number }[]
+}
+
+/** El HubSpot sale de los libros elegidos (connectionId); companyId del selector es un tercero de esos libros */
+function crmParamsOf(params: Record<string, string>) {
+  const out: Record<string, string> = {}
+  for (const k of ['connectionId', 'startDate', 'endDate']) if (params[k]) out[k] = params[k]!
+  return out
+}
+
+/** Informe de CRM (HubSpot): lo comparten las gráficas de CRM y el dashboard de negocios */
+export function useCrmReport(params: Record<string, string>) {
+  const crmParams = crmParamsOf(params)
+  return useQuery<CrmReport>({
+    queryKey: ['hubspot-report', crmParams],
+    queryFn: async () => (await api.get('/api/hubspot/report', { params: crmParams })).data,
+    staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    refetchInterval: q => (q.state.data?.isSyncRunning ? 10_000 : false),
+  })
+}
+
+/** Informe de cartera sin filtros por clic (misma consulta, en caché, que la pestaña Cartera) */
+export function useReceivablesReport(params: Record<string, string>) {
+  return useQuery<ReceivablesReport>({
+    queryKey: ['siigo-receivables-report', params],
+    queryFn: async () => (await api.get('/api/siigo/receivables/report', { params })).data,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
+  })
 }
 
 /** Colores categóricos por socio (máx. 6; el resto se agrupa en "Otros", en gris) */
@@ -1700,17 +1740,8 @@ export function CrmCharts({ params, style, scopeName }: ChartProps) {
   const qc = useQueryClient()
   const startWatching = useSiigoSyncStore(s => s.start)
 
-  // El HubSpot sale de los libros elegidos (connectionId); companyId del selector es un tercero de esos libros
-  const crmParams: Record<string, string> = {}
-  for (const k of ['connectionId', 'startDate', 'endDate']) if (params[k]) crmParams[k] = params[k]!
-
-  const { data, isLoading } = useQuery<CrmReport>({
-    queryKey: ['hubspot-report', crmParams],
-    queryFn: async () => (await api.get('/api/hubspot/report', { params: crmParams })).data,
-    staleTime: 60_000,
-    placeholderData: keepPreviousData,
-    refetchInterval: q => (q.state.data?.isSyncRunning ? 10_000 : false),
-  })
+  const crmParams = crmParamsOf(params)
+  const { data, isLoading } = useCrmReport(params)
 
   const syncMut = useMutation({
     mutationFn: async () => (await api.post('/api/hubspot/sync', { connectionId: crmParams.connectionId })).data,
@@ -2028,7 +2059,7 @@ function StatTile({ label, value, title, cardCls, titleCls, mutedCls }: {
 type TooltipRow = { key: string; label: string; color?: string; fmt?: (n: number) => string }
 
 /** Tooltip con tokens de texto; el color de serie solo va en la marca junto a la etiqueta */
-function ChartTooltip({ active, payload, label, rows, labelKey, isDark, isInternal }: {
+export function ChartTooltip({ active, payload, label, rows, labelKey, isDark, isInternal }: {
   active?: boolean
   payload?: any[]
   label?: string
