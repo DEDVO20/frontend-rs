@@ -78,7 +78,8 @@ interface SiigoReport {
   byCustomer: CustomerRow[]
 }
 
-type Preset = '12m' | 'year-current' | 'year-previous' | 'all' | 'custom'
+/** Atajos relativos a hoy, un mes concreto ('month') o un rango de fechas exacto ('range') */
+type Preset = 'month-current' | 'month-previous' | '3m' | '12m' | 'year-current' | 'year-previous' | 'all' | 'month' | 'range'
 
 /**
  * Colores de serie validados (scripts/validate_palette.js del skill dataviz):
@@ -146,17 +147,44 @@ function lastDayOfMonth(ym: string) {
   return `${ym}-${String(new Date(y!, m!, 0).getDate()).padStart(2, '0')}`
 }
 
-/** Rango de meses [desde, hasta] del filtro por periodo; null = sin límite */
-function presetRange(preset: Preset, customFrom: string, customTo: string): { from: string | null; to: string | null } {
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+
+/** Fecha local como YYYY-MM-DD (sin desfase por zona horaria) */
+const toYmd = (d: Date) => `${toYm(d)}-${String(d.getDate()).padStart(2, '0')}`
+
+/** "15 mar 2026" */
+const fmtFullDay = (ymd: string) => {
+  const [y, m, d] = ymd.split('-')
+  return `${Number(d)} ${MONTHS[Number(m) - 1] ?? m} ${y}`
+}
+
+/**
+ * Fechas exactas [desde, hasta] del filtro de periodo (YYYY-MM-DD); null = sin límite.
+ * Atajos relativos a hoy, un mes concreto o un rango de fechas exacto.
+ */
+function presetDates(preset: Preset, monthPick: string, dateFrom: string, dateTo: string): { start: string | null; end: string | null } {
   const now = new Date()
-  const year = now.getFullYear()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const today = toYmd(now)
   switch (preset) {
-    case '12m':           return { from: toYm(new Date(year, now.getMonth() - 11, 1)), to: toYm(now) }
-    case 'year-current':  return { from: `${year}-01`, to: `${year}-12` }
-    case 'year-previous': return { from: `${year - 1}-01`, to: `${year - 1}-12` }
-    case 'custom':        return { from: customFrom || null, to: customTo || null }
-    default:              return { from: null, to: null }
+    case 'month-current':  return { start: `${toYm(now)}-01`, end: today }
+    case 'month-previous': { const p = toYm(new Date(y, m - 1, 1)); return { start: `${p}-01`, end: lastDayOfMonth(p) } }
+    case '3m':             return { start: `${toYm(new Date(y, m - 2, 1))}-01`, end: today }
+    case '12m':            return { start: `${toYm(new Date(y, m - 11, 1))}-01`, end: today }
+    case 'year-current':   return { start: `${y}-01-01`, end: today }
+    case 'year-previous':  return { start: `${y - 1}-01-01`, end: `${y - 1}-12-31` }
+    case 'month':          return monthPick ? { start: `${monthPick}-01`, end: lastDayOfMonth(monthPick) } : { start: null, end: null }
+    case 'range':          return { start: dateFrom || null, end: dateTo || null }
+    default:               return { start: null, end: null }
   }
+}
+
+/** Texto del periodo aplicado, para que siempre quede claro qué se está viendo */
+function describeDates(start: string | null, end: string | null): string {
+  if (!start && !end) return 'Todo el histórico'
+  if (start && end) return `${fmtFullDay(start)} – ${fmtFullDay(end)}`
+  return start ? `Desde ${fmtFullDay(start)}` : `Hasta ${fmtFullDay(end!)}`
 }
 
 /** Completa con ceros los meses sin documentos para que la serie sea continua */
@@ -227,27 +255,52 @@ export function useChartStyle(): ChartStyle {
  */
 export function usePeriodFilter() {
   const [preset, setPresetRaw] = useState<Preset>('12m')
-  const [customFrom, setCustomFromRaw] = useState('')
-  const [customTo, setCustomToRaw] = useState('')
+  const [monthPick, setMonthPickRaw] = useState(() => toYm(new Date()))
+  const [dateFrom, setDateFromRaw] = useState('')
+  const [dateTo, setDateToRaw] = useState('')
   const [month, setMonth] = useState<string | null>(null)
   // Cambiar el periodo quita el mes seleccionado (podría quedar fuera del rango)
-  const setPreset = (p: Preset) => { setPresetRaw(p); setMonth(null) }
-  const setCustomFrom = (v: string) => { setCustomFromRaw(v); setMonth(null) }
-  const setCustomTo = (v: string) => { setCustomToRaw(v); setMonth(null) }
-  const range = presetRange(preset, customFrom, customTo)
-  const dateParams: Record<string, string> = {
-    ...(range.from ? { startDate: `${range.from}-01` } : {}),
-    ...(range.to ? { endDate: lastDayOfMonth(range.to) } : {}),
+  const setPreset = (p: Preset) => {
+    // El rango exacto arranca con las fechas del periodo que se estaba viendo, para ajustarlo desde ahí
+    if (p === 'range' && !dateFrom && !dateTo) {
+      const cur = presetDates(preset, monthPick, dateFrom, dateTo)
+      setDateFromRaw(cur.start ?? '')
+      setDateToRaw(cur.end ?? '')
+    }
+    setPresetRaw(p)
+    setMonth(null)
   }
-  return { preset, setPreset, customFrom, setCustomFrom, customTo, setCustomTo, month, setMonth, range, dateParams }
+  const setMonthPick = (v: string) => { setMonthPickRaw(v); setMonth(null) }
+  const setDateFrom = (v: string) => { setDateFromRaw(v); setMonth(null) }
+  const setDateTo = (v: string) => { setDateToRaw(v); setMonth(null) }
+
+  const dates = presetDates(preset, monthPick, dateFrom, dateTo)
+  // Un rango invertido (desde > hasta) no se aplica hasta corregirlo
+  const invalid = Boolean(dates.start && dates.end && dates.start > dates.end)
+  const start = invalid ? null : dates.start
+  const end = invalid ? null : dates.end
+  // Meses que cubre el periodo, para las series mes a mes
+  const range = { from: start?.slice(0, 7) ?? null, to: end?.slice(0, 7) ?? null }
+  const dateParams: Record<string, string> = {
+    ...(start ? { startDate: start } : {}),
+    ...(end ? { endDate: end } : {}),
+  }
+  return {
+    preset, setPreset, monthPick, setMonthPick, dateFrom, setDateFrom, dateTo, setDateTo,
+    invalid, label: describeDates(start, end), month, setMonth, range, dateParams,
+  }
 }
 
 export type PeriodFilter = ReturnType<typeof usePeriodFilter>
 
-/** Barra de filtros en una sola fila sobre las gráficas; `children` va a la derecha */
+/**
+ * Barra del filtro de periodo sobre las gráficas: atajos, un mes concreto o un rango de fechas
+ * exacto, y siempre el periodo aplicado en texto. `children` va a la derecha.
+ */
 export function PeriodFilterBar({ filter, style, children }: { filter: PeriodFilter; style: ChartStyle; children?: React.ReactNode }) {
-  const { isInternal, cardCls, mutedCls } = style
-  const year = new Date().getFullYear()
+  const { isInternal, cardCls, mutedCls, titleCls } = style
+  const now = new Date()
+  const year = now.getFullYear()
   const chipCls = (active: boolean) => cn(
     'px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors',
     active
@@ -257,46 +310,85 @@ export function PeriodFilterBar({ filter, style, children }: { filter: PeriodFil
         : 'border-navy-900/10 text-navy-900/70 hover:bg-navy-900/5 dark:border-white/10 dark:text-cream-100/80 dark:hover:bg-white/5',
   )
   const inputCls = chartInputCls(isInternal)
+  const quick: { id: Preset; label: string }[] = [
+    { id: 'month-current', label: 'Este mes' },
+    { id: 'month-previous', label: 'Mes anterior' },
+    { id: '3m', label: 'Últimos 3 meses' },
+    { id: '12m', label: 'Últimos 12 meses' },
+    { id: 'year-current', label: `Año ${year}` },
+    { id: 'year-previous', label: `Año ${year - 1}` },
+    { id: 'all', label: 'Todo' },
+  ]
+  const [pickYear, pickMonth] = filter.monthPick.split('-').map(Number) as [number, number]
+  const maxMonth = pickYear === year ? now.getMonth() + 1 : 12
+  const today = toYmd(now)
 
   return (
-    <div className={cn(cardCls, 'flex flex-wrap items-center gap-2 py-3')}>
-      <span className={cn('text-xs font-bold uppercase tracking-wider mr-1', mutedCls)}>Periodo</span>
-      <button className={chipCls(filter.preset === '12m')} onClick={() => filter.setPreset('12m')}>Últimos 12 meses</button>
-      <button className={chipCls(filter.preset === 'year-current')} onClick={() => filter.setPreset('year-current')}>Año {year}</button>
-      <button className={chipCls(filter.preset === 'year-previous')} onClick={() => filter.setPreset('year-previous')}>Año {year - 1}</button>
-      <button className={chipCls(filter.preset === 'all')} onClick={() => filter.setPreset('all')}>Todo</button>
-      <button className={chipCls(filter.preset === 'custom')} onClick={() => filter.setPreset('custom')}>Personalizado</button>
-      {filter.preset === 'custom' && (
-        <div className="flex items-center gap-1.5">
-          <input
-            type="month"
-            aria-label="Mes desde"
-            value={filter.customFrom}
-            max={filter.customTo || undefined}
-            onChange={e => filter.setCustomFrom(e.target.value)}
-            className={inputCls}
-          />
-          <span className={cn('text-xs', mutedCls)}>a</span>
-          <input
-            type="month"
-            aria-label="Mes hasta"
-            value={filter.customTo}
-            min={filter.customFrom || undefined}
-            onChange={e => filter.setCustomTo(e.target.value)}
-            className={inputCls}
-          />
+    <div className={cn(cardCls, 'py-3 space-y-3')}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn('text-xs font-bold uppercase tracking-wider mr-1', mutedCls)}>Periodo</span>
+        {quick.map(q => (
+          <button key={q.id} className={chipCls(filter.preset === q.id)} onClick={() => filter.setPreset(q.id)}>{q.label}</button>
+        ))}
+        <span className={cn('mx-1 h-5 w-px', isInternal ? 'bg-slate-200' : 'bg-navy-900/10 dark:bg-white/10')} aria-hidden />
+        <button className={chipCls(filter.preset === 'month')} onClick={() => filter.setPreset('month')}>Un mes</button>
+        <button className={chipCls(filter.preset === 'range')} onClick={() => filter.setPreset('range')}>Rango de fechas</button>
+        {children}
+      </div>
+
+      {(filter.preset === 'month' || filter.preset === 'range') && (
+        <div className="flex flex-wrap items-center gap-2">
+          {filter.preset === 'month' ? (
+            <>
+              <select
+                aria-label="Mes"
+                value={pickMonth}
+                onChange={e => filter.setMonthPick(`${pickYear}-${String(e.target.value).padStart(2, '0')}`)}
+                className={inputCls}
+              >
+                {MONTH_NAMES.map((n, i) => <option key={n} value={i + 1} disabled={i + 1 > maxMonth}>{n}</option>)}
+              </select>
+              <select
+                aria-label="Año"
+                value={pickYear}
+                onChange={e => {
+                  const y = Number(e.target.value)
+                  // Si el mes aún no ha llegado en el año elegido, se usa el último mes disponible
+                  const m = y === year ? Math.min(pickMonth, now.getMonth() + 1) : pickMonth
+                  filter.setMonthPick(`${y}-${String(m).padStart(2, '0')}`)
+                }}
+                className={inputCls}
+              >
+                {Array.from({ length: year - 2019 }, (_, i) => year - i).map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </>
+          ) : (
+            <>
+              <label className={cn('text-xs', mutedCls)} htmlFor="period-from">Desde</label>
+              <input id="period-from" type="date" value={filter.dateFrom} max={filter.dateTo || today}
+                onChange={e => filter.setDateFrom(e.target.value)} className={inputCls} />
+              <label className={cn('text-xs', mutedCls)} htmlFor="period-to">Hasta</label>
+              <input id="period-to" type="date" value={filter.dateTo} min={filter.dateFrom || undefined}
+                onChange={e => filter.setDateTo(e.target.value)} className={inputCls} />
+              {filter.invalid && <span className="text-xs font-semibold text-red-500">«Desde» debe ser anterior a «Hasta»</span>}
+            </>
+          )}
         </div>
       )}
-      {filter.month && (
-        <button
-          onClick={() => filter.setMonth(null)}
-          title="Quitar el mes seleccionado"
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-primary-50 text-primary-700 ring-1 ring-primary-600/20 hover:bg-primary-100"
-        >
-          Mes: {fmtPeriod(filter.month)} <X className="w-3 h-3" />
-        </button>
-      )}
-      {children}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={cn('text-xs', mutedCls)}>Mostrando:</span>
+        <span className={cn('text-xs font-semibold', titleCls)}>{filter.label}</span>
+        {filter.month && (
+          <button
+            onClick={() => filter.setMonth(null)}
+            title="Quitar el mes seleccionado"
+            className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-semibold bg-primary-50 text-primary-700 ring-1 ring-primary-600/20 hover:bg-primary-100"
+          >
+            Detalle de {fmtPeriod(filter.month)} <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
