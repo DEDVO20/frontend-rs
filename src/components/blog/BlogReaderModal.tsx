@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { X, Clock, Calendar, Share2, Check, ArrowRight, BookOpen } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -77,7 +77,7 @@ export function BlogReaderModal({ post, onClose, onOpenContact }: Props) {
             {listItems.map((item, idx) => (
               <li key={idx} className="flex items-start gap-3 text-slate-700 leading-relaxed text-base">
                 <span className="w-2 h-2 rounded-full bg-brand-500 mt-2 shrink-0" />
-                <span dangerouslySetInnerHTML={{ __html: formatInline(item) }} />
+                <span>{formatInline(item)}</span>
               </li>
             ))}
           </ul>
@@ -86,12 +86,17 @@ export function BlogReaderModal({ post, onClose, onOpenContact }: Props) {
       }
     }
 
-    const formatInline = (str: string) => {
-      return str
-        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-navy-950">$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em class="italic text-slate-800">$1</em>')
-        .replace(/\$(.*?)\$/g, '<code class="px-2 py-0.5 rounded bg-sand-200/50 text-brand-700 font-mono text-sm">$1</code>')
-    }
+    const formatInline = (str: string): ReactNode[] =>
+      str.split(/(\*\*.*?\*\*|\*.*?\*|\$.*?\$)/g).map((part, index) => {
+        if (index % 2 === 0) return part
+        if (part.startsWith('**')) {
+          return <strong key={index} className="font-bold text-navy-950">{formatInline(part.slice(2, -2))}</strong>
+        }
+        if (part.startsWith('*')) {
+          return <em key={index} className="italic text-slate-800">{part.slice(1, -1)}</em>
+        }
+        return <code key={index} className="px-2 py-0.5 rounded bg-sand-200/50 text-brand-700 font-mono text-sm">{part.slice(1, -1)}</code>
+      })
 
     lines.forEach((line, index) => {
       const trimmed = line.trim()
@@ -153,8 +158,7 @@ export function BlogReaderModal({ post, onClose, onOpenContact }: Props) {
             )}
             <p
               className="text-base md:text-lg font-medium leading-relaxed font-sans"
-              dangerouslySetInnerHTML={{ __html: formatInline(quoteContent) }}
-            />
+            >{formatInline(quoteContent)}</p>
           </div>
         )
         return
@@ -188,8 +192,7 @@ export function BlogReaderModal({ post, onClose, onOpenContact }: Props) {
             </div>
             <div
               className="text-slate-800 text-base leading-relaxed pt-1"
-              dangerouslySetInnerHTML={{ __html: formatInline(content) }}
-            />
+            >{formatInline(content)}</div>
           </div>
         )
         return
@@ -207,8 +210,7 @@ export function BlogReaderModal({ post, onClose, onOpenContact }: Props) {
         <p
           key={`p-${index}`}
           className="text-slate-700 text-base md:text-lg leading-relaxed mb-4"
-          dangerouslySetInnerHTML={{ __html: formatInline(trimmed) }}
-        />
+        >{formatInline(trimmed)}</p>
       )
     })
 

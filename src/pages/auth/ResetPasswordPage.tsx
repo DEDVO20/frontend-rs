@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 const BASE = import.meta.env.VITE_API_URL || ''
 import { Button } from '@/components/ui/Button'
 import { CheckCircle2, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react'
@@ -50,9 +50,14 @@ export function ResetPasswordPage() {
         password,
       })
       setStatus('success')
-    } catch (e: any) {
-      setErrorMsg(e.response?.data?.error ?? 'Error al restablecer la contraseña')
-      setStatus('error')
+    } catch (error) {
+      const response = isAxiosError(error) ? error.response : undefined
+      if (response?.status === 401) {
+        setStatus('invalid')
+      } else {
+        setErrorMsg(response?.data?.error ?? 'Error al restablecer la contraseña')
+        setStatus('error')
+      }
     } finally {
       setSubmitting(false)
     }

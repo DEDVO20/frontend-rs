@@ -1,3 +1,4 @@
+import { queryKeys } from '@/lib/queryKeys'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -93,7 +94,7 @@ export function HubspotDealsPage() {
   }
 
   const { data, isLoading, isFetching } = useQuery<DealsResponse>({
-    queryKey: ['hubspot-deals', params],
+    queryKey: [...queryKeys.hubspotDeals, params],
     queryFn: async () => (await api.get('/api/hubspot/deals', { params })).data,
     staleTime: 30_000,
     refetchInterval: q => (q.state.data?.isSyncRunning ? 10_000 : false),
@@ -101,7 +102,7 @@ export function HubspotDealsPage() {
 
   // Totales del periodo: mismo informe que las gráficas de CRM
   const { data: report } = useQuery<CrmSummary>({
-    queryKey: ['hubspot-report', scopeParams],
+    queryKey: [...queryKeys.hubspotReport, scopeParams],
     queryFn: async () => (await api.get('/api/hubspot/report', { params: scopeParams })).data,
     staleTime: 60_000,
   })
@@ -111,7 +112,7 @@ export function HubspotDealsPage() {
     onSuccess: (res) => {
       startWatching('hubspot', res.connectionId, res.label ?? 'HubSpot')
       toast.info('Sincronización de HubSpot iniciada en segundo plano. Te avisaremos cuando termine.')
-      qc.invalidateQueries({ queryKey: ['hubspot-deals'] })
+      qc.invalidateQueries({ queryKey: queryKeys.hubspotDeals })
     },
     onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudo iniciar la sincronización de HubSpot'),
   })

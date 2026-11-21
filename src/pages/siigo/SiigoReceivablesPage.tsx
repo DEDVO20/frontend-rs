@@ -1,3 +1,4 @@
+import { queryKeys } from '@/lib/queryKeys'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -100,7 +101,7 @@ export function SiigoReceivablesPage() {
   }
 
   const { data: companiesRes } = useQuery({
-    queryKey: ['companies-siigo-selector'],
+    queryKey: queryKeys.siigoCompanies,
     queryFn: async () => (await api.get('/api/companies?limit=100')).data,
     enabled: isInternal,
     staleTime: 120_000,
@@ -108,7 +109,7 @@ export function SiigoReceivablesPage() {
   const companies: any[] = Array.isArray(companiesRes) ? companiesRes : (companiesRes?.data ?? [])
 
   const { data, isLoading, isFetching } = useQuery<ReceivablesResponse>({
-    queryKey: ['siigo-receivables', params],
+    queryKey: [...queryKeys.siigoReceivables, params],
     queryFn: async () => (await api.get('/api/siigo/receivables', { params })).data,
     staleTime: 30_000,
     refetchInterval: q => (q.state.data?.isSyncRunning ? 10_000 : false),
@@ -116,7 +117,7 @@ export function SiigoReceivablesPage() {
 
   // Totales y edades: mismo informe que la pestaña Cartera de las gráficas
   const { data: report } = useQuery<ReceivablesSummary>({
-    queryKey: ['siigo-receivables-report', scopeParams],
+    queryKey: [...queryKeys.siigoReceivablesReport, scopeParams],
     queryFn: async () => (await api.get('/api/siigo/receivables/report', { params: scopeParams })).data,
     staleTime: 30_000,
   })
@@ -126,7 +127,7 @@ export function SiigoReceivablesPage() {
     onSuccess: (res) => {
       startWatching('receivables', res.connectionId, selected?.label ?? 'Finto')
       toast.info('Cálculo de cartera iniciado en segundo plano. Te avisaremos cuando termine.')
-      qc.invalidateQueries({ queryKey: ['siigo-receivables'] })
+      qc.invalidateQueries({ queryKey: queryKeys.siigoReceivables })
     },
     onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudo iniciar la sincronización de cartera'),
   })

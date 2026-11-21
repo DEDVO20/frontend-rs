@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 
 const modules = import.meta.glob('../../assets/finto/icons/*/*.svg', {
   eager: true,
-  query: '?url',
+  query: '?url&no-inline',
   import: 'default',
 }) as Record<string, string>
 

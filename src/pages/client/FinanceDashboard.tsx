@@ -1,6 +1,8 @@
+import { useBalanceReport, useSalesReport } from '@/features/siigo/reports'
+import { ChartContainer } from '@/components/ui/ChartContainer'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, Tooltip, XAxis, YAxis } from 'recharts'
 import {
   AlertTriangle, BarChart3, CheckCircle2, Coins, FileText, Landmark, Layers, Scale, ShieldCheck, TrendingDown, TrendingUp,
   type LucideIcon,
@@ -10,13 +12,12 @@ import { PageLoader } from '@/components/ui/Spinner'
 import {
   ChartTooltip,
   PeriodFilterBar,
-  useBalanceReport,
   useChartStyle,
-  useSalesReport,
   type ChartStyle,
   type PeriodFilter,
-} from '@/pages/siigo/SiigoChartsPage'
+} from '@/features/charts'
 import { SiigoNotConnected } from '@/pages/siigo/siigoBooks'
+import { StatementTree } from './StatementTree'
 
 const compact = new Intl.NumberFormat('es-CO', { notation: 'compact', maximumFractionDigits: 1 })
 const money = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
@@ -181,7 +182,7 @@ export function GestionFinancieraTab({ period }: { period: PeriodFilter }) {
         <section className={cn(cardCls, 'xl:col-span-2')}>
           <CardTitle style={style}>Estado de resultados</CardTitle>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer width="100%" height="100%">
               <BarChart data={monthly} barGap={2} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke={colors.grid} />
                 <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={8} />
@@ -200,7 +201,7 @@ export function GestionFinancieraTab({ period }: { period: PeriodFilter }) {
                 <Bar dataKey="costos" name="Costos" fill={costosColor} maxBarSize={16} radius={[3, 3, 0, 0]} />
                 <Bar dataKey="gastos" name="Gastos" fill={colors.notas} maxBarSize={16} radius={[3, 3, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
         </section>
 
@@ -229,7 +230,7 @@ export function GestionFinancieraTab({ period }: { period: PeriodFilter }) {
         <section className={cn(cardCls, 'xl:col-span-2')}>
           <CardTitle style={style}>Flujo de caja reportado</CardTitle>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ChartContainer width="100%" height="100%">
               <ComposedChart data={monthly} barGap={2} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid vertical={false} stroke={colors.grid} />
                 <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={8} />
@@ -248,7 +249,7 @@ export function GestionFinancieraTab({ period }: { period: PeriodFilter }) {
                 <Line dataKey="posicion" name="Posición de caja" type="linear" stroke={lineColor} strokeWidth={2}
                   dot={{ r: 3, fill: isDark ? '#1a2545' : '#ffffff', stroke: lineColor, strokeWidth: 2 }} />
               </ComposedChart>
-            </ResponsiveContainer>
+            </ChartContainer>
           </div>
           <p className={cn('text-xs mt-2', mutedCls)}>Movimientos de las cuentas de caja y bancos (disponible) en el balance de prueba.</p>
         </section>
@@ -270,6 +271,39 @@ export function GestionFinancieraTab({ period }: { period: PeriodFilter }) {
           </p>
         </section>
       </div>
+
+      {/* Estado de resultados: detalle por cuenta y por año */}
+      <h2 className={cn('text-xl font-bold font-display pt-2', titleCls)}>Estado de resultados por cuenta</h2>
+      <StatementTree statement="resultados" params={params} style={style} />
+
+      {/* Estado de situación financiera: evolución mensual y detalle por cuenta */}
+      <h2 className={cn('text-xl font-bold font-display pt-2', titleCls)}>Estado de situación financiera</h2>
+      <section className={cardCls}>
+        <CardTitle style={style}>Evolución mensual del activo, el pasivo y el patrimonio</CardTitle>
+        <div className="h-72">
+          <ChartContainer width="100%" height="100%">
+            <BarChart data={monthly} barGap={2} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke={colors.grid} />
+              <XAxis dataKey="label" {...axisProps} interval="preserveStartEnd" minTickGap={8} />
+              <YAxis {...axisProps} tickFormatter={fmtCompact} width={64} />
+              <Tooltip
+                cursor={{ fill: colors.grid }}
+                content={<ChartTooltip isDark={isDark} isInternal={isInternal} rows={[
+                  { key: 'activo', label: 'Activo', color: colors.facturado },
+                  { key: 'pasivo', label: 'Pasivo', color: costosColor },
+                  { key: 'patrimonio', label: 'Patrimonio', color: colors.notas },
+                ]} />}
+              />
+              {legend}
+              <Bar dataKey="activo" name="Activo" fill={colors.facturado} maxBarSize={16} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="pasivo" name="Pasivo" fill={costosColor} maxBarSize={16} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="patrimonio" name="Patrimonio" fill={colors.notas} maxBarSize={16} radius={[3, 3, 0, 0]} />
+            </BarChart>
+          </ChartContainer>
+        </div>
+        <p className={cn('text-xs mt-2', mutedCls)}>Saldos al cierre de cada mes (pasivo y patrimonio en valor positivo para compararlos).</p>
+      </section>
+      <StatementTree statement="situacion" params={params} style={style} />
 
       <p className={cn('text-xs flex items-center gap-1.5', mutedCls)}>
         <Landmark className="w-3.5 h-3.5" /> Información del balance de prueba importado desde Siigo.

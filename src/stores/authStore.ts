@@ -36,8 +36,14 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email, password) => {
         const { data } = await http.post('/auth/login', { email, password })
-        const meRes = await http.get('/auth/me')
-        set({ user: { ...data.user, ...meRes.data } })
+        try {
+          const meRes = await http.get('/auth/me')
+          set({ user: { ...data.user, ...meRes.data } })
+        } catch (e) {
+          // Credenciales válidas pero sin acceso (usuario o empresa inactiva): no dejar la sesión abierta
+          await http.post('/auth/logout').catch(() => {})
+          throw e
+        }
       },
 
       refresh: () => {

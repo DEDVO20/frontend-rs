@@ -1,3 +1,4 @@
+import { queryKeys } from '@/lib/queryKeys'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { AlertTriangle, BookOpen, PlugZap } from 'lucide-react'
@@ -37,7 +38,7 @@ export interface SiigoBooksInfo {
 
 export function useSiigoConnections(enabled = true) {
   return useQuery<SiigoConnection[]>({
-    queryKey: ['siigo-connections'],
+    queryKey: queryKeys.siigoConnections,
     queryFn: async () => (await api.get('/api/siigo/connections')).data,
     enabled,
     staleTime: 60_000,

@@ -11,6 +11,7 @@ import {
   Building2, Search, Plus, Eye, Pencil, Trash2, X,
   CheckCircle2, FileText, LayoutGrid, ListTodo, Activity,
   FileSignature, Upload, Download, Handshake, Info, Calendar, PlugZap,
+  Mail, UserPlus, Users, RotateCw, Power,
 } from 'lucide-react'
 import { SiigoConnectionPanel } from '@/pages/siigo/SiigoConnectionPanel'
 import { HubspotConnectionPanel } from '@/pages/siigo/HubspotConnectionPanel'
@@ -27,10 +28,15 @@ const STATUS_MAP: Record<string, { label: string; cls: string }> = {
   active: { label: 'Activa', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   activa: { label: 'Activa', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   approved: { label: 'Activa', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  inactive: { label: 'Inactiva', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  inactive: { label: 'Inactiva', cls: 'bg-red-50 text-red-600 border-red-200' },
+  inactiva: { label: 'Inactiva', cls: 'bg-red-50 text-red-600 border-red-200' },
   nueva: { label: 'Nueva', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
   new: { label: 'Nueva', cls: 'bg-amber-100 text-amber-700 border-amber-200' },
 }
+
+// La inactivación manda sobre el estado del onboarding (una empresa aprobada puede inactivarse)
+const companyBadge = (c: { status?: string; onboarding_status?: string }) =>
+  STATUS_MAP[c.status === 'inactive' || c.status === 'inactiva' ? 'inactive' : (c.onboarding_status ?? c.status ?? '')] ?? STATUS_MAP['nueva']!
 
 const isActive = (s: string) => s === 'active' || s === 'activa' || s === 'approved'
 const isNew = (s: string) => s === 'new' || s === 'nueva'
@@ -80,6 +86,10 @@ function NewCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreate
     contact: '', cargo: '', email: '', phone: '', asesor: '', status: 'nueva', notes: '',
   })
   const [selectedServices, setSelectedServices] = useState<string[]>([])
+  // Invitar al contacto principal como dueño (client_owner) al crear la empresa
+  const [inviteOwner, setInviteOwner] = useState(true)
+  const ownerEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+  const ownerReady = form.contact.trim().length >= 2 && ownerEmailValid
 
   const { data: allServices } = useQuery({
     queryKey: ['all-services'],
@@ -102,12 +112,26 @@ function NewCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreate
           api.post(`/api/company-services/${company.id}`, { service_id: serviceId })
         )
       )
-      return company
+
+      // La empresa ya existe: si la invitación falla se avisa, pero no se revierte
+      let inviteError: string | null = null
+      if (inviteOwner) {
+        try {
+          await api.post(`/api/companies/${company.id}/invite`, {
+            email: form.email.trim(), full_name: form.contact.trim(), role: 'client_owner',
+          })
+        } catch (e: any) {
+          inviteError = e.response?.data?.error ?? 'Error al enviar la invitación'
+        }
+      }
+      return { company, inviteError }
     },
-    onSuccess: (data) => {
-      toast.success('Empresa creada exitosamente')
+    onSuccess: ({ company, inviteError }) => {
+      if (!inviteOwner) toast.success('Empresa creada exitosamente')
+      else if (inviteError) toast.warning(`Empresa creada, pero no se envió la invitación: ${inviteError}. Puedes reintentarla desde el detalle.`)
+      else toast.success(`Empresa creada. Invitación enviada a ${form.email.trim()}`)
       qc.invalidateQueries({ queryKey: ['companies'] })
-      onCreated(data.id)
+      onCreated(company.id)
       onClose()
     },
     onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al crear empresa'),
@@ -196,6 +220,26 @@ function NewCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreate
                     placeholder="+57 300 000 0000" className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500" />
                 </Field>
               </div>
+
+              <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${inviteOwner ? 'border-primary-300 bg-primary-50' : 'border-slate-200 bg-white'}`}>
+                <input
+                  type="checkbox"
+                  checked={inviteOwner}
+                  onChange={e => setInviteOwner(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-primary-600"
+                />
+                <span className="text-sm">
+                  <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <Mail className="w-4 h-4 text-primary-600" /> Invitar al contacto como dueño de la empresa
+                  </span>
+                  <span className="block text-xs text-slate-500 mt-0.5">
+                    Recibirá un correo para crear su contraseña y entrar al portal como administrador de la empresa.
+                  </span>
+                  {inviteOwner && !ownerReady && (
+                    <span className="block text-xs text-amber-600 mt-1">Completa el nombre y un email válido del contacto.</span>
+                  )}
+                </span>
+              </label>
             </div>
           </fieldset>
 
@@ -261,13 +305,238 @@ function NewCompanyModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <Button
             onClick={() => createMut.mutate()}
             loading={createMut.isPending}
-            disabled={!form.name.trim()}
+            disabled={!form.name.trim() || (inviteOwner && !ownerReady)}
           >
-            Crear empresa →
+            {inviteOwner ? 'Crear e invitar →' : 'Crear empresa →'}
           </Button>
         </div>
       </div>
     </>
+  )
+}
+
+// ── Inactivación de empresa ──────────────────────────────────────────────────
+
+const isInactive = (s?: string | null) => s === 'inactive' || s === 'inactiva'
+
+function InactivateCompanyModal({ company, onClose }: { company: any; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [reason, setReason] = useState('')
+
+  const mut = useMutation({
+    mutationFn: async () =>
+      (await api.post(`/api/companies/${company.id}/inactivate`, reason.trim() ? { reason: reason.trim() } : {})).data,
+    onSuccess: (data) => {
+      const n = data?.cancelled_invitations ?? 0
+      toast.success(`Empresa inactivada${n ? ` · ${n} invitación(es) pendiente(s) cancelada(s)` : ''}`)
+      qc.invalidateQueries({ queryKey: ['companies'] })
+      qc.invalidateQueries({ queryKey: ['company-detail', company.id] })
+      qc.invalidateQueries({ queryKey: ['company-invitations', company.id] })
+      onClose()
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al inactivar la empresa'),
+  })
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div className="flex items-start gap-3 px-6 py-5 border-b border-slate-100">
+            <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+              <Power className="w-5 h-5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-slate-900">Inactivar {company.name}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Puedes reactivarla en cualquier momento.</p>
+            </div>
+            <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            <ul className="text-sm text-slate-600 space-y-1.5 list-disc pl-5">
+              <li>Sus usuarios <strong>pierden el acceso al portal</strong> de inmediato.</li>
+              <li>Se cancelan las invitaciones pendientes.</li>
+              <li>Deja de generar tareas automáticas y de sincronizar Siigo y HubSpot.</li>
+              <li>No se borra nada: datos, documentos e historial se conservan.</li>
+            </ul>
+            <Field label="Motivo (opcional)">
+              <textarea
+                rows={3}
+                maxLength={500}
+                value={reason}
+                onChange={e => setReason(e.target.value)}
+                placeholder="Ej: Terminó el contrato, mora, solicitud del cliente…"
+                className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+            </Field>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+            <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+            <Button variant="danger" onClick={() => mut.mutate()} loading={mut.isPending}>
+              <Power className="w-4 h-4" /> Inactivar empresa
+            </Button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Usuarios de la empresa e invitaciones ────────────────────────────────────
+
+const CLIENT_ROLE_LABEL: Record<string, string> = {
+  client_owner: 'Dueño',
+  client_user:  'Usuario',
+}
+
+type PendingInvite = { email: string; full_name: string | null; role: string; expires_at: string }
+
+function CompanyUsersPanel({ company }: { company: any }) {
+  const qc = useQueryClient()
+  const [inviting, setInviting] = useState<null | { email: string; full_name: string; role: string }>(null)
+  const members: any[] = company.profiles ?? []
+  const hasOwner = members.some(m => m.role === 'client_owner' && m.active)
+  const inactive = isInactive(company.status)
+
+  const { data: pending = [] } = useQuery<PendingInvite[]>({
+    queryKey: ['company-invitations', company.id],
+    queryFn: async () => (await api.get(`/api/companies/${company.id}/invitations`)).data,
+  })
+
+  const inviteMut = useMutation({
+    mutationFn: async (body: { email: string; full_name: string; role: string }) =>
+      (await api.post(`/api/companies/${company.id}/invite`, {
+        email: body.email.trim(),
+        role: body.role,
+        ...(body.full_name.trim() ? { full_name: body.full_name.trim() } : {}),
+      })).data,
+    onSuccess: (_d, body) => {
+      toast.success(`Invitación enviada a ${body.email.trim()}`)
+      qc.invalidateQueries({ queryKey: ['company-invitations', company.id] })
+      setInviting(null)
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al enviar la invitación'),
+  })
+
+  const openInvite = () => setInviting(
+    hasOwner || pending.some(p => p.role === 'client_owner')
+      ? { email: '', full_name: '', role: 'client_user' }
+      : { email: company.email ?? '', full_name: company.contact ?? '', role: 'client_owner' },
+  )
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Users className="w-4 h-4 text-slate-400" /> Usuarios de la empresa
+        </h3>
+        <Button size="sm" onClick={openInvite} disabled={inactive} title={inactive ? 'Reactiva la empresa para invitar usuarios' : undefined}>
+          <UserPlus className="w-4 h-4" /> Invitar usuario
+        </Button>
+      </div>
+
+      {!inactive && !hasOwner && !pending.some(p => p.role === 'client_owner') && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" />
+          Esta empresa aún no tiene dueño con acceso al portal. Invítalo para que pueda entrar.
+        </div>
+      )}
+
+      <div className="divide-y divide-slate-100">
+        {members.map(m => (
+          <div key={m.id} className="flex items-center justify-between py-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-900 truncate">{m.full_name || m.email}</p>
+              <p className="text-xs text-slate-400 truncate">{m.email}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                {CLIENT_ROLE_LABEL[m.role] ?? m.role}
+              </span>
+              {!m.active && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-600">Inactivo</span>}
+            </div>
+          </div>
+        ))}
+
+        {pending.map(p => (
+          <div key={p.email} className="flex items-center justify-between py-2.5">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-900 truncate">{p.full_name || p.email}</p>
+              <p className="text-xs text-slate-400 truncate">{p.email} · vence {fmtDate(p.expires_at)}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                {CLIENT_ROLE_LABEL[p.role] ?? p.role}
+              </span>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Invitación pendiente</span>
+              <button
+                type="button"
+                title="Reenviar invitación"
+                disabled={inviteMut.isPending}
+                onClick={() => inviteMut.mutate({ email: p.email, full_name: p.full_name ?? '', role: p.role })}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-primary-600 hover:bg-slate-100 disabled:opacity-50"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {members.length === 0 && pending.length === 0 && (
+          <p className="text-sm text-slate-400 text-center py-6">Sin usuarios ni invitaciones</p>
+        )}
+      </div>
+
+      {inviting && (
+        <>
+          <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-sm" onClick={() => setInviting(null)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+              <div className="flex items-start justify-between px-6 py-5 border-b border-slate-100">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">Invitar a {company.name}</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">Recibirá un correo para crear su contraseña (vence en 7 días).</p>
+                </div>
+                <button onClick={() => setInviting(null)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <Field label="Nombre completo">
+                  <input value={inviting.full_name} onChange={e => setInviting({ ...inviting, full_name: e.target.value })}
+                    placeholder="Jorge Rodríguez" className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </Field>
+                <Field label="Correo electrónico" required>
+                  <input type="email" value={inviting.email} onChange={e => setInviting({ ...inviting, email: e.target.value })}
+                    placeholder="contacto@empresa.co" className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </Field>
+                <Field label="Rol">
+                  <select value={inviting.role} onChange={e => setInviting({ ...inviting, role: e.target.value })}
+                    className="w-full mt-1 text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    <option value="client_owner">Dueño — administra la empresa y su equipo</option>
+                    <option value="client_user">Usuario — acceso a la información de la empresa</option>
+                  </select>
+                </Field>
+              </div>
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+                <Button variant="secondary" onClick={() => setInviting(null)}>Cancelar</Button>
+                <Button
+                  onClick={() => inviteMut.mutate(inviting)}
+                  loading={inviteMut.isPending}
+                  disabled={!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviting.email.trim())}
+                >
+                  <Mail className="w-4 h-4" /> Enviar invitación
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -1011,6 +1280,19 @@ export function CompaniesPage() {
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Record<string, string>>({})
   const [showNew, setShowNew] = useState(false)
+  const [showInactivate, setShowInactivate] = useState(false)
+  const confirm = useConfirm()
+  const canManageStatus = ['admin', 'rs_admin'].includes(user?.role ?? '')
+
+  const reactivateMut = useMutation({
+    mutationFn: async () => (await api.post(`/api/companies/${selectedId}/reactivate`)).data,
+    onSuccess: () => {
+      toast.success('Empresa reactivada')
+      qc.invalidateQueries({ queryKey: ['companies'] })
+      qc.invalidateQueries({ queryKey: ['company-detail', selectedId] })
+    },
+    onError: (e: any) => toast.error(e.response?.data?.error ?? 'Error al reactivar la empresa'),
+  })
 
   // List
   const { data: listData, isLoading } = useQuery({
@@ -1156,7 +1438,7 @@ export function CompaniesPage() {
             {isLoading ? (
               <div className="py-10 flex justify-center"><PageLoader /></div>
             ) : filtered.map((c: any) => {
-              const st = STATUS_MAP[c.onboarding_status ?? c.status] ?? STATUS_MAP['nueva']!
+              const st = companyBadge(c)
               const isSelected = selectedId === c.id
               return (
                 <button
@@ -1210,8 +1492,8 @@ export function CompaniesPage() {
                     <h2 className="text-xl font-bold text-slate-900">{co.name ?? co.legal_name}</h2>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs text-slate-400">NIT: {co.nit ?? '—'}</span>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${(STATUS_MAP[co.onboarding_status ?? co.status] ?? STATUS_MAP['nueva']!).cls}`}>
-                        • {(STATUS_MAP[co.onboarding_status ?? co.status] ?? STATUS_MAP['nueva']!).label}
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${companyBadge(co).cls}`}>
+                        • {companyBadge(co).label}
                       </span>
                       {co.city && <span className="text-xs text-slate-400">📍 {co.city}</span>}
                     </div>
@@ -1224,36 +1506,43 @@ export function CompaniesPage() {
                   <Button size="sm" variant="secondary">
                     <Eye className="w-3.5 h-3.5" /> Portal
                   </Button>
-                  <div className="relative group">
-                    <button
-                      onClick={() => {
-                        toast(
-                          `¿Desactivar la empresa "${co.name}"?`,
-                          {
-                            description: 'La empresa quedará inactiva y no podrá acceder a la plataforma.',
-                            action: {
-                              label: 'Desactivar',
-                              onClick: () => {
-                                api.patch(`/api/companies/${selectedId}`, { status: 'inactive' })
-                                  .then(() => { toast.success('Empresa desactivada correctamente'); qc.invalidateQueries({ queryKey: ['companies'] }); setSelectedId(null) })
-                                  .catch((e: any) => toast.error(e.response?.data?.error ?? 'Error al desactivar'))
-                              },
-                            },
-                            cancel: { label: 'Cancelar', onClick: () => { } },
-                            duration: 10000,
-                          },
-                        )
-                      }}
-                      className="p-2 rounded-lg border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs font-medium text-white bg-slate-800 rounded-md whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                      Eliminar empresa
-                    </span>
-                  </div>
+                  {canManageStatus && (
+                    isInactive(co.status) ? (
+                      <Button size="sm" variant="secondary" loading={reactivateMut.isPending} onClick={() => confirm({
+                        title: `¿Reactivar ${co.name}?`,
+                        description: 'Sus usuarios recuperarán el acceso al portal y volverá a generar tareas y sincronizar Siigo/HubSpot. Las invitaciones canceladas deben enviarse de nuevo.',
+                        type: 'info',
+                        confirmLabel: 'Reactivar',
+                        onConfirm: () => reactivateMut.mutateAsync(),
+                      })}>
+                        <Power className="w-3.5 h-3.5" /> Reactivar
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="secondary" onClick={() => setShowInactivate(true)}
+                        className="text-red-600 hover:text-red-700 hover:border-red-200">
+                        <Power className="w-3.5 h-3.5" /> Inactivar
+                      </Button>
+                    )
+                  )}
                 </div>
               </div>
+
+              {isInactive(co.status) && (
+                <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                  <Power className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                  <div className="text-sm text-red-800">
+                    <p className="font-semibold">
+                      Empresa inactiva{co.inactivated_at ? ` desde el ${fmtDate(co.inactivated_at)}` : ''}
+                    </p>
+                    <p className="text-red-700/80 text-xs mt-0.5">
+                      {co.inactivation_reason ? `Motivo: ${co.inactivation_reason}. ` : ''}
+                      Sus usuarios no pueden entrar al portal y no se generan tareas ni sincronizaciones.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {showInactivate && <InactivateCompanyModal company={co} onClose={() => setShowInactivate(false)} />}
 
               {/* Tabs */}
               <div className="flex gap-1 border-b border-slate-200">
@@ -1367,6 +1656,8 @@ export function CompaniesPage() {
                       </>
                     )}
                   </div>
+
+                  <CompanyUsersPanel company={co} />
 
                   {/* KPI cards */}
                   <div className="grid grid-cols-3 gap-4">

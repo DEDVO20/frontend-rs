@@ -1,3 +1,4 @@
+import { queryKeys } from '@/lib/queryKeys'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -94,7 +95,7 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
   }
 
   const { data: companiesRes } = useQuery({
-    queryKey: ['companies-siigo-selector'],
+    queryKey: queryKeys.siigoCompanies,
     queryFn: async () => (await api.get('/api/companies?limit=100')).data,
     enabled: isInternal,
     staleTime: 120_000,
@@ -102,7 +103,7 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
   const companies: any[] = Array.isArray(companiesRes) ? companiesRes : (companiesRes?.data ?? [])
 
   const { data, isLoading, isFetching } = useQuery<CollectionsResponse>({
-    queryKey: ['siigo-collections', params],
+    queryKey: [...queryKeys.siigoCollections, params],
     queryFn: async () => (await api.get('/api/siigo/collections', { params })).data,
     staleTime: 30_000,
     // Mientras corre una sincronización en segundo plano se consulta su estado
@@ -126,7 +127,7 @@ export function SiigoCollectionsPanel({ canSync }: { canSync: boolean }) {
         ? `Importación de ${months.length} mes(es) de ${monthsYear} iniciada en segundo plano. Te avisaremos cuando termine.`
         : 'Sincronización de recaudo iniciada en segundo plano. Puedes seguir trabajando: te avisaremos cuando termine.')
       if (byMonths) { setShowMonths(false); setMonths([]) }
-      qc.invalidateQueries({ queryKey: ['siigo-collections'] })
+      qc.invalidateQueries({ queryKey: queryKeys.siigoCollections })
     },
     onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudo iniciar la sincronización de recaudo'),
   })

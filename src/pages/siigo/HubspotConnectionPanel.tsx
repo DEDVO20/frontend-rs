@@ -1,3 +1,4 @@
+import { queryKeys } from '@/lib/queryKeys'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -33,7 +34,7 @@ export function HubspotConnectionPanel({ companyId }: { companyId: string }) {
   const startWatching = useSiigoSyncStore(s => s.start)
 
   const { data: conn, isLoading } = useQuery<HubspotConnection | null>({
-    queryKey: ['hubspot-connection', companyId],
+    queryKey: [...queryKeys.hubspotConnection, companyId],
     queryFn: async () => (await api.get(`/api/hubspot/connections/company/${companyId}`)).data,
   })
 
@@ -46,8 +47,8 @@ export function HubspotConnectionPanel({ companyId }: { companyId: string }) {
   }, [conn])
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['hubspot-connection', companyId] })
-    qc.invalidateQueries({ queryKey: ['hubspot-report'] })
+    qc.invalidateQueries({ queryKey: [...queryKeys.hubspotConnection, companyId] })
+    qc.invalidateQueries({ queryKey: queryKeys.hubspotReport })
   }
 
   const saveMut = useMutation({

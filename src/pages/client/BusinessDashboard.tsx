@@ -1,6 +1,8 @@
+import { useCollectionsReport, useCrmReport, useReceivablesReport, useSalesReport } from '@/features/siigo/reports'
+import { ChartContainer } from '@/components/ui/ChartContainer'
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, LabelList, XAxis, YAxis } from 'recharts'
 import { AlertTriangle, BellRing, CalendarCheck, FileText, Mail, Users, Wallet } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PageLoader } from '@/components/ui/Spinner'
@@ -11,14 +13,10 @@ import {
   PeriodFilterBar,
   RecaudoCharts,
   useChartStyle,
-  useCollectionsReport,
-  useCrmReport,
-  useReceivablesReport,
-  useSalesReport,
   type ChartProps,
   type ChartStyle,
   type PeriodFilter,
-} from '@/pages/siigo/SiigoChartsPage'
+} from '@/features/charts'
 import { SiigoNotConnected } from '@/pages/siigo/siigoBooks'
 
 const compact = new Intl.NumberFormat('es-CO', { notation: 'compact', maximumFractionDigits: 1 })
@@ -92,7 +90,7 @@ function FunnelChart({ params, style }: { params: Record<string, string>; style:
           : !stages.length ? <p className={cn('text-sm py-12 text-center', mutedCls)}>Sin negocios en el periodo seleccionado.</p>
             : (
               <div style={{ height: Math.max(160, stages.length * 44) }}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer width="100%" height="100%">
                   <BarChart data={stages} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                     <XAxis type="number" hide />
                     <YAxis type="category" dataKey="name" width={130} tickLine={false} axisLine={false} tick={{ fill: colors.axis, fontSize: 12 }} />
@@ -100,7 +98,7 @@ function FunnelChart({ params, style }: { params: Record<string, string>; style:
                       <LabelList dataKey="deals" position="insideRight" style={{ fill: '#ffffff', fontSize: 12, fontWeight: 700 }} />
                     </Bar>
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </div>
             )}
     </section>

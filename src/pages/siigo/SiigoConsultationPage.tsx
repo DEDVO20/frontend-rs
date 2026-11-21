@@ -1,3 +1,4 @@
+import { queryKeys } from '@/lib/queryKeys'
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -164,7 +165,7 @@ export function SiigoConsultationPage() {
 
   // Listado de empresas registradas (para filtro interno)
   const { data: companiesRes } = useQuery({
-    queryKey: ['companies-siigo-selector'],
+    queryKey: queryKeys.siigoCompanies,
     queryFn: async () => {
       const { data } = await api.get('/api/companies?limit=100')
       return data
@@ -189,7 +190,7 @@ export function SiigoConsultationPage() {
   }
 
   const { data, isLoading, isFetching, refetch } = useQuery<SiigoSalesResponse>({
-    queryKey: ['siigo-sales', queryParams],
+    queryKey: [...queryKeys.siigoSales, queryParams],
     queryFn: async () => {
       const res = await api.get('/api/siigo/sales', { params: queryParams })
       return res.data
@@ -1041,7 +1042,7 @@ function SyncSiigoModal({
       // La sincronización sigue en el servidor; SiigoSyncWatcher avisa cuando termine
       startWatching('sales', res.connectionId, books?.label ?? 'Finto')
       toast.info('Sincronización iniciada en segundo plano. Puedes seguir trabajando: te avisaremos cuando termine.')
-      qc.invalidateQueries({ queryKey: ['siigo-sales'] })
+      qc.invalidateQueries({ queryKey: queryKeys.siigoSales })
       onSynced()
       onClose()
     },

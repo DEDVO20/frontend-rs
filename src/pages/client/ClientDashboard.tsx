@@ -5,7 +5,7 @@ import { api } from '@/lib/api'
 import { PortalTopBar } from '@/components/layout/PortalTopBar'
 import { useAuthStore } from '@/stores/authStore'
 import { cn } from '@/lib/utils'
-import { usePeriodFilter } from '@/pages/siigo/SiigoChartsPage'
+import { usePeriodFilter } from '@/features/charts'
 import { GestionNegociosTab } from './BusinessDashboard'
 import { GestionFinancieraTab } from './FinanceDashboard'
 

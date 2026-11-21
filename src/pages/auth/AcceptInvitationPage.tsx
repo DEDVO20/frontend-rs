@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import axios, { isAxiosError } from 'axios'
 const BASE = import.meta.env.VITE_API_URL || ''
 import { Button } from '@/components/ui/Button'
 import { CheckCircle2, AlertCircle, Eye, EyeOff, Lock } from 'lucide-react'
@@ -11,7 +11,9 @@ export function AcceptInvitationPage() {
   const token = params.get('token') ?? ''
 
   const [status, setStatus] = useState<'loading' | 'valid' | 'invalid' | 'success' | 'error'>('loading')
-  const [invite, setInvite] = useState<{ email: string; companyName: string; fullName: string } | null>(null)
+  const [invite, setInvite] = useState<{
+    email: string; companyName: string; fullName: string; requiresLogin: boolean
+  } | null>(null)
   const [password, setPassword] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -23,7 +25,10 @@ export function AcceptInvitationPage() {
     axios.get(`${BASE}/auth/invitations/verify?token=${token}`)
       .then(({ data }) => {
         if (data.valid) {
-          setInvite({ email: data.email, companyName: data.companyName, fullName: data.fullName ?? '' })
+          setInvite({
+            email: data.email, companyName: data.companyName,
+            fullName: data.fullName ?? '', requiresLogin: data.requiresLogin === true,
+          })
           setStatus('valid')
         } else {
           setStatus('invalid')
@@ -34,22 +39,31 @@ export function AcceptInvitationPage() {
 
   const pwMatch = password === confirmPw
   const pwValid = password.length >= 6
-  const canSubmit = pwValid && pwMatch && !submitting
+  const canSubmit = pwValid && (invite?.requiresLogin || pwMatch) && !submitting
 
   const handleSubmit = async () => {
     if (!canSubmit || !invite) return
     setSubmitting(true)
     setErrorMsg('')
     try {
+      if (invite.requiresLogin) {
+        // Verifica la identidad aunque el perfil de la plataforma esté inactivo.
+        await axios.post(`${BASE}/auth/login`, { email: invite.email, password }, { withCredentials: true })
+      }
       await axios.post(`${BASE}/auth/invitations/accept`, {
         token,
         email: invite.email,
-        password,
+        ...(invite.requiresLogin ? {} : { password }),
         fullName: invite.fullName,
-      })
+      }, { withCredentials: true })
       setStatus('success')
-    } catch (e: any) {
-      setErrorMsg(e.response?.data?.error ?? 'Error al crear la cuenta')
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.data?.code === 'INVITATION_LOGIN_REQUIRED') {
+        setInvite({ ...invite, requiresLogin: true })
+        setPassword('')
+      }
+      const message = isAxiosError(error) ? error.response?.data?.error : undefined
+      setErrorMsg(message ?? 'Error al aceptar la invitación')
       setStatus('error')
     } finally {
       setSubmitting(false)
@@ -101,7 +115,7 @@ export function AcceptInvitationPage() {
               <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
                 <CheckCircle2 className="w-6 h-6 text-emerald-500" />
               </div>
-              <h2 className="text-lg font-bold text-slate-900">¡Cuenta creada!</h2>
+              <h2 className="text-lg font-bold text-slate-900">{invite?.requiresLogin ? 'Invitación aceptada' : '¡Cuenta creada!'}</h2>
               <p className="text-sm text-slate-500 mt-2">
                 Tu cuenta ha sido configurada exitosamente. Ya puedes iniciar sesión.
               </p>
@@ -115,10 +129,11 @@ export function AcceptInvitationPage() {
           {(status === 'valid' || status === 'error') && invite && (
             <div>
               <div className="px-6 pt-6 pb-4">
-                <h2 className="text-lg font-bold text-slate-900">Crear tu cuenta</h2>
+              <h2 className="text-lg font-bold text-slate-900">{invite.requiresLogin ? 'Vincula tu cuenta' : 'Crear tu cuenta'}</h2>
                 <p className="text-sm text-slate-400 mt-1">
                   Has sido invitado a unirte a <strong className="text-slate-700">{invite.companyName || 'Finto'}</strong>
                 </p>
+              {invite.requiresLogin && <p className="text-sm text-slate-600 mt-2">Ingresa la contraseña de tu cuenta para aceptar la invitación.</p>}
               </div>
 
               <div className="px-6 pb-6 space-y-4">
@@ -150,7 +165,8 @@ export function AcceptInvitationPage() {
                       type={showPw ? 'text' : 'password'}
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder={invite.requiresLogin ? 'Tu contraseña actual' : 'Mínimo 6 caracteres'}
+                      autoComplete={invite.requiresLogin ? 'current-password' : 'new-password'}
                       className="w-full pl-10 pr-10 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                     <button
@@ -161,13 +177,13 @@ export function AcceptInvitationPage() {
                       {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                  {password && !pwValid && (
+                  {!invite.requiresLogin && password && !pwValid && (
                     <p className="text-xs text-red-500 mt-1">La contraseña debe tener al menos 6 caracteres</p>
                   )}
                 </div>
 
                 {/* Confirm password */}
-                <div>
+                {!invite.requiresLogin && <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Confirmar contraseña *</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -182,7 +198,7 @@ export function AcceptInvitationPage() {
                   {confirmPw && !pwMatch && (
                     <p className="text-xs text-red-500 mt-1">Las contraseñas no coinciden</p>
                   )}
-                </div>
+                </div>}
 
                 {/* Error */}
                 {errorMsg && (
@@ -200,7 +216,7 @@ export function AcceptInvitationPage() {
                   loading={submitting}
                   disabled={!canSubmit}
                 >
-                  Crear mi cuenta →
+                  {invite.requiresLogin ? 'Iniciar sesión y aceptar →' : 'Crear mi cuenta →'}
                 </Button>
               </div>
             </div>

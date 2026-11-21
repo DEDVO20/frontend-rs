@@ -2,16 +2,17 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from '@/lib/api'
+import { syncQueryKeys } from '@/lib/queryKeys'
 import { useSiigoSyncStore, type SiigoSyncKind, type WatchedSync } from '@/stores/siigoSyncStore'
 
 const POLL_MS = 10_000
 
-const SOURCES: Record<SiigoSyncKind, { url: string; queryKeys: string[][] }> = {
-  sales:        { url: '/api/siigo/sync-logs',               queryKeys: [['siigo-sales'], ['siigo-report']] },
-  collections:  { url: '/api/siigo/collections/sync-logs',   queryKeys: [['siigo-collections'], ['siigo-collections-report']] },
-  trialBalance: { url: '/api/siigo/trial-balance/sync-logs', queryKeys: [['siigo-trial-balance'], ['siigo-trial-balance-report']] },
-  receivables:  { url: '/api/siigo/receivables/sync-logs',   queryKeys: [['siigo-receivables'], ['siigo-receivables-report']] },
-  hubspot:      { url: '/api/hubspot/sync-logs',              queryKeys: [['hubspot-report']] },
+const syncLogUrls: Record<SiigoSyncKind, string> = {
+  sales: '/api/siigo/sync-logs',
+  collections: '/api/siigo/collections/sync-logs',
+  trialBalance: '/api/siigo/trial-balance/sync-logs',
+  receivables: '/api/siigo/receivables/sync-logs',
+  hubspot: '/api/hubspot/sync-logs',
 }
 
 function successMessage(w: WatchedSync, log: any): string {
@@ -51,7 +52,7 @@ export function SiigoSyncWatcher() {
         const w = watching[key]
         if (!w) continue
         try {
-          const { data } = await api.get(SOURCES[w.kind].url, { params: { connectionId: w.connectionId } })
+          const { data } = await api.get(syncLogUrls[w.kind], { params: { connectionId: w.connectionId } })
           if (cancelled || data?.isSyncRunning) continue
 
           const startedAt = new Date(w.startedAt).getTime()
@@ -64,7 +65,7 @@ export function SiigoSyncWatcher() {
           }
 
           finish(key)
-          for (const qk of SOURCES[w.kind].queryKeys) qc.invalidateQueries({ queryKey: qk })
+          for (const queryKey of syncQueryKeys[w.kind]) void qc.invalidateQueries({ queryKey })
         } catch (err: any) {
           // La conexión ya no existe: dejar de vigilarla. Otros errores son transitorios.
           if (err?.response?.status === 404) finish(key)

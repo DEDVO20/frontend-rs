@@ -1,3 +1,4 @@
+import { queryKeys } from '@/lib/queryKeys'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -21,7 +22,7 @@ export function SiigoConnectionPanel({ companyId }: { companyId: string }) {
   const canEdit = ['admin', 'rs_admin'].includes(role)
 
   const { data: conn, isLoading } = useQuery<SiigoConnection | null>({
-    queryKey: ['siigo-connection', companyId],
+    queryKey: [...queryKeys.siigoConnection, companyId],
     queryFn: async () => (await api.get(`/api/siigo/connections/company/${companyId}`)).data,
   })
 
@@ -44,8 +45,8 @@ export function SiigoConnectionPanel({ companyId }: { companyId: string }) {
   }, [conn])
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['siigo-connection', companyId] })
-    qc.invalidateQueries({ queryKey: ['siigo-connections'] })
+    qc.invalidateQueries({ queryKey: [...queryKeys.siigoConnection, companyId] })
+    qc.invalidateQueries({ queryKey: queryKeys.siigoConnections })
   }
 
   const saveMut = useMutation({

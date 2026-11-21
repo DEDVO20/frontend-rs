@@ -145,6 +145,7 @@ export function RegisterCompanyPage() {
       }
       const { data: draft } = await api.post('/api/onboarding', payload)
       const id = draft.id as string
+      const draftRequest = { headers: { Authorization: `Onboarding ${draft.draft_token}` } }
 
       // 2. Subir documentos KYC
       const uploadKyc = async (file: File, doc_type: string) => {
@@ -152,7 +153,7 @@ export function RegisterCompanyPage() {
         fd.append('file', file)
         fd.append('doc_type', doc_type)
         try {
-          await api.post(`/api/onboarding/${id}/kyc/documents`, fd)
+          await api.post(`/api/onboarding/${id}/kyc/documents`, fd, draftRequest)
         } catch (err: any) {
           const msg = err?.response?.data?.error ?? err?.message ?? 'Error desconocido'
           throw new Error(`Error al subir "${file.name}": ${msg}`)
@@ -198,7 +199,7 @@ export function RegisterCompanyPage() {
         }))
       }
       try {
-        await api.post(`/api/onboarding/${id}/policies`, { policies: policyPayload })
+        await api.post(`/api/onboarding/${id}/policies`, { policies: policyPayload }, draftRequest)
       } catch (err: any) {
         // Si falla la aceptación de políticas (ej: policy_version_id inválido), continuamos
         // El equipo puede registrarlas manualmente
@@ -206,7 +207,7 @@ export function RegisterCompanyPage() {
 
       // 5. Enviar a revisión
       try {
-        const { data } = await api.post(`/api/onboarding/${id}/submit`)
+        const { data } = await api.post(`/api/onboarding/${id}/submit`, undefined, draftRequest)
         return data
       } catch (err: any) {
         const msg = err?.response?.data?.error ?? err?.message ?? 'Error al enviar la solicitud'

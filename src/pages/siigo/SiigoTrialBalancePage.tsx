@@ -1,3 +1,4 @@
+import { queryKeys } from '@/lib/queryKeys'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -95,7 +96,7 @@ export function SiigoTrialBalancePage() {
   }
 
   const { data, isLoading, isFetching } = useQuery<TrialBalanceResponse>({
-    queryKey: ['siigo-trial-balance', params],
+    queryKey: [...queryKeys.siigoTrialBalance, params],
     queryFn: async () => (await api.get('/api/siigo/trial-balance', { params })).data,
     staleTime: 30_000,
     refetchInterval: q => (q.state.data?.isSyncRunning ? 10_000 : false),
@@ -128,7 +129,7 @@ export function SiigoTrialBalancePage() {
             : 'Actualización del mes actual iniciada en segundo plano. Te avisaremos cuando termine.',
       )
       if (mode === 'months') { setShowPicker(false); setImportMonths([]) }
-      qc.invalidateQueries({ queryKey: ['siigo-trial-balance'] })
+      qc.invalidateQueries({ queryKey: queryKeys.siigoTrialBalance })
     },
     onError: (err: any) => toast.error(err.response?.data?.error ?? 'No se pudo iniciar la importación del balance'),
   })
