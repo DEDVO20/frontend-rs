@@ -1319,7 +1319,7 @@ export function CompaniesPage() {
   const activeCount = allCompanies.filter(c => isActive(c.status ?? '')).length
 
   // Detail
-  const { data: detail, isLoading: detailLoading } = useQuery({
+  const { data: detail, isLoading: detailLoading, error: detailErr, refetch: refetchDetail } = useQuery({
     queryKey: ['company-detail', selectedId],
     queryFn: async () => {
       const { data } = await api.get(`/api/companies/${selectedId}`)
@@ -1770,7 +1770,16 @@ export function CompaniesPage() {
                 </div>
               )}
             </div>
-          ) : null}
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center max-w-sm space-y-3">
+                <Building2 className="w-12 h-12 mx-auto text-slate-300" />
+                <p className="text-sm font-medium text-slate-700">No se pudo cargar la empresa</p>
+                <p className="text-xs text-slate-400 break-words">{(detailErr as any)?.response?.data?.error ?? detailErr?.message ?? 'Error desconocido'}</p>
+                <Button size="sm" variant="secondary" onClick={() => refetchDetail()}>Reintentar</Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
