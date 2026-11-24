@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, ArrowUp, Menu, X, Search, Settings2, FileText, BarChart3, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { FintoLogo } from '@/components/ui/FintoLogo'
+import { usePageMeta } from '@/lib/usePageMeta'
 import { FintoIcon, type FintoIconName } from '@/components/ui/FintoIcon'
 import { BlogSection } from '@/components/blog/BlogSection'
 import { ContactFormModal } from '@/components/ui/ContactFormModal'
@@ -76,6 +77,11 @@ const STATS = [
 ]
 
 export function LandingPage() {
+  usePageMeta({
+    title: 'Finto · Back office financiero y administrativo para empresas',
+    description: 'Finto centraliza la contabilidad, impuestos, tesorería, facturación, cartera y nómina de su empresa en un solo lugar, con un portal de clientes en tiempo real. Bogotá, Colombia.',
+    path: '/',
+  })
   const [mobileOpen, setMobileOpen]   = useState(false)
   const [contactOpen, setContactOpen]  = useState(false)
   const [scrolled, setScrolled]        = useState(false)

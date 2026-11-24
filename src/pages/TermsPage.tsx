@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Download, ScrollText } from 'lucide-react'
 import { FintoLogo } from '@/components/ui/FintoLogo'
+import { usePageMeta } from '@/lib/usePageMeta'
 import terms from '@/content/terms.json'
 
 interface Clause {
@@ -15,6 +16,11 @@ const clauses: Clause[] = terms.clauses
 const effectiveDate: string | null = terms.effectiveDate
 
 export function TermsPage() {
+  usePageMeta({
+    title: 'Términos y Condiciones · Finto',
+    description: 'Términos y Condiciones de los servicios empresariales de back office de Finto (RAD Services S.A.S.): contratación, obligaciones, tarifas, confidencialidad y datos personales.',
+    path: '/terminos-y-condiciones',
+  })
   return (
     <div className="min-h-screen bg-cream-50 font-sans text-navy-900 flex flex-col">
       {/* ── Top Header ────────────────────────────────────────────── */}

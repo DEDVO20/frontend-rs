@@ -2,8 +2,10 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { Home, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { usePageMeta } from '@/lib/usePageMeta'
 
 export function NotFoundPage() {
+  usePageMeta({ title: 'Página no encontrada · Finto', noindex: true })
   const nav = useNavigate()
   const isAuthenticated = useAuthStore(s => !!s.user)
   const home = isAuthenticated ?'/app/dashboard' : '/'

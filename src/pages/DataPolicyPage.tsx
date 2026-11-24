@@ -1,8 +1,14 @@
 import { Link } from 'react-router-dom'
 import { ArrowLeft, Download, ShieldCheck } from 'lucide-react'
 import { FintoLogo } from '@/components/ui/FintoLogo'
+import { usePageMeta } from '@/lib/usePageMeta'
 
 export function DataPolicyPage() {
+  usePageMeta({
+    title: 'Política de Tratamiento de Datos Personales · Finto',
+    description: 'Cómo Finto (RAD Services S.A.S.) recolecta, usa, protege y suprime datos personales conforme a la Ley 1581 de 2012, y cómo ejercer sus derechos como titular.',
+    path: '/politica-tratamiento-datos',
+  })
   return (
     <div className="min-h-screen bg-cream-50 font-sans text-navy-900 flex flex-col">
       {/* ── Top Header ────────────────────────────────────────────── */}
